@@ -10,6 +10,7 @@ data class ChatState(
     val streamingResponse: String = "",
     val streamingParentId: String? = null,
     val isGenerating: Boolean = false,
+    val preparationStatus: String? = null,
     val isDownloading: Boolean = false,
     val downloadPercent: Int? = null,
     val downloadStatus: String? = null,

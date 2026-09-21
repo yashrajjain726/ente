@@ -1,0 +1,77 @@
+[
+  {
+    "name": "unicode_and_attachment",
+    "messages": [
+      {
+        "uuid": "00000000-0000-0000-0000-000000000001",
+        "session_uuid": "00000000-0000-0000-0000-000000000064",
+        "parent_message_uuid": null,
+        "sender": "self",
+        "text": "Café🙂",
+        "attachments": [
+          {
+            "id": "file",
+            "kind": "document",
+            "name": "notes.md",
+            "size": 12
+          }
+        ]
+      },
+      {
+        "uuid": "00000000-0000-0000-0000-000000000002",
+        "session_uuid": "00000000-0000-0000-0000-000000000064",
+        "parent_message_uuid": "00000000-0000-0000-0000-000000000001",
+        "sender": "other",
+        "text": "xxxxxxxxxxxxxxxxxxxx",
+        "attachments": []
+      }
+    ],
+    "fingerprint": "711773b8c54ac4b3b13bd9f2ff6da94956549422b10a66ca105c3f775f28740e",
+    "exchange_ends": [
+      2
+    ]
+  },
+  {
+    "name": "leading_assistant_and_unanswered",
+    "messages": [
+      {
+        "uuid": "00000000-0000-0000-0000-000000000001",
+        "session_uuid": "00000000-0000-0000-0000-000000000064",
+        "parent_message_uuid": null,
+        "sender": "other",
+        "text": "Legacy prefix",
+        "attachments": []
+      },
+      {
+        "uuid": "00000000-0000-0000-0000-000000000002",
+        "session_uuid": "00000000-0000-0000-0000-000000000064",
+        "parent_message_uuid": "00000000-0000-0000-0000-000000000001",
+        "sender": "self",
+        "text": "Unanswered",
+        "attachments": []
+      },
+      {
+        "uuid": "00000000-0000-0000-0000-000000000003",
+        "session_uuid": "00000000-0000-0000-0000-000000000064",
+        "parent_message_uuid": "00000000-0000-0000-0000-000000000002",
+        "sender": "self",
+        "text": "Next",
+        "attachments": []
+      },
+      {
+        "uuid": "00000000-0000-0000-0000-000000000004",
+        "session_uuid": "00000000-0000-0000-0000-000000000064",
+        "parent_message_uuid": "00000000-0000-0000-0000-000000000003",
+        "sender": "other",
+        "text": "Partial",
+        "attachments": []
+      }
+    ],
+    "fingerprint": "08a9f5af99f0ef903ced70c105dcc0334bde0412eb9b26fbe5128159dc6e0b25",
+    "exchange_ends": [
+      1,
+      2,
+      4
+    ]
+  }
+]

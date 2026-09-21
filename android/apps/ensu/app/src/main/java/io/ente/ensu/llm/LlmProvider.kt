@@ -146,27 +146,13 @@ class LlmProvider(
                 } else {
                     assetStore.llmMmprojPath(chatAsset(selection))?.absolutePath
                 }
-            val clampedTemperature = temperature.coerceIn(0.35f, 0.7f)
-
             val request =
-                LlmChatRequest(
-                    messages =
-                        messages.map { msg -> NativeChatMessage(msg.roleString(), msg.text) },
-                    templateOverride = null,
-                    addAssistant = true,
-                    imagePaths = imageFiles.map { it.absolutePath },
-                    mmprojPath = mmprojPath,
-                    mediaMarker = null,
-                    maxTokens = maxTokens,
-                    temperature = clampedTemperature,
-                    topP = 0.9f,
-                    topK = 50,
-                    repeatPenalty = 1.18f,
-                    frequencyPenalty = 0f,
-                    presencePenalty = 0f,
-                    seed = null,
-                    stopSequences = null,
-                    grammar = null,
+                chatRequest(
+                    messages.map { NativeChatMessage(it.roleString(), it.text) },
+                    imageFiles.map { it.absolutePath },
+                    mmprojPath,
+                    temperature,
+                    maxTokens,
                 )
 
             unloadTranscriptionModelIfLoaded()
@@ -174,6 +160,59 @@ class LlmProvider(
             GenerationSummary(summary.jobId, summary.generatedTokens ?: 0, summary.totalTimeMs)
         }
     }
+
+    internal suspend fun <T> withConversationContext(
+        selection: LlmModelSelection,
+        block: suspend (LlmContext) -> T,
+    ): T = withModelContext {
+        modelLoadMutex.withLock {
+            ensureModelReadyLocked(selection, onProgress = {})
+            unloadTranscriptionModelIfLoaded()
+            block(requireNotNull(loadedContext))
+        }
+    }
+
+    internal fun generatePreparedChat(
+        context: LlmContext,
+        messages: List<NativeChatMessage>,
+        maxTokens: UInt,
+        temperature: Float,
+        onToken: (String) -> Unit,
+    ): GenerationSummary {
+        val summary =
+            generateStreamWithCallback(
+                context,
+                chatRequest(messages, emptyList(), null, temperature, maxTokens.toInt()),
+                onToken,
+            )
+        return GenerationSummary(summary.jobId, summary.generatedTokens ?: 0, summary.totalTimeMs)
+    }
+
+    private fun chatRequest(
+        messages: List<NativeChatMessage>,
+        imagePaths: List<String>,
+        mmprojPath: String?,
+        temperature: Float,
+        maxTokens: Int?,
+    ) =
+        LlmChatRequest(
+            messages = messages,
+            templateOverride = null,
+            addAssistant = true,
+            imagePaths = imagePaths,
+            mmprojPath = mmprojPath,
+            mediaMarker = null,
+            maxTokens = maxTokens,
+            temperature = temperature.coerceIn(0.35f, 0.7f),
+            topP = 0.9f,
+            topK = 50,
+            repeatPenalty = 1.18f,
+            frequencyPenalty = 0f,
+            presencePenalty = 0f,
+            seed = null,
+            stopSequences = null,
+            grammar = null,
+        )
 
     suspend fun <T> withChatModelReleasedForRetrieval(
         block: suspend (embed: (String) -> List<Float>) -> T
@@ -269,6 +308,7 @@ class LlmProvider(
                     )
                 loadedContext?.destroy()
                 loadedContext = model.newContext(contextParams)
+                currentContextLength = loadedContext?.contextSize()?.toInt()
             }
         }
     }
@@ -393,7 +433,7 @@ class LlmProvider(
                     )
                 loadedContext = model.newContext(contextParams)
                 currentModelKey = LoadedModelKey(selection.id, selection.contextLength)
-                currentContextLength = ctx
+                currentContextLength = loadedContext?.contextSize()?.toInt()
                 return
             } catch (err: Throwable) {
                 lastError = err

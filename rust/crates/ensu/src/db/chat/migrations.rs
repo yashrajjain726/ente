@@ -3,7 +3,7 @@ use crate::db::{Backend, Error, Result};
 
 use super::schema;
 
-pub const LATEST_VERSION: i64 = 5;
+pub const LATEST_VERSION: i64 = 6;
 
 pub fn migrate<B: Backend>(backend: &B) -> Result<()> {
     match user_version(backend)? {
@@ -12,12 +12,25 @@ pub fn migrate<B: Backend>(backend: &B) -> Result<()> {
             backend.execute(&format!("PRAGMA user_version = {LATEST_VERSION};"), &[])?;
             Ok(())
         }
-        1..=4 => migrate_to_local_schema(backend),
+        1..=4 => {
+            migrate_to_local_schema(backend)?;
+            migrate_conversation_state(backend)
+        }
+        5 => migrate_conversation_state(backend),
         LATEST_VERSION => Ok(()),
         other => Err(Error::Migration(format!(
             "unsupported schema version {other}"
         ))),
     }
+}
+
+fn migrate_conversation_state<B: Backend>(backend: &B) -> Result<()> {
+    backend.transaction(|tx| {
+        tx.execute_batch(
+            "ALTER TABLE sessions ADD COLUMN conversation_state BLOB;
+            PRAGMA user_version = 6;",
+        )
+    })
 }
 
 fn migrate_to_local_schema<B: Backend>(backend: &B) -> Result<()> {
@@ -58,7 +71,7 @@ fn migrate_to_local_schema<B: Backend>(backend: &B) -> Result<()> {
              ALTER TABLE messages_v5 RENAME TO messages;",
         )?;
         tx.execute_batch(schema::CREATE_INDEXES)?;
-        tx.execute(&format!("PRAGMA user_version = {LATEST_VERSION};"), &[])?;
+        tx.execute("PRAGMA user_version = 5;", &[])?;
         Ok(())
     });
     let enable_result = backend.execute_batch("PRAGMA foreign_keys = ON;");
@@ -220,5 +233,33 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    const V5: &str = "CREATE TABLE sessions(session_uuid TEXT PRIMARY KEY, title BLOB NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+        CREATE TABLE messages(message_uuid TEXT PRIMARY KEY, session_uuid TEXT NOT NULL, parent_message_uuid TEXT, sender TEXT NOT NULL, text BLOB NOT NULL, attachments TEXT, created_at INTEGER NOT NULL);
+        INSERT INTO sessions VALUES ('s', X'010203', 1, 2);
+        INSERT INTO messages VALUES ('m', 's', NULL, 'self', X'040506', NULL, 3);
+        PRAGMA user_version = 5;";
+    #[test]
+    fn additive_upgrade_preserves_ciphertext_and_reopens_idempotently() {
+        let backend = SqliteBackend::open_in_memory().unwrap();
+        backend.execute_batch(V5).unwrap();
+        migrate(&backend).unwrap();
+        migrate(&backend).unwrap();
+        assert_eq!(
+            backend
+                .query_row("SELECT title, conversation_state FROM sessions", &[])
+                .unwrap()
+                .unwrap(),
+            vec![Value::Blob(vec![1, 2, 3]), Value::Null]
+        );
+        assert_eq!(
+            backend
+                .query_row("SELECT text FROM messages", &[])
+                .unwrap()
+                .unwrap(),
+            vec![Value::Blob(vec![4, 5, 6])]
+        );
+        assert_eq!(user_version(&backend).unwrap(), LATEST_VERSION);
     }
 }

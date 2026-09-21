@@ -144,6 +144,11 @@ class AppStore(
             )
     }
 
+    fun setForeground(foreground: Boolean, chatVisible: Boolean) {
+        chatActions.setForeground(foreground && chatVisible)
+        notesStore.setForeground(foreground)
+    }
+
     fun createNewSession(): String = chatActions.createNewSession()
 
     fun startNewSessionDraft() = chatActions.startNewSessionDraft()
@@ -201,12 +206,20 @@ class AppStore(
 
     fun cancelOverflowDialog() = chatActions.cancelOverflowDialog()
 
-    fun updateModelSettings(state: ModelSettingsState) =
+    fun updateModelSettings(state: ModelSettingsState) {
+        chatActions.cancelGenerationForDownload()
         modelSettingsActions.updateModelSettings(state)
+    }
 
-    fun resetModelSettings() = modelSettingsActions.resetModelSettings()
+    fun resetModelSettings() {
+        chatActions.cancelGenerationForDownload()
+        modelSettingsActions.resetModelSettings()
+    }
 
     fun updateDeveloperSettings(state: DeveloperSettingsState) {
+        if (state.systemPrompt != _state.value.developerSettings.systemPrompt) {
+            chatActions.cancelGenerationForDownload()
+        }
         _state.value = _state.value.copy(developerSettings = state)
     }
 

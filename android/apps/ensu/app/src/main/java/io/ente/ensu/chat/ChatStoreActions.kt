@@ -3,7 +3,12 @@ package io.ente.ensu.chat
 import io.ente.ensu.AppState
 import io.ente.ensu.bindings.AssetDownloadException
 import io.ente.ensu.bindings.ConfigDefaults
+import io.ente.ensu.bindings.ConversationException
+import io.ente.ensu.bindings.ConversationPreparation
+import io.ente.ensu.bindings.ConversationProgressCallback
+import io.ente.ensu.bindings.ConversationRequest
 import io.ente.ensu.bindings.DbException
+import io.ente.ensu.bindings.GroundedExcerpt
 import io.ente.ensu.bindings.GroundedSource
 import io.ente.ensu.bindings.LlmException
 import io.ente.ensu.bindings.buildGroundedPromptContext
@@ -31,6 +36,7 @@ import kotlin.math.min
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -60,7 +66,10 @@ internal class ChatStoreActions(
     private var scope: CoroutineScope? = null
     private var generationJob: Job? = null
     private var sessionSummaryJob: Job? = null
-    private var stopRequested = false
+    @Volatile private var stopRequested = false
+    private var isForeground = true
+    private var preparingGenerationToken: Long? = null
+    @Volatile private var activePreparation: ConversationPreparation? = null
     private var streamingParentId: String? = null
     private var activeGenerationToken = 0L
     private var pendingOverflow: PendingOverflow? = null
@@ -188,6 +197,8 @@ internal class ChatStoreActions(
                         sessions = sessions,
                         currentSessionId = newCurrent,
                         isGenerating = if (resetCurrent) false else appState.chat.isGenerating,
+                        preparationStatus =
+                            if (resetCurrent) null else appState.chat.preparationStatus,
                         isDownloading = if (resetCurrent) false else appState.chat.isDownloading,
                         streamingResponse =
                             if (resetCurrent) "" else appState.chat.streamingResponse,
@@ -245,7 +256,7 @@ internal class ChatStoreActions(
 
     fun updateBranchSelection(messageId: String, selectedIndex: Int) {
         if (state.value.chat.isGenerating) {
-            stopGeneration()
+            resetGenerationState()
         }
         val sessionId = state.value.chat.currentSessionId ?: return
         val messages = messageStore[sessionId].orEmpty()
@@ -257,6 +268,7 @@ internal class ChatStoreActions(
         val index = (selectedIndex - 1).coerceIn(0, siblings.lastIndex)
         val selectionMap = branchSelections.getOrPut(sessionId) { mutableMapOf() }
         selectionMap[parentKey] = siblings[index].id
+        clearTransientAssistantError()
         rebuildChatState(sessionId)
     }
 
@@ -267,6 +279,7 @@ internal class ChatStoreActions(
         val message = messageStore[sessionId]?.firstOrNull { it.id == messageId } ?: return
         if (message.author != MessageAuthor.User) return
 
+        clearTransientAssistantError()
         state.update { appState ->
             appState.copy(
                 chat =
@@ -277,6 +290,7 @@ internal class ChatStoreActions(
                     )
             )
         }
+        rebuildChatState(sessionId)
     }
 
     fun cancelEditing() {
@@ -294,6 +308,7 @@ internal class ChatStoreActions(
     }
 
     fun stopGeneration() {
+        if (state.value.chat.preparationStatus != null) activePreparation?.cancel()
         stopRequested = true
         llmProvider.stopGeneration()
         generationJob?.cancel()
@@ -349,7 +364,11 @@ internal class ChatStoreActions(
                 val existing = messageStore[sessionId]?.firstOrNull { it.id == editingMessageId }
                 existing?.parentId
             } else {
-                buildSelectedPath(sessionId).lastOrNull()?.id
+                val path = buildSelectedPath(sessionId)
+                currentState.chat.transientAssistantParentId?.takeIf { parent ->
+                    currentState.chat.transientAssistantError != null &&
+                        path.any { it.id == parent && it.author == MessageAuthor.User }
+                } ?: path.lastOrNull()?.id
             }
 
         val userMessage =
@@ -410,6 +429,15 @@ internal class ChatStoreActions(
 
     fun cancelGenerationForDownload() {
         resetGenerationState()
+        rebuildChatState(state.value.chat.currentSessionId)
+    }
+
+    fun setForeground(foreground: Boolean) {
+        isForeground = foreground
+        if (!foreground && preparingGenerationToken != null) {
+            resetGenerationState()
+            rebuildChatState(state.value.chat.currentSessionId)
+        }
     }
 
     fun loadSessionsFromDb() {
@@ -462,8 +490,11 @@ internal class ChatStoreActions(
     private fun startGeneration(sessionId: String, userMessage: ChatMessage) {
         val scope = scope ?: return
         if (!state.value.chat.deviceCapability.isChatSupported()) return
+        val prompt = buildPrompt(userMessage.text, userMessage.attachments)
+        if (!isForeground && prompt.imageFiles.isEmpty()) return
         val priorGeneration = generationJob
         val priorSummary = sessionSummaryJob
+        activePreparation?.cancel()
         priorGeneration?.cancel()
         priorSummary?.cancel()
         llmProvider.stopGeneration()
@@ -471,15 +502,17 @@ internal class ChatStoreActions(
 
         val settings = state.value.modelSettings
         val selection = modelSettingsActions.resolveSelection(settings)
-        val prompt = buildPrompt(userMessage.text, userMessage.attachments)
 
+        clearTransientAssistantError()
         val generationToken = nextGenerationToken()
+        preparingGenerationToken = generationToken.takeIf { prompt.imageFiles.isEmpty() }
         streamingParentId = userMessage.id
         state.update { appState ->
             appState.copy(
                 chat =
                     appState.chat.copy(
                         isGenerating = true,
+                        preparationStatus = null,
                         isDownloading = false,
                         streamingResponse = "",
                         streamingParentId = userMessage.id,
@@ -497,7 +530,11 @@ internal class ChatStoreActions(
             notesStore.awaitMaintenance()
             priorGeneration?.join()
             priorSummary?.join()
-            val isActive = { isGenerationActive(generationToken, sessionId) }
+            val runningJob = coroutineContext[Job]
+            val isActive = {
+                isGenerationActive(generationToken, sessionId) &&
+                    (runningJob?.isActive != false || stopRequested)
+            }
             if (!isActive()) return@launch
             awaitKnowledgeReady()
             notesStore.awaitReady()
@@ -505,16 +542,17 @@ internal class ChatStoreActions(
             val progressTracker = DownloadProgressTracker()
             var embeddingAssetInvalid = false
             val enabledDatasets = state.value.knowledge.enabledReadyDatasets
+            val retrievalQuery = userMessage.text.trim()
             val knowledgeHits =
                 if (
-                    userMessage.text.isNotBlank() &&
+                    retrievalQuery.isNotBlank() &&
                         (enabledDatasets.isNotEmpty() ||
                             notesStore.state.value.collections.any { it.eligible })
                 ) {
                     try {
                         val hits = llmProvider.withChatModelReleasedForRetrieval { embed ->
                             if (!isActive()) throw kotlinx.coroutines.CancellationException()
-                            val query = embed(userMessage.text.trim())
+                            val query = embed(retrievalQuery)
                             if (!isActive()) throw kotlinx.coroutines.CancellationException()
                             val packs =
                                 knowledgeProvider.search(
@@ -531,13 +569,20 @@ internal class ChatStoreActions(
                         hits
                     } catch (error: kotlinx.coroutines.CancellationException) {
                         throw error
-                    } catch (_: LlmProvider.EmbeddingAssetInvalid) {
-                        embeddingAssetInvalid = true
-                        emptyList()
                     } catch (error: Throwable) {
+                        if (
+                            !isActive() ||
+                                stopRequested ||
+                                error is LlmException.Cancelled ||
+                                error is AssetDownloadException.Cancelled
+                        ) {
+                            return@launch
+                        }
+                        embeddingAssetInvalid = error is LlmProvider.EmbeddingAssetInvalid
                         logRepository.log(
                             LogLevel.Warning,
-                            "Context retrieval failed",
+                            "Source search failed",
+                            details = error.message,
                             tag = "Chat",
                             throwable = error,
                         )
@@ -612,6 +657,20 @@ internal class ChatStoreActions(
             if (!modelReady) return@launch
 
             if (!isActive()) return@launch
+
+            if (prompt.imageFiles.isEmpty()) {
+                generateTextConversation(
+                    sessionId,
+                    userMessage,
+                    prompt.text,
+                    selection,
+                    modelSettingsActions.resolveTemperature(settings),
+                    knowledgeHits,
+                    { isActive() && state.value.modelSettings == settings },
+                )
+                if (embeddingAssetInvalid) modelSettingsActions.refreshModelDownloadInfo()
+                return@launch
+            }
 
             val generationLimits = resolveGenerationLimits(selection)
             val normalSystemPrompt = buildSystemPrompt()
@@ -788,6 +847,148 @@ internal class ChatStoreActions(
         }
     }
 
+    private suspend fun generateTextConversation(
+        sessionId: String,
+        userMessage: ChatMessage,
+        current: String,
+        selection: LlmModelSelection,
+        temperature: Float,
+        searched: List<GroundedExcerpt>,
+        isActive: () -> Boolean,
+    ) {
+        val buffer = StringBuilder()
+        var tokens = 0
+        val path =
+            buildSelectedPath(sessionId).takeWhile { it.id != userMessage.id }.map { it.id } +
+                userMessage.id
+        val system = buildSystemPrompt()
+        try {
+            llmProvider.withConversationContext(selection) { context ->
+                if (!isActive() || stopRequested) return@withConversationContext
+                require(selection.maxTokens == null || selection.maxTokens > 0) {
+                    "Max output must be a positive whole number, or Auto"
+                }
+                val preparation =
+                    chatRepository.prepareConversation(
+                        context,
+                        ConversationRequest(
+                            sessionUuid = sessionId,
+                            path = path,
+                            system = system,
+                            current = current,
+                            expectedUserText = userMessage.text,
+                            historyQuery = userMessage.text,
+                            maxTokens = selection.maxTokens?.toUInt(),
+                            searched = searched,
+                        ),
+                    )
+                activePreparation = preparation.work
+                if (!isActive() || stopRequested) preparation.work.cancel()
+                val progress =
+                    object : ConversationProgressCallback {
+                        override fun onProgress() {
+                            if (!isActive() || stopRequested) preparation.work.cancel()
+                            else
+                                state.update {
+                                    it.copy(
+                                        chat =
+                                            it.chat.copy(
+                                                preparationStatus = "Remembering earlier messages"
+                                            )
+                                    )
+                                }
+                        }
+                    }
+                try {
+                    state.update {
+                        it.copy(chat = it.chat.copy(preparationStatus = "Preparing conversation"))
+                    }
+                    val result = preparation.work.run(progress)
+                    if (!isActive() || stopRequested)
+                        throw kotlinx.coroutines.CancellationException()
+                    chatRepository.validateConversation(preparation)
+                    withContext(Dispatchers.Main) {
+                        if (!isActive() || !isForeground || stopRequested)
+                            throw kotlinx.coroutines.CancellationException()
+                        preparingGenerationToken = null
+                        state.update { it.copy(chat = it.chat.copy(preparationStatus = null)) }
+                    }
+                    val generated = runCatching {
+                        llmProvider.generatePreparedChat(
+                            context,
+                            result.messages,
+                            result.maxTokens,
+                            temperature,
+                        ) { token ->
+                            if (!isActive() || stopRequested) llmProvider.stopGeneration()
+                            else {
+                                buffer.append(token)
+                                tokens += estimateTokens(token)
+                                state.update {
+                                    it.copy(
+                                        chat = it.chat.copy(streamingResponse = buffer.toString())
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    withContext(Dispatchers.Main + NonCancellable) {
+                        val error = generated.exceptionOrNull()
+                        finishGeneration(
+                            sessionId,
+                            userMessage,
+                            buffer,
+                            tokens,
+                            generated.getOrNull()?.totalTimeMs,
+                            interrupted =
+                                stopRequested ||
+                                    error is LlmException.Cancelled ||
+                                    error is kotlinx.coroutines.CancellationException,
+                            shouldUpdateUi = isActive(),
+                            saveAnswer = { chatRepository.insertPreparedAnswer(preparation, it) },
+                        )
+                    }
+                    generated.getOrThrow()
+                } finally {
+                    activePreparation = null
+                    preparation.work.cancel()
+                    preparation.work.destroy()
+                }
+            }
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            val cancelled =
+                stopRequested ||
+                    error is LlmException.Cancelled ||
+                    error is ConversationException.Cancelled
+            if (!cancelled) {
+                logRepository.log(
+                    LogLevel.Error,
+                    "Conversation preparation failed",
+                    details = error.message,
+                    tag = "Chat",
+                    throwable = error,
+                )
+                if (isActive() && buffer.isEmpty())
+                    state.update {
+                        it.copy(
+                            chat =
+                                it.chat.copy(
+                                    transientAssistantError =
+                                        (error as? ConversationException.Other)?.detail
+                                            ?: error.message
+                                            ?: "Unable to prepare conversation",
+                                    transientAssistantParentId = userMessage.id,
+                                )
+                        )
+                    }
+            }
+        } finally {
+            if (isActive()) state.update { it.copy(chat = it.chat.copy(preparationStatus = null)) }
+        }
+    }
+
     private fun finishGeneration(
         sessionId: String,
         parentMessage: ChatMessage,
@@ -797,10 +998,11 @@ internal class ChatStoreActions(
         interrupted: Boolean,
         shouldUpdateUi: Boolean,
         citations: List<GroundedSource> = emptyList(),
+        saveAnswer: ((String) -> ChatMessage)? = null,
     ) {
         val rawText = buffer.toString().trim()
         val finalText =
-            if (rawText.isNotEmpty()) {
+            if (rawText.isNotEmpty() && saveAnswer == null) {
                 runCatching { finalizeGroundedAssistantText(rawText, citations) }
                     .getOrElse { error ->
                         logRepository.log(
@@ -824,13 +1026,14 @@ internal class ChatStoreActions(
 
             if (shouldUpdateUi) {
                 val inserted = runCatching {
-                    chatRepository.insertMessage(
-                        sessionId = sessionId,
-                        parentId = parentMessage.id,
-                        author = MessageAuthor.Assistant,
-                        text = finalText,
-                        attachments = emptyList(),
-                    )
+                    saveAnswer?.invoke(rawText)
+                        ?: chatRepository.insertMessage(
+                            sessionId = sessionId,
+                            parentId = parentMessage.id,
+                            author = MessageAuthor.Assistant,
+                            text = finalText,
+                            attachments = emptyList(),
+                        )
                 }
                     .getOrElse { error ->
                         logRepository.log(
@@ -855,7 +1058,7 @@ internal class ChatStoreActions(
                     updateSelectionForParent(sessionId, parentMessage.id, assistantMessage.id)
                     updateCurrentSessionPreview(
                         sessionId,
-                        cleanAssistantText(finalText),
+                        cleanAssistantText(assistantMessage.text),
                         assistantMessage.timestampMillis,
                     )
                 }
@@ -1145,7 +1348,12 @@ internal class ChatStoreActions(
         }
 
         val messages = messageStore[sessionId].orEmpty()
-        val path = buildSelectedPath(sessionId)
+        val chat = state.value.chat
+        val selectedPath = buildSelectedPath(sessionId)
+        val errorIndex = selectedPath.indexOfFirst {
+            chat.transientAssistantError != null && it.id == chat.transientAssistantParentId
+        }
+        val path = if (errorIndex >= 0) selectedPath.take(errorIndex + 1) else selectedPath
         val childrenMap = buildChildrenMap(messages)
         val selectionMap = branchSelections.getOrPut(sessionId) { mutableMapOf() }
         val branchSelectionIndices = mutableMapOf<String, Int>()
@@ -1162,7 +1370,7 @@ internal class ChatStoreActions(
             message.copy(branchCount = max(1, siblings.size))
         }
 
-        val isGenerating = state.value.chat.isGenerating
+        val isGenerating = chat.isGenerating
         val finalMessages = buildList {
             for (i in displayMessages.indices) {
                 val msg = displayMessages[i]
@@ -1177,7 +1385,10 @@ internal class ChatStoreActions(
                                 sessionId = sessionId,
                                 parentId = msg.id,
                                 author = MessageAuthor.Assistant,
-                                text = "Response was interrupted",
+                                text =
+                                    chat.transientAssistantError?.takeIf {
+                                        chat.transientAssistantParentId == msg.id
+                                    } ?: "Response was interrupted",
                                 timestampMillis = msg.timestampMillis,
                                 isInterrupted = true,
                                 isSynthetic = true,
@@ -1441,7 +1652,19 @@ internal class ChatStoreActions(
         return estimateTokens(promptText) + estimateImageTokens(imageCount)
     }
 
+    private fun clearTransientAssistantError() {
+        state.update {
+            it.copy(
+                chat =
+                    it.chat.copy(transientAssistantError = null, transientAssistantParentId = null)
+            )
+        }
+    }
+
     private fun cancelGeneration() {
+        clearTransientAssistantError()
+        preparingGenerationToken = null
+        activePreparation?.cancel()
         generationJob?.cancel()
         llmProvider.stopGeneration()
         invalidateGenerationToken()
@@ -1450,6 +1673,7 @@ internal class ChatStoreActions(
     }
 
     private fun settleGenerationIfActive(token: Long, sessionId: String) {
+        if (preparingGenerationToken == token) preparingGenerationToken = null
         if (!isGenerationActive(token, sessionId) || !state.value.chat.isGenerating) return
         streamingParentId = null
         state.update { appState ->
@@ -1457,6 +1681,7 @@ internal class ChatStoreActions(
                 chat =
                     appState.chat.copy(
                         isGenerating = false,
+                        preparationStatus = null,
                         isDownloading = false,
                         streamingResponse = "",
                         streamingParentId = null,
@@ -1476,6 +1701,7 @@ internal class ChatStoreActions(
                 chat =
                     appState.chat.copy(
                         isGenerating = false,
+                        preparationStatus = null,
                         isDownloading = false,
                         streamingResponse = "",
                         streamingParentId = null,

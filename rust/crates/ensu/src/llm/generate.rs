@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use super::context::Context;
-use super::event::{EventSink, GenerationEvent, GenerationSummary, JobId};
+use super::event::{EventSink, FinishReason, GenerationEvent, GenerationSummary, JobId};
 use super::{Error, format_error, lock};
 
 static JOB_COUNTER: AtomicI64 = AtomicI64::new(1);
@@ -73,7 +73,7 @@ struct SamplingParams {
     grammar: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ChatRequest {
     pub messages: Vec<ChatMessage>,
     pub template_override: Option<String>,
@@ -186,24 +186,23 @@ fn should_add_bos(model: &LlamaModel, prompt: &str) -> AddBos {
     AddBos::Always
 }
 
-fn find_stop_index(text: &str, stop_sequences: &[String], start: usize) -> Option<usize> {
-    let mut found: Option<usize> = None;
-    let search = &text[start.min(text.len())..];
-
-    for stop in stop_sequences {
-        if stop.is_empty() {
-            continue;
-        }
-        if let Some(idx) = search.find(stop) {
-            let idx = start + idx;
-            found = match found {
-                Some(existing) if existing <= idx => Some(existing),
-                _ => Some(idx),
-            };
-        }
+fn tokenize_text_prompt(model: &LlamaModel, prompt: &str) -> Result<Vec<LlamaToken>, Error> {
+    let tokens = model
+        .str_to_token(prompt, should_add_bos(model, prompt))
+        .map_err(|err| Error::Llama {
+            op: "Tokenize failed",
+            message: err.to_string(),
+        })?;
+    if tokens.is_empty() {
+        return Err(Error::InvalidInput("Prompt produced no tokens".to_string()));
     }
+    Ok(tokens)
+}
 
-    found
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TextPromptMeasurement {
+    pub prompt_tokens: usize,
+    pub context_size: u32,
 }
 
 fn drain_utf8(pending: &mut Vec<u8>) -> String {
@@ -246,75 +245,65 @@ struct DecodeStep {
 }
 
 struct StreamDecoder {
-    generated_text: String,
+    pending_text: String,
     pending_bytes: Vec<u8>,
     stop_sequences: Vec<String>,
-    max_stop_len: usize,
 }
 
 impl StreamDecoder {
     fn new(stop_sequences: &[String]) -> Self {
-        let max_stop_len = stop_sequences.iter().map(String::len).max().unwrap_or(0);
         Self {
-            generated_text: String::new(),
+            pending_text: String::new(),
             pending_bytes: Vec::new(),
             stop_sequences: stop_sequences.to_vec(),
-            max_stop_len,
         }
     }
 
     fn push_bytes(&mut self, bytes: &[u8]) -> DecodeStep {
-        if !bytes.is_empty() {
-            self.pending_bytes.extend_from_slice(bytes);
-        }
-        let piece = drain_utf8(&mut self.pending_bytes);
-        self.push_text(piece)
+        self.pending_bytes.extend_from_slice(bytes);
+        self.pending_text
+            .push_str(&drain_utf8(&mut self.pending_bytes));
+        self.emit(false)
     }
 
     fn flush(&mut self) -> DecodeStep {
-        if self.pending_bytes.is_empty() {
-            return DecodeStep {
-                text: None,
-                stop: false,
-            };
-        }
-        let piece = String::from_utf8_lossy(&self.pending_bytes).to_string();
+        self.pending_text
+            .push_str(&String::from_utf8_lossy(&self.pending_bytes));
         self.pending_bytes.clear();
-        self.push_text(piece)
+        self.emit(true)
     }
 
-    fn push_text(&mut self, piece: String) -> DecodeStep {
-        if piece.is_empty() {
-            return DecodeStep {
-                text: None,
-                stop: false,
-            };
+    fn emit(&mut self, final_piece: bool) -> DecodeStep {
+        let stop_index = self
+            .stop_sequences
+            .iter()
+            .filter(|stop| !stop.is_empty())
+            .filter_map(|stop| self.pending_text.find(stop))
+            .min();
+        let keep = if stop_index.is_none() && !final_piece {
+            self.stop_sequences
+                .iter()
+                .flat_map(|stop| {
+                    stop.char_indices()
+                        .skip(1)
+                        .filter(|(end, _)| self.pending_text.ends_with(&stop[..*end]))
+                        .map(|(end, _)| end)
+                })
+                .max()
+                .unwrap_or(0)
+        } else {
+            0
+        };
+        let end = stop_index.unwrap_or(self.pending_text.len() - keep);
+        let text = self.pending_text[..end].to_owned();
+        if stop_index.is_some() {
+            self.pending_text.clear();
+        } else {
+            self.pending_text.drain(..end);
         }
-
-        let prev_len = self.generated_text.len();
-        self.generated_text.push_str(&piece);
-
-        if self.max_stop_len > 0 {
-            let search_start = prev_len.saturating_sub(self.max_stop_len);
-            if let Some(stop_index) =
-                find_stop_index(&self.generated_text, &self.stop_sequences, search_start)
-            {
-                let new_piece = self.generated_text[prev_len..stop_index].to_string();
-                self.generated_text.truncate(stop_index);
-                return DecodeStep {
-                    text: if new_piece.is_empty() {
-                        None
-                    } else {
-                        Some(new_piece)
-                    },
-                    stop: true,
-                };
-            }
-        }
-
         DecodeStep {
-            text: Some(piece),
-            stop: false,
+            text: (!text.is_empty()).then_some(text),
+            stop: stop_index.is_some(),
         }
     }
 }
@@ -327,6 +316,7 @@ struct GenerationJob<'a> {
     stop_sequences: &'a [String],
     prompt_tokens: i32,
     generated_tokens: i32,
+    finish_reason: FinishReason,
 }
 
 impl GenerationJob<'_> {
@@ -342,21 +332,23 @@ impl GenerationJob<'_> {
         let mut stop_triggered = false;
         let n_ctx = ctx.n_ctx();
 
-        for _ in 0..self.max_tokens {
-            if self.cancel_flag.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
-            }
-            if pos >= n_ctx as i32 {
-                break;
-            }
+        self.finish_reason = FinishReason::OutputLimit;
+        for sample_index in 0..self.max_tokens {
+            check_cancelled(self.cancel_flag)?;
 
             let token = sampler.sample(ctx, logits_index);
-            sampler.accept(token);
-            self.generated_tokens = self.generated_tokens.saturating_add(1);
+            check_cancelled(self.cancel_flag)?;
 
             if ctx.model.is_eog_token(token) {
+                self.generated_tokens = self.generated_tokens.saturating_add(1);
+                self.finish_reason = FinishReason::Eog;
                 break;
             }
+            if pos >= n_ctx as i32 {
+                self.finish_reason = FinishReason::ContextLimit;
+                break;
+            }
+            self.generated_tokens = self.generated_tokens.saturating_add(1);
 
             let bytes = token_piece_bytes(ctx.model, token).map_err(|err| Error::Llama {
                 op: "Detokenize failed",
@@ -367,9 +359,15 @@ impl GenerationJob<'_> {
             if let Some(text) = step.text {
                 self.emit_text(text, Some(token.0));
             }
+            check_cancelled(self.cancel_flag)?;
 
             if step.stop {
                 stop_triggered = true;
+                self.finish_reason = FinishReason::StopSequence;
+                break;
+            }
+
+            if sample_index + 1 == self.max_tokens {
                 break;
             }
 
@@ -400,10 +398,15 @@ impl GenerationJob<'_> {
 
         if !stop_triggered {
             let step = decoder.flush();
+            if step.stop {
+                self.finish_reason = FinishReason::StopSequence;
+            }
             if let Some(text) = step.text {
                 self.emit_text(text, None);
             }
         }
+
+        check_cancelled(self.cancel_flag)?;
 
         Ok(())
     }
@@ -417,7 +420,11 @@ impl GenerationJob<'_> {
     }
 }
 
-fn build_sampler(model: &LlamaModel, request: &SamplingParams) -> Result<LlamaSampler, Error> {
+fn build_sampler(
+    model: &LlamaModel,
+    request: &SamplingParams,
+    prompt_tokens: &[LlamaToken],
+) -> Result<LlamaSampler, Error> {
     let mut samplers = Vec::new();
 
     let mut repeat_penalty = request.repeat_penalty.unwrap_or(1.0);
@@ -437,12 +444,10 @@ fn build_sampler(model: &LlamaModel, request: &SamplingParams) -> Result<LlamaSa
         || frequency_penalty != 0.0
         || presence_penalty != 0.0
     {
-        samplers.push(LlamaSampler::penalties(
-            -1,
-            repeat_penalty,
-            frequency_penalty,
-            presence_penalty,
-        ));
+        let mut penalties =
+            LlamaSampler::penalties(-1, repeat_penalty, frequency_penalty, presence_penalty);
+        penalties.accept_many(prompt_tokens.iter());
+        samplers.push(penalties);
     }
 
     if let Some(grammar) = request.grammar.as_deref() {
@@ -479,6 +484,33 @@ fn build_sampler(model: &LlamaModel, request: &SamplingParams) -> Result<LlamaSa
 }
 
 impl Context {
+    pub fn measure_text_chat_prompt(
+        &self,
+        request: &ChatRequest,
+    ) -> Result<TextPromptMeasurement, Error> {
+        if request
+            .image_paths
+            .as_ref()
+            .is_some_and(|paths| !paths.is_empty())
+        {
+            return Err(Error::Unsupported(
+                "Text measurement does not count image positions",
+            ));
+        }
+        self.with_context_and_cache_mut(|ctx, _| {
+            let prompt = build_chat_prompt(
+                ctx.model,
+                request.messages.clone(),
+                request.template_override.clone(),
+                request.add_assistant.unwrap_or(true),
+            )?;
+            Ok(TextPromptMeasurement {
+                prompt_tokens: tokenize_text_prompt(ctx.model, &prompt)?.len(),
+                context_size: ctx.n_ctx(),
+            })
+        })
+    }
+
     pub fn generate_chat_stream(
         &self,
         request: ChatRequest,
@@ -534,6 +566,7 @@ fn generate_chat_stream(
         stop_sequences: &stop_sequences,
         prompt_tokens: 0,
         generated_tokens: 0,
+        finish_reason: FinishReason::Unknown,
     };
 
     let result = match catch_unwind(AssertUnwindSafe(|| {
@@ -589,18 +622,7 @@ fn generate_chat_stream(
             };
 
             if image_paths.is_empty() {
-                let add_bos = should_add_bos(ctx.model, &prompt);
-                let prompt_tokens =
-                    ctx.model
-                        .str_to_token(&prompt, add_bos)
-                        .map_err(|err| Error::Llama {
-                            op: "Tokenize failed",
-                            message: err.to_string(),
-                        })?;
-
-                if prompt_tokens.is_empty() {
-                    return Err(Error::InvalidInput("Prompt produced no tokens".to_string()));
-                }
+                let prompt_tokens = tokenize_text_prompt(ctx.model, &prompt)?;
 
                 let n_ctx = ctx.n_ctx();
                 if prompt_tokens.len() as u32 > n_ctx {
@@ -662,8 +684,7 @@ fn generate_chat_stream(
                     token_offset = end;
                 }
 
-                let mut sampler = build_sampler(ctx.model, &sampler_request)?;
-                sampler.accept_many(prompt_tokens.iter());
+                let mut sampler = build_sampler(ctx.model, &sampler_request, &prompt_tokens)?;
 
                 let pos = prompt_tokens.len() as i32;
                 job.run(ctx, &mut sampler, Some(cached_tokens), pos, logits_index)?;
@@ -749,7 +770,6 @@ fn generate_chat_stream(
                 })?;
             check_cancelled(&cancel_flag)?;
 
-            let mut sampler = build_sampler(ctx.model, &sampler_request)?;
             let mut prompt_tokens = Vec::new();
             for index in 0..chunks.len() {
                 if let Some(chunk) = chunks.get(index)
@@ -758,7 +778,7 @@ fn generate_chat_stream(
                     prompt_tokens.extend_from_slice(tokens);
                 }
             }
-            sampler.accept_many(prompt_tokens.iter());
+            let mut sampler = build_sampler(ctx.model, &sampler_request, &prompt_tokens)?;
 
             job.run(ctx, &mut sampler, None, n_past, -1)?;
 
@@ -778,6 +798,7 @@ fn generate_chat_stream(
         prompt_tokens: Some(job.prompt_tokens),
         generated_tokens: Some(job.generated_tokens),
         total_time_ms: Some(start.elapsed().as_millis() as i64),
+        finish_reason: job.finish_reason,
     };
 
     sink.add(GenerationEvent::Done {
@@ -824,6 +845,54 @@ mod tests {
         let step = decoder.push_bytes(&[0x99, 0x82]);
         assert_eq!(step.text.as_deref(), Some("🙂"));
         assert!(!step.stop);
+    }
+
+    #[test]
+    fn stop_sequences_are_withheld_across_stream_boundaries() {
+        for (pieces, stops, expected, stopped) in [
+            (
+                vec!["hello <", "END", "> ignored"],
+                vec!["<END>"],
+                "hello ",
+                true,
+            ),
+            (vec!["🙂é", "FIN rest"], vec!["éFIN"], "🙂", true),
+            (vec!["hello <EN"], vec!["<END>"], "hello <EN", false),
+            (vec!["hello <E", "lse"], vec!["<END>"], "hello <Else", false),
+            (
+                vec!["before STOP after END"],
+                vec!["END", "STOP"],
+                "before ",
+                true,
+            ),
+            (vec!["hello", " world"], vec![""], "hello world", false),
+            (
+                vec!["{\"fragment", "_start_byte\":0"],
+                vec!["{\"fragment_start_byte\":"],
+                "",
+                true,
+            ),
+        ] {
+            let mut decoder =
+                StreamDecoder::new(&stops.into_iter().map(str::to_owned).collect::<Vec<_>>());
+            let mut output = String::new();
+            let mut did_stop = false;
+            for piece in pieces {
+                let step = decoder.push_bytes(piece.as_bytes());
+                output.push_str(step.text.as_deref().unwrap_or(""));
+                if step.stop {
+                    did_stop = true;
+                    break;
+                }
+            }
+            if !did_stop {
+                let step = decoder.flush();
+                output.push_str(step.text.as_deref().unwrap_or(""));
+                did_stop = step.stop;
+            }
+            assert_eq!(output, expected);
+            assert_eq!(did_stop, stopped);
+        }
     }
 
     #[test]

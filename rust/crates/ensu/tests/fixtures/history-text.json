@@ -1,0 +1,47 @@
+[
+    {
+        "name": "plain_unicode",
+        "input": " \u092e\u093e\u092f\u093e owns SQLite. ",
+        "expected": "\u092e\u093e\u092f\u093e owns SQLite."
+    },
+    {
+        "name": "closed_reasoning",
+        "input": "<think>Upload the data.</think>Keep data offline.",
+        "expected": "Keep data offline."
+    },
+    {
+        "name": "interrupted_reasoning",
+        "input": "Visible fact.<think>Unfinished private reasoning",
+        "expected": "Visible fact."
+    },
+    {
+        "name": "control_block",
+        "input": "<todo_list>Invent a purchase.</todo_list>No purchase approved.",
+        "expected": "No purchase approved."
+    },
+    {
+        "name": "nested_blocks",
+        "input": "<think>outer<todo_list>inner</todo_list>hidden</think>Visible",
+        "expected": "Visible"
+    },
+    {
+        "name": "mismatched_close",
+        "input": "Before<think>hidden</todo_list>still hidden",
+        "expected": "Before"
+    },
+    {
+        "name": "nul",
+        "input": "\u0000Safe\u0000 text",
+        "expected": "Safe text"
+    },
+    {
+        "name": "unknown_markup",
+        "input": "<example>Keep this</example>",
+        "expected": "<example>Keep this</example>"
+    },
+    {
+        "name": "multiple_blocks",
+        "input": "A<think>x</think>B<todo_list>y</todo_list>C",
+        "expected": "ABC"
+    }
+]

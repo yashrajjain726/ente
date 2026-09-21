@@ -1,11 +1,15 @@
 package io.ente.ensu.chat
 
 import android.content.Context
+import io.ente.ensu.bindings.ConversationPreparation
+import io.ente.ensu.bindings.ConversationRequest
 import io.ente.ensu.bindings.DbAttachmentKind
 import io.ente.ensu.bindings.DbAttachmentMeta
 import io.ente.ensu.bindings.DbException
+import io.ente.ensu.bindings.DbMessage
 import io.ente.ensu.bindings.DbSender
 import io.ente.ensu.bindings.EnsuDb
+import io.ente.ensu.bindings.LlmContext
 import io.ente.ensu.bindings.cleanAssistantText
 import io.ente.ensu.storage.CredentialStore
 import io.ente.ensu.storage.FilePathManager
@@ -71,17 +75,8 @@ class ChatRepository(
 
     fun getMessages(sessionId: String): List<ChatMessage> = withDbRecovery {
         db.getMessages(sessionId).map { message ->
-            ChatMessage(
-                id = message.uuid,
-                sessionId = message.sessionUuid,
-                parentId = message.parentMessageUuid,
-                author =
-                    when (message.sender) {
-                        DbSender.SELF_USER -> MessageAuthor.User
-                        DbSender.OTHER -> MessageAuthor.Assistant
-                    },
-                text = message.text,
-                timestampMillis = message.createdAtUs / 1000,
+            toMessage(
+                message,
                 attachments =
                     message.attachments.map { meta ->
                         val file = File(attachmentsDir, meta.id)
@@ -136,15 +131,33 @@ class ChatRepository(
                 attachments = meta,
             )
 
-        ChatMessage(
-            id = message.uuid,
-            sessionId = message.sessionUuid,
-            parentId = message.parentMessageUuid,
-            author = author,
-            text = message.text,
-            timestampMillis = message.createdAtUs / 1000,
-            attachments = attachments,
-        )
+        toMessage(message, attachments)
+    }
+
+    internal class PreparedConversation(val owner: EnsuDb, val work: ConversationPreparation)
+
+    internal fun prepareConversation(
+        context: LlmContext,
+        request: ConversationRequest,
+    ): PreparedConversation = withDbRecovery {
+        PreparedConversation(db, db.prepareConversation(context, request))
+    }
+
+    private fun checkConversationOwner(prepared: PreparedConversation) {
+        check(db === prepared.owner && dbFile.exists()) { "Conversation changed; retry the reply" }
+    }
+
+    internal fun validateConversation(prepared: PreparedConversation) {
+        checkConversationOwner(prepared)
+        prepared.work.validate()
+    }
+
+    internal fun insertPreparedAnswer(
+        prepared: PreparedConversation,
+        text: String,
+    ): ChatMessage {
+        checkConversationOwner(prepared)
+        return toMessage(prepared.work.addAnswer(text, emptyList()), emptyList())
     }
 
     fun updateMessageText(messageId: String, text: String) = withDbRecovery {
@@ -154,6 +167,21 @@ class ChatRepository(
     fun updateSessionTitle(sessionId: String, title: String) = withDbRecovery {
         db.updateSessionTitle(sessionId, title)
     }
+
+    private fun toMessage(message: DbMessage, attachments: List<Attachment>) =
+        ChatMessage(
+            id = message.uuid,
+            sessionId = message.sessionUuid,
+            parentId = message.parentMessageUuid,
+            author =
+                when (message.sender) {
+                    DbSender.SELF_USER -> MessageAuthor.User
+                    DbSender.OTHER -> MessageAuthor.Assistant
+                },
+            text = message.text,
+            timestampMillis = message.createdAtUs / 1000,
+            attachments = attachments,
+        )
 
     private fun openDb(dbFile: File, key: ByteArray): EnsuDb {
         return EnsuDb.open(

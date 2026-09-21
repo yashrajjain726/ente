@@ -65,7 +65,7 @@ export interface InferenceBackend {
     createContext(
         model: { modelPath: string },
         params?: ContextParams,
-    ): Promise<void>;
+    ): Promise<number>;
     generateChatStream(
         request: GenerateChatRequest,
         onEvent?: (event: GenerateEvent) => void,
@@ -127,6 +127,7 @@ class WasmInference implements InferenceBackend {
         const modelUrl = ensureUrl(model.modelPath);
         try {
             await this.ensureModelLoaded(modelUrl, params);
+            return this.wllama.getLoadedContextInfo().n_ctx;
         } catch (error) {
             throw normalizeWllamaError(error, "Model failed to start");
         }
@@ -480,7 +481,7 @@ class WasmInference implements InferenceBackend {
                     stopTokens.push(first);
                 }
             } catch {
-                // Skip stop sequences that fail to tokenize.
+                continue;
             }
         }
 
@@ -580,7 +581,7 @@ class TauriInference implements InferenceBackend {
             nBatch: params.nBatch ?? null,
         });
         try {
-            await invoke("llm_create_context", {
+            return await invoke<number>("llm_create_context", {
                 params: {
                     context_size: params.contextSize ?? null,
                     n_threads: params.nThreads ?? null,
@@ -653,7 +654,10 @@ class TauriInference implements InferenceBackend {
             });
             const summary = await invoke<GenerateSummary>(
                 "llm_generate_chat_stream",
-                { request: buildGenerateChatRequest(request) },
+                {
+                    request: buildGenerateChatRequest(request),
+                    preparationToken: request.preparationToken,
+                },
             );
             await done;
             return summary;

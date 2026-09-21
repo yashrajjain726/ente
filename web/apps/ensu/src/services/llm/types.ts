@@ -60,4 +60,5 @@ export interface GenerateChatRequest {
     seed?: number;
     stopSequences?: string[];
     grammar?: string;
+    preparationToken?: string;
 }

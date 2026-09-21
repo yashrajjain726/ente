@@ -197,17 +197,18 @@ fun HomeView(
             scope.launch { drawerState.close() }
         }
 
-        DisposableEffect(lifecycleOwner) {
+        DisposableEffect(lifecycleOwner, isChatRoute) {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
-                    latestStore.notesStore.setForeground(true)
+                    latestStore.setForeground(true, isChatRoute)
                     latestStore.refreshModelDownloadInfo()
                 } else if (event == Lifecycle.Event.ON_STOP) {
-                    latestStore.notesStore.setForeground(false)
+                    latestStore.setForeground(false, isChatRoute)
                 }
             }
-            latestStore.notesStore.setForeground(
-                lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+            latestStore.setForeground(
+                lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED),
+                isChatRoute,
             )
             lifecycleOwner.lifecycle.addObserver(observer)
             onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }

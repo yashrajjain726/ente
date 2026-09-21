@@ -48,6 +48,12 @@ import {
     type GroundedSource,
     type KnowledgePack,
 } from "@/services/knowledge";
+import { DEFAULT_WEB_CONTEXT_SIZE } from "@/services/llm/budget";
+import {
+    prepareDesktopConversation,
+    type PreparedReply,
+} from "@/services/llm/conversation";
+import { stripHiddenPartsText } from "@/services/llm/history-text";
 import {
     DEFAULT_MODEL,
     FALLBACK_DESKTOP_MODEL_PRESETS,
@@ -102,9 +108,6 @@ const formatTime = (timestamp: number) => {
     return `${hour12}:${minute} ${period}`;
 };
 
-const DEFAULT_GENERATION_MAX_TOKENS = 8_192;
-const OVERFLOW_SAFETY_TOKENS = 256;
-const DEFAULT_WEB_CONTEXT_SIZE = 4096;
 const ADVANCED_SETTINGS_UNLOCK_KEY = "ensu.advancedSettingsUnlocked";
 const MODEL_SETTINGS_STORAGE_KEY = "ensu.modelSettings";
 const SYSTEM_PROMPT_STORAGE_KEY = "ensu.systemPrompt";
@@ -297,19 +300,11 @@ const parseDocumentBlocks = (text: string) => {
     return { text: stripped, documents };
 };
 
-const stripHiddenPartsText = (text: string) =>
-    text
-        .replaceAll("\0", "")
-        .replace(/<think>[\s\S]*?<\/think>/g, "")
-        .replace(/<todo_list>[\s\S]*?<\/todo_list>/g, "")
-        .trim();
-
 const buildDocumentBlocks = (documents: DocumentAttachment[]) => {
     if (!documents.length) return "";
     return documents
         .map((doc, index) => {
             const name = doc.name || `Document ${index + 1}`;
-            // Remove null bytes which are invalid in C strings used by llama.cpp
             const content = doc.text.replace(/\0/g, "").trim();
             return `----- BEGIN DOCUMENT: ${name} -----\n${content}\n----- END DOCUMENT: ${name} -----`;
         })
@@ -648,6 +643,10 @@ const Page: React.FC = () => {
     > | null>(null);
     const generationStartingRef = useRef(false);
     const generationActiveRef = useRef(false);
+    const preparedReplyRef = useRef<PreparedReply | undefined>(undefined);
+    const [conversationStatus, setConversationStatus] = useState<string | null>(
+        null,
+    );
     const generationStoppingRef = useRef(false);
     const pendingGenerationStopsRef = useRef(0);
     const modelGateRequestRef = useRef(0);
@@ -1071,12 +1070,9 @@ const Page: React.FC = () => {
             setMaxTokens(settings.maxTokens);
         };
 
-        // Older builds persisted a model URL selection; llm_migrate_models
-        // converts it to a model id once.
         const loadSettings = async () => {
             let raw = window.localStorage.getItem(MODEL_SETTINGS_STORAGE_KEY);
             if (!raw) {
-                // Settings from even older builds live in IndexedDB.
                 const kvRaw = await getKV(MODEL_SETTINGS_STORAGE_KEY).catch(
                     () => undefined,
                 );
@@ -1438,9 +1434,11 @@ const Page: React.FC = () => {
         if (!isGenerating && !generationStartingRef.current) return;
 
         generationTokenRef.current += 1;
+        setConversationStatus(null);
         beginGenerationStop();
         const jobId = currentJobIdRef.current;
         currentJobIdRef.current = null;
+        preparedReplyRef.current = undefined;
         activeKnowledgeSourcesRef.current = [];
         generationActiveRef.current = false;
         setIsGenerating(false);
@@ -1502,6 +1500,7 @@ const Page: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        preparedReplyRef.current = undefined;
         setStreamingParentId(null);
         setStreamingText("");
         streamingBufferRef.current = "";
@@ -1866,11 +1865,11 @@ const Page: React.FC = () => {
             modelId: selectedModelId || undefined,
             contextLength: contextLength ? Number(contextLength) : undefined,
             maxTokens:
-                maxTokens && Number(maxTokens) > 0
+                maxTokens && (isTauriRuntime || Number(maxTokens) > 0)
                     ? Number(maxTokens)
                     : undefined,
         };
-    }, [selectedModelId, contextLength, maxTokens]);
+    }, [selectedModelId, contextLength, maxTokens, isTauriRuntime]);
 
     const modelSettingsKey = useMemo(
         () => JSON.stringify(getModelSettings()),
@@ -1881,7 +1880,7 @@ const Page: React.FC = () => {
         if (isNamedError(error, "prompt_too_long")) {
             return "Prompt exceeds the model context window. Reduce history, lower max tokens, or increase context length.";
         }
-        return error instanceof Error ? error.message : "Unknown model error";
+        return tauriCommandError(error).message ?? "Unknown model error";
     }, []);
 
     const trimToWords = useCallback((text: string, maxWords: number) => {
@@ -1931,15 +1930,7 @@ const Page: React.FC = () => {
         async (paths: string[]) => {
             if (!isTauriRuntime || paths.length === 0) return;
             const { remove } = await import("@tauri-apps/plugin-fs");
-            await Promise.all(
-                paths.map(async (path) => {
-                    try {
-                        await remove(path);
-                    } catch {
-                        // Deleting the temporary file is best effort.
-                    }
-                }),
-            );
+            await Promise.allSettled(paths.map((path) => remove(path)));
         },
         [isTauriRuntime],
     );
@@ -2377,8 +2368,7 @@ const Page: React.FC = () => {
         (
             path: ChatMessage[],
             promptText: string,
-            contextSize: number,
-            maxTokensCount?: number,
+            inputBudget: number,
             stopAtMessageUuid?: string | null,
         ): LlmMessage[] => {
             const candidates = slicePathUntil(path, stopAtMessageUuid);
@@ -2389,10 +2379,6 @@ const Page: React.FC = () => {
                     ? candidates.slice(0, -1)
                     : candidates;
 
-            const inputBudget =
-                contextSize -
-                (maxTokensCount ?? DEFAULT_GENERATION_MAX_TOKENS) -
-                256;
             const budget =
                 inputBudget -
                 approxTokens(buildChatSystemPrompt(systemPrompt)) -
@@ -2812,6 +2798,7 @@ const Page: React.FC = () => {
     const handleStopGeneration = useCallback(() => {
         const jobId = currentJobIdRef.current;
         generationTokenRef.current += 1;
+        setConversationStatus(null);
         beginGenerationStop();
 
         flushStreamingText();
@@ -2820,6 +2807,8 @@ const Page: React.FC = () => {
         const parentMessageUuid = streamingParentId;
         const activeSessionId = currentSessionIdRef.current ?? currentSessionId;
         const activeKnowledgeSources = activeKnowledgeSourcesRef.current;
+        const preparedReply = preparedReplyRef.current;
+        preparedReplyRef.current = undefined;
         activeKnowledgeSourcesRef.current = [];
 
         const last = lastGenerationRef.current;
@@ -2847,15 +2836,17 @@ const Page: React.FC = () => {
                 chatKey
             ) {
                 try {
-                    const assistantMessage = await addMessage(
-                        activeSessionId,
-                        "assistant",
-                        finalText,
-                        chatKey,
-                        parentMessageUuid,
-                        [],
-                        activeKnowledgeSources,
-                    );
+                    const assistantMessage = await (preparedReply
+                        ? preparedReply.saveAnswer(finalText)
+                        : addMessage(
+                              activeSessionId,
+                              "assistant",
+                              finalText,
+                              chatKey,
+                              parentMessageUuid,
+                              [],
+                              activeKnowledgeSources,
+                          ));
 
                     await updateBranchSelectionState(
                         parentMessageUuid,
@@ -2950,7 +2941,7 @@ const Page: React.FC = () => {
             sessionUuid?: string;
             imagePaths?: string[];
             mediaMarker?: string;
-        }) => {
+        }): Promise<void> => {
             const activeSessionId =
                 sessionUuid ?? currentSessionIdRef.current ?? currentSessionId;
             if (!chatKey || !activeSessionId) return;
@@ -2975,8 +2966,8 @@ const Page: React.FC = () => {
 
             let provider: LlmProvider;
             let settings: ModelSettings;
-            let contextSize: number;
             let maxTokens: number;
+            let inputBudget: number;
             let previousSelection: string | null | undefined;
             let startupCompleted = false;
             try {
@@ -2993,7 +2984,7 @@ const Page: React.FC = () => {
                     if (!isActiveGeneration()) return;
                 }
                 settings = getModelSettings();
-                ({ contextSize, maxTokens } =
+                ({ maxTokens, inputBudget } =
                     provider.resolveRuntimeSettings(settings));
 
                 if (!isActiveGeneration()) return;
@@ -3031,29 +3022,35 @@ const Page: React.FC = () => {
             }
 
             let errorMessage: string | null = null;
+            preparedReplyRef.current = undefined;
             activeKnowledgeSourcesRef.current = [];
 
             try {
                 const normalSystemPrompt = buildChatSystemPrompt(systemPrompt);
-                const history = buildHistory(
-                    historyPath,
-                    promptText,
-                    contextSize,
-                    maxTokens,
-                    stopAtMessageUuid,
-                );
+                const useConversationMemory =
+                    provider.getBackendKind() === "tauri" &&
+                    !imagePaths?.length;
+                let history = useConversationMemory
+                    ? []
+                    : buildHistory(
+                          historyPath,
+                          promptText,
+                          inputBudget,
+                          stopAtMessageUuid,
+                      );
                 const normalMessages: LlmMessage[] = [
                     { role: "system", content: normalSystemPrompt },
                     ...history,
                     { role: "user", content: promptText },
                 ];
-                const inputBudget =
-                    contextSize - maxTokens - OVERFLOW_SAFETY_TOKENS;
                 const normalPromptTokenEstimate = normalMessages.reduce(
                     (total, message) => total + approxTokens(message.content),
                     0,
                 );
-                if (normalPromptTokenEstimate > inputBudget) {
+                if (
+                    provider.getBackendKind() === "wasm" &&
+                    normalPromptTokenEstimate > inputBudget
+                ) {
                     throw new Error(
                         "Prompt exceeds the model context window. Reduce history, lower max tokens, or increase context length.",
                     );
@@ -3091,15 +3088,18 @@ const Page: React.FC = () => {
                     .text.replaceAll(MEDIA_MARKER, "")
                     .replace(/\[\d+ image attachments? provided\]/gi, "")
                     .trim();
-                const remainingKnowledgeBytes = Math.max(
-                    0,
-                    (inputBudget - normalPromptTokenEstimate) * 4 - 2,
-                );
+                const remainingKnowledgeBytes = useConversationMemory
+                    ? 6000
+                    : Math.max(
+                          0,
+                          (inputBudget - normalPromptTokenEstimate) * 4 - 2,
+                      );
                 if (
                     isTauriRuntime &&
                     knowledgeQuery &&
                     remainingKnowledgeBytes > 0
                 ) {
+                    setConversationStatus("Finding sources");
                     try {
                         knowledgeContext =
                             await provider.withKnowledgeRetrieval(
@@ -3115,17 +3115,19 @@ const Page: React.FC = () => {
                         if (!isActiveGeneration()) return;
                     } catch (error) {
                         const { name } = tauriCommandError(error);
-                        if (!isActiveGeneration() || name === "cancelled") {
+                        if (
+                            !isActiveGeneration() ||
+                            name === "cancelled" ||
+                            name === "stale"
+                        ) {
                             return;
-                        }
-                        if (name === "embedding_missing") {
-                            throw error;
                         }
                         log.warn(
                             "Knowledge retrieval failed; continuing without source context",
                             error,
                         );
                     }
+                    setConversationStatus(null);
                 }
                 if (!isActiveGeneration()) return;
 
@@ -3139,20 +3141,52 @@ const Page: React.FC = () => {
                 }
 
                 if (resetContext) {
-                    await provider.resetContext(contextSize);
+                    await provider.resetContext(
+                        provider.resolveRuntimeSettings(settings, false)
+                            .contextSize,
+                    );
                     if (!isActiveGeneration()) return;
+                }
+
+                ({ maxTokens, inputBudget } =
+                    provider.resolveRuntimeSettings(settings));
+                if (
+                    provider.getBackendKind() === "tauri" &&
+                    !useConversationMemory
+                ) {
+                    history = buildHistory(
+                        historyPath,
+                        promptText,
+                        inputBudget,
+                        stopAtMessageUuid,
+                    );
+                    normalMessages.splice(
+                        1,
+                        normalMessages.length - 2,
+                        ...history,
+                    );
+                    if (
+                        normalMessages.reduce(
+                            (total, message) =>
+                                total + approxTokens(message.content),
+                            0,
+                        ) > inputBudget
+                    ) {
+                        throw new Error(
+                            "Prompt exceeds the loaded model context window. Reduce history, lower max output, or increase context length.",
+                        );
+                    }
                 }
 
                 let messages = normalMessages;
                 let activeSources: GroundedSource[] = [];
-                if (knowledgeContext) {
+                if (knowledgeContext && !useConversationMemory) {
                     const candidateMessages: LlmMessage[] = [
                         {
                             role: "system",
                             content: `${normalSystemPrompt}\n\n${knowledgeContext.text}`,
                         },
-                        ...history,
-                        { role: "user", content: promptText },
+                        ...normalMessages.slice(1),
                     ];
                     if (
                         candidateMessages.reduce(
@@ -3164,6 +3198,45 @@ const Page: React.FC = () => {
                         messages = candidateMessages;
                         activeSources = knowledgeContext.sources;
                     }
+                }
+                if (useConversationMemory) {
+                    const selectedPath = slicePathUntil(
+                        historyPath,
+                        stopAtMessageUuid,
+                    ).map((message) => message.messageUuid);
+                    if (selectedPath.at(-1) !== parentMessageUuid)
+                        selectedPath.push(parentMessageUuid);
+                    const prepared = await prepareDesktopConversation(
+                        {
+                            sessionUuid: activeSessionId,
+                            path: selectedPath,
+                            system: normalSystemPrompt,
+                            current: promptText,
+                            historyQuery: knowledgeQuery,
+                            maxTokens,
+                            groundingCandidates: knowledgeContext?.candidates,
+                        },
+                        provider,
+                        {
+                            isCurrent: isActiveGeneration,
+                            onProgress: () =>
+                                setConversationStatus(
+                                    "Remembering earlier messages",
+                                ),
+                        },
+                    );
+                    if (!isActiveGeneration()) return;
+                    setConversationStatus(null);
+                    if (!prepared) {
+                        if (previousSelection) {
+                            void updateBranchSelectionState(
+                                parentMessageUuid,
+                                previousSelection,
+                            );
+                        }
+                        return;
+                    }
+                    preparedReplyRef.current = prepared;
                 }
                 activeKnowledgeSourcesRef.current = activeSources;
                 const nativeImagePaths =
@@ -3178,7 +3251,7 @@ const Page: React.FC = () => {
                 }
 
                 const generate = () =>
-                    provider.generateChatStream(
+                    (preparedReplyRef.current ?? provider).generateChatStream(
                         {
                             messages,
                             imagePaths: nativeImagePaths,
@@ -3219,7 +3292,8 @@ const Page: React.FC = () => {
                         name === "prompt_too_long" &&
                         !streamingBufferRef.current &&
                         streamingChunksRef.current.length === 0 &&
-                        activeSources.length > 0
+                        activeSources.length > 0 &&
+                        !useConversationMemory
                     ) {
                         activeSources = [];
                         activeKnowledgeSourcesRef.current = [];
@@ -3276,16 +3350,19 @@ const Page: React.FC = () => {
 
                 activeKnowledgeSourcesRef.current = [];
 
-                const assistantMessage = await addMessage(
-                    activeSessionId,
-                    "assistant",
-                    rawAssistantText,
-                    chatKey,
-                    parentMessageUuid,
-                    [],
-                    activeSources,
-                );
+                const assistantMessage = await (preparedReplyRef.current
+                    ? preparedReplyRef.current.saveAnswer(rawAssistantText)
+                    : addMessage(
+                          activeSessionId,
+                          "assistant",
+                          rawAssistantText,
+                          chatKey,
+                          parentMessageUuid,
+                          [],
+                          activeSources,
+                      ));
 
+                if (!isActiveGeneration()) return;
                 void updateBranchSelectionState(
                     parentMessageUuid,
                     assistantMessage.messageUuid,
@@ -3313,7 +3390,9 @@ const Page: React.FC = () => {
                     setModelGateStatus("missing");
                 } else {
                     const message = formatErrorMessage(error);
-                    showMiniDialog({ title: "Model error", message });
+                    if (name !== "cancelled" && name !== "stale") {
+                        showMiniDialog({ title: "Model error", message });
+                    }
                 }
                 if (previousSelection) {
                     void updateBranchSelectionState(
@@ -3324,6 +3403,8 @@ const Page: React.FC = () => {
             } finally {
                 if (isActiveGeneration()) {
                     activeKnowledgeSourcesRef.current = [];
+                    preparedReplyRef.current = undefined;
+                    setConversationStatus(null);
                     generationActiveRef.current = false;
                     setIsGenerating(false);
                     setIsStreamingOutro(false);
@@ -3344,6 +3425,7 @@ const Page: React.FC = () => {
             ensureProvider,
             getModelSettings,
             buildHistory,
+            slicePathUntil,
             branchSelections,
             updateBranchSelectionState,
             appendMessageToState,
@@ -3428,9 +3510,10 @@ const Page: React.FC = () => {
                 (switcher.currentIndex - 1 + switcher.total) % switcher.total;
             const target = switcher.targets[nextIndex];
             if (!target) return;
+            cancelActiveGenerationForNavigation();
             void updateBranchSelectionState(switcher.selectionKey, target);
         },
-        [updateBranchSelectionState],
+        [cancelActiveGenerationForNavigation, updateBranchSelectionState],
     );
 
     const handleNextBranch = useCallback(
@@ -3439,9 +3522,10 @@ const Page: React.FC = () => {
             const nextIndex = (switcher.currentIndex + 1) % switcher.total;
             const target = switcher.targets[nextIndex];
             if (!target) return;
+            cancelActiveGenerationForNavigation();
             void updateBranchSelectionState(switcher.selectionKey, target);
         },
-        [updateBranchSelectionState],
+        [cancelActiveGenerationForNavigation, updateBranchSelectionState],
     );
 
     const handleOpenDrawer = useCallback(() => {
@@ -4575,6 +4659,7 @@ const Page: React.FC = () => {
                             attachmentPreviews={attachmentPreviews}
                             branchSwitchers={branchSwitchers}
                             loadingPhrase={loadingPhrase}
+                            preparationStatus={conversationStatus}
                             loadingDots={loadingDots}
                             isGenerating={isGenerating}
                             isStreamingOutro={isStreamingOutro}

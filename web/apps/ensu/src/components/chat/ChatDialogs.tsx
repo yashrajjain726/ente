@@ -1,4 +1,8 @@
 import type { KnowledgePack } from "@/services/knowledge";
+import {
+    DEFAULT_TAURI_CONTEXT_SIZE,
+    resolveGenerationBudget,
+} from "@/services/llm/budget";
 import type { NotesCollectionView } from "@/services/notes-lifecycle";
 import { isTauriRuntime as detectTauriAppRuntime } from "@/services/tauri-runtime";
 import {
@@ -241,14 +245,13 @@ export const ChatDialogs = memo(
     }: ChatDialogsProps) => {
         const openExternalUrl = async (url: string) => {
             if (isTauriRuntime || detectTauriAppRuntime()) {
-                try {
-                    const { openUrl } =
-                        await import("@tauri-apps/plugin-opener");
-                    await openUrl(url);
-                    return;
-                } catch {
-                    // Fall through to window.open.
-                }
+                const opened = await import("@tauri-apps/plugin-opener")
+                    .then(({ openUrl }) => openUrl(url))
+                    .then(
+                        () => true,
+                        () => false,
+                    );
+                if (opened) return;
             }
 
             if (typeof window !== "undefined") {
@@ -328,11 +331,11 @@ export const ChatDialogs = memo(
         }, [showSystemPromptSettings, systemPrompt]);
 
         const validateModelSettings = React.useCallback(() => {
-            const contextErrorValue =
+            let contextErrorValue =
                 draftContextLength && !/^\d+$/.test(draftContextLength)
                     ? "Enter a number"
                     : undefined;
-            const maxTokensErrorValue =
+            let maxTokensErrorValue =
                 draftMaxTokens && !/^\d+$/.test(draftMaxTokens)
                     ? "Enter a number"
                     : undefined;
@@ -344,22 +347,36 @@ export const ChatDialogs = memo(
                 ? Number(draftMaxTokens)
                 : undefined;
 
-            const maxTokensLimitError =
-                contextValue && maxTokensValue && maxTokensValue > contextValue
-                    ? "Must be <= context length"
-                    : undefined;
+            if (isTauriRuntime) {
+                const contextSize = contextValue ?? DEFAULT_TAURI_CONTEXT_SIZE;
+                if (!contextErrorValue) {
+                    try {
+                        resolveGenerationBudget(contextSize, 1);
+                    } catch (error) {
+                        contextErrorValue = (error as Error).message;
+                    }
+                }
+                if (!contextErrorValue && !maxTokensErrorValue) {
+                    try {
+                        resolveGenerationBudget(contextSize, maxTokensValue);
+                    } catch (error) {
+                        maxTokensErrorValue = (error as Error).message;
+                    }
+                }
+            } else if (
+                !maxTokensErrorValue &&
+                contextValue &&
+                maxTokensValue &&
+                maxTokensValue > contextValue
+            ) {
+                maxTokensErrorValue = "Must be <= context length";
+            }
 
             setDraftContextError(contextErrorValue ?? null);
-            setDraftMaxTokensError(
-                maxTokensErrorValue ?? maxTokensLimitError ?? null,
-            );
+            setDraftMaxTokensError(maxTokensErrorValue ?? null);
 
-            return !(
-                contextErrorValue ||
-                maxTokensErrorValue ||
-                maxTokensLimitError
-            );
-        }, [draftContextLength, draftMaxTokens]);
+            return !(contextErrorValue || maxTokensErrorValue);
+        }, [draftContextLength, draftMaxTokens, isTauriRuntime]);
 
         return (
             <>
@@ -1520,7 +1537,11 @@ export const ChatDialogs = memo(
                                             <TextField
                                                 fullWidth
                                                 label="Max output"
-                                                placeholder="2048"
+                                                placeholder={
+                                                    isTauriRuntime
+                                                        ? "Auto"
+                                                        : "2048"
+                                                }
                                                 value={draftMaxTokens}
                                                 onChange={(event) =>
                                                     setDraftMaxTokens(
@@ -1538,7 +1559,9 @@ export const ChatDialogs = memo(
                                         variant="mini"
                                         sx={{ color: "text.muted" }}
                                     >
-                                        Leave blank to use model defaults
+                                        {isTauriRuntime
+                                            ? "Leave blank for Auto. Output adjusts to the available context."
+                                            : "Leave blank to use model defaults."}
                                     </Typography>
                                 </Stack>
                             </Stack>
