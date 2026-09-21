@@ -91,15 +91,14 @@ import workmanager_apple
     if defaults.bool(forKey: "flutter.ls.internal_user_disabled") {
       return false
     }
-    if !defaults.bool(forKey: "flutter.ls.bg_debug_notifications_enabled")
-      && defaults.object(forKey: "flutter.ls.bg_debug_notifications_enabled") != nil
-    {
+    if !defaults.bool(forKey: "flutter.ls.bg_debug_notifications_enabled") &&
+        defaults.object(forKey: "flutter.ls.bg_debug_notifications_enabled") != nil {
       return false
     }
 
     guard let remoteFlags = defaults.string(forKey: "flutter.remote_flags"),
-      let data = remoteFlags.data(using: .utf8),
-      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+          let data = remoteFlags.data(using: .utf8),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     else {
       return false
     }

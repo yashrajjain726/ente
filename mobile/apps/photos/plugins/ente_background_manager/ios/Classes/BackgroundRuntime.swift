@@ -8,14 +8,12 @@ import os
 final class BackgroundRuntime: NSObject {
   static let shared = BackgroundRuntime()
   private static let logger = Logger(subsystem: "io.ente.background", category: "BackgroundManager")
-  private static let preemptionTimeout: TimeInterval = 30
   private var configuration = StoredConfiguration.load()
   private var isAllowed: () -> Bool = { false }
   private var registrant: ((FlutterPluginRegistry) -> Void)?
   private let observers = NSHashTable<BackgroundManagerPlugin>.weakObjects()
   private var registrations: [String: Bool] = [:]
   private var active: Run?
-  private var pending: Pending?
   private var isForeground = false
   private var installed = false
   private var reconciling = false
@@ -35,19 +33,6 @@ final class BackgroundRuntime: NSObject {
     var budgetTimer: DispatchWorkItem?
     var foregroundTimer: DispatchWorkItem?
     var stopResults: [FlutterResult] = []
-
-    init(task: BGTask, configuration: TaskConfiguration, startedAt: TimeInterval) {
-      self.task = task
-      self.configuration = configuration
-      self.startedAt = startedAt
-    }
-  }
-
-  private final class Pending {
-    let task: BGTask
-    let configuration: TaskConfiguration
-    let startedAt: TimeInterval
-    var timer: DispatchWorkItem?
 
     init(task: BGTask, configuration: TaskConfiguration, startedAt: TimeInterval) {
       self.task = task
@@ -105,7 +90,6 @@ final class BackgroundRuntime: NSObject {
 
   @objc private func foreground() {
     isForeground = true
-    finishPending(outcome: "skipped", reason: "foreground", success: true)
     if let run = active { stop(run, reason: "foreground") }
   }
 
@@ -114,7 +98,6 @@ final class BackgroundRuntime: NSObject {
   }
 
   func requestStop(result: FlutterResult? = nil) {
-    finishPending(outcome: "skipped", reason: "requested", success: true)
     guard let run = active else {
       result?(nil)
       return
@@ -277,12 +260,10 @@ final class BackgroundRuntime: NSObject {
         identifier: task.identifier, outcome: "failed", reason: "schedule",
         error: String(describing: error))
     }
-    let occupant = active
-    let preempts = occupant.map { canPreempt($0, with: policy) } ?? false
     let skip: String?
     if !isAllowed() {
       skip = "disabled"
-    } else if occupant != nil, !preempts {
+    } else if active != nil {
       skip = "busy"
     } else if isForeground || UIApplication.shared.applicationState != .background {
       skip = "foreground"
@@ -294,66 +275,15 @@ final class BackgroundRuntime: NSObject {
       task.setTaskCompleted(success: true)
       return
     }
-    task.expirationHandler = { [weak task] in
-      DispatchQueue.main.async {
-        guard let task else { return }
-        self.expire(task)
-      }
-    }
-    if let occupant {
-      preempt(occupant, for: Pending(task: task, configuration: policy, startedAt: startedAt))
-      return
-    }
-    admit(task, policy: policy, startedAt: startedAt)
-  }
-
-  private func expire(_ task: BGTask) {
-    if pending?.task === task {
-      finishPending(outcome: "stopped", reason: "expired", success: false)
-    } else if let run = active, run.task === task {
-      stop(run, reason: "system")
-      retire(run, outcome: "stopped", reason: "expired", success: false)
-    }
-  }
-
-  private func canPreempt(_ occupant: Run, with policy: TaskConfiguration) -> Bool {
-    pending == nil && !isForeground && UIApplication.shared.applicationState == .background
-      && occupant.configuration.kind == "refresh" && policy.kind == "processing"
-  }
-
-  private func preempt(_ occupant: Run, for waiting: Pending) {
-    pending = waiting
-    let timer = DispatchWorkItem { [weak waiting] in
-      guard let waiting, self.pending === waiting else { return }
-      self.finishPending(outcome: "skipped", reason: "busy", success: true)
-    }
-    waiting.timer = timer
-    DispatchQueue.main.asyncAfter(deadline: .now() + Self.preemptionTimeout, execute: timer)
-    stop(occupant, reason: "preempted")
-  }
-
-  private func takePending() -> Pending? {
-    guard let waiting = pending else { return nil }
-    pending = nil
-    waiting.timer?.cancel()
-    return waiting
-  }
-
-  private func finishPending(outcome: String, reason: String, success: Bool) {
-    guard let waiting = takePending() else { return }
-    report(identifier: waiting.configuration.identifier, outcome: outcome, reason: reason)
-    waiting.task.expirationHandler = nil
-    waiting.task.setTaskCompleted(success: success)
-  }
-
-  private func resumePending() {
-    guard let waiting = takePending() else { return }
-    admit(waiting.task, policy: waiting.configuration, startedAt: waiting.startedAt)
-  }
-
-  private func admit(_ task: BGTask, policy: TaskConfiguration, startedAt: TimeInterval) {
     let run = Run(task: task, configuration: policy, startedAt: startedAt)
     active = run
+    task.expirationHandler = { [weak run] in
+      DispatchQueue.main.async {
+        guard let run, self.active === run else { return }
+        self.stop(run, reason: "system")
+        self.retire(run, outcome: "stopped", reason: "expired", success: false)
+      }
+    }
     if let budget = policy.runBudgetMs {
       let timer = DispatchWorkItem { [weak run] in
         guard let run, self.active === run else { return }
@@ -470,7 +400,6 @@ final class BackgroundRuntime: NSObject {
     }
     for result in run.stopResults { result(nil) }
     run.stopResults.removeAll()
-    resumePending()
   }
 
   private func report(
