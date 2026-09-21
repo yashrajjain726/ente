@@ -169,13 +169,65 @@ struct Component {
     boundary: Vec<Point>,
 }
 
-fn components(map: &ProbabilityMap, cutoff: f32, count: usize) -> Vec<Component> {
+fn background_regions(map: &ProbabilityMap, cutoff: f32) -> Vec<usize> {
+    let mut labels = vec![0; map.values.len()];
+    let mut touches_frame = vec![true];
+    let mut queue = Vec::new();
+    for seed in 0..map.values.len() {
+        if map.values[seed] >= cutoff || labels[seed] != 0 {
+            continue;
+        }
+        let label = touches_frame.len();
+        touches_frame.push(false);
+        labels[seed] = label;
+        queue.clear();
+        queue.push(seed);
+        let mut cursor = 0;
+        while cursor < queue.len() {
+            let index = queue[cursor];
+            cursor += 1;
+            let x = index % map.width;
+            let y = index / map.width;
+            touches_frame[label] |= x == 0 || y == 0 || x + 1 == map.width || y + 1 == map.height;
+            for dy in -1isize..=1 {
+                for dx in -1isize..=1 {
+                    let nx = x as isize + dx;
+                    let ny = y as isize + dy;
+                    if nx < 0 || ny < 0 || nx >= map.width as isize || ny >= map.height as isize {
+                        continue;
+                    }
+                    let neighbor = ny as usize * map.width + nx as usize;
+                    if map.values[neighbor] < cutoff && labels[neighbor] == 0 {
+                        labels[neighbor] = label;
+                        queue.push(neighbor);
+                    }
+                }
+            }
+        }
+    }
+    for label in &mut labels {
+        if touches_frame[*label] {
+            *label = 0;
+        }
+    }
+    labels
+}
+
+fn components(map: &ProbabilityMap, cutoff: f32, count: usize, outer_only: bool) -> Vec<Component> {
+    let background = outer_only.then(|| background_regions(map, cutoff));
     let mut visited = vec![false; map.values.len()];
     let mut components = Vec::new();
     for seed in 0..map.values.len() {
         if visited[seed] || map.values[seed] < cutoff {
             continue;
         }
+        let exterior = if seed < map.width {
+            0
+        } else {
+            background
+                .as_ref()
+                .map_or(0, |regions| regions[seed - map.width])
+        };
         let mut queue = vec![seed];
         visited[seed] = true;
         let mut cursor = 0;
@@ -197,6 +249,12 @@ fn components(map: &ProbabilityMap, cutoff: f32, count: usize) -> Vec<Component>
                 }
                 let neighbor = ny as usize * map.width + nx as usize;
                 if map.values[neighbor] < cutoff {
+                    if background
+                        .as_ref()
+                        .is_some_and(|regions| regions[neighbor] != exterior)
+                    {
+                        continue;
+                    }
                     let t = ((map.values[index] - cutoff)
                         / (map.values[index] - map.values[neighbor]))
                         as f64;
@@ -424,6 +482,20 @@ fn supporting_intersections(hull: &[Point], indices: [usize; 4]) -> Option<[Poin
 }
 
 pub(super) fn locate(map: &ProbabilityMap, frame: SourceExtent, budget: SearchBudget) -> Detection {
+    let detection = locate_with_boundaries(map, frame, budget, false);
+    if detection.quad.is_some() || matches!(budget, SearchBudget::Live) {
+        detection
+    } else {
+        locate_with_boundaries(map, frame, budget, true)
+    }
+}
+
+fn locate_with_boundaries(
+    map: &ProbabilityMap,
+    frame: SourceExtent,
+    budget: SearchBudget,
+    outer_only: bool,
+) -> Detection {
     let live = matches!(budget, SearchBudget::Live);
     let extent = SourceExtent {
         width: map.width as f64,
@@ -437,7 +509,7 @@ pub(super) fn locate(map: &ProbabilityMap, frame: SourceExtent, budget: SearchBu
     let cutoffs: &[f32] = if live { &[0.5] } else { &[0.5, 0.35, 0.7] };
     let component_groups = cutoffs
         .iter()
-        .map(|&cutoff| components(map, cutoff, if live { 2 } else { 4 }))
+        .map(|&cutoff| components(map, cutoff, if live { 2 } else { 4 }, outer_only))
         .collect::<Vec<_>>();
     let largest = component_groups
         .iter()
@@ -512,6 +584,7 @@ pub(super) fn locate(map: &ProbabilityMap, frame: SourceExtent, budget: SearchBu
                 else {
                     continue;
                 };
+                let needs_complete_source_support = needs_complete_source_support || outer_only;
                 if best.quad.is_none_or(|current| {
                     if current.needs_complete_source_support != needs_complete_source_support {
                         !needs_complete_source_support
@@ -1041,6 +1114,171 @@ mod tests {
             }
         }
         ProbabilityMap::new(values, 256, 256)
+    }
+
+    #[test]
+    fn enclosed_mask_hole_does_not_hide_a_partially_obscured_page() -> OpResult<()> {
+        let p = [(40.0, 75.0), (220.0, 75.0), (220.0, 190.0), (40.0, 190.0)]
+            .map(|(x, y)| Point { x, y });
+        for hole in [false, true] {
+            let mut mask = polygon_mask(p)?;
+            for y in 177..190 {
+                for x in 100..180 {
+                    mask.values[y * 256 + x] = 0.02;
+                }
+            }
+            if hole {
+                for y in 82..92 {
+                    for x in 116..160 {
+                        mask.values[y * 256 + x] = 0.02;
+                    }
+                }
+            }
+            let quad = locate(&mask, SourceExtent::new(2304, 4096)?, SearchBudget::Capture)
+                .quad
+                .ok_or(format!("page rejected with enclosed hole: {hole}"))?;
+            for (actual, expected) in points(quad.corners).into_iter().zip(p) {
+                assert!(distance(actual, expected) < 2.0);
+            }
+            if hole {
+                assert!(quad.needs_complete_source_support);
+                let mut source = ImageU8::new(256, 256, 3, vec![30; 256 * 256 * 3])?;
+                for y in 20..190 {
+                    for x in 40..220 {
+                        source.data[(y * 256 + x) * 3..(y * 256 + x + 1) * 3].fill(230);
+                    }
+                }
+                assert!(refine_capture(&source, quad.corners, false)?.is_some());
+                assert!(refine_capture(&source, quad.corners, true)?.is_none());
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn outer_boundaries_keep_open_and_diagonal_channels() -> OpResult<()> {
+        let mut values = vec![0.02; 100];
+        for y in 1..9 {
+            for x in 1..9 {
+                values[y * 10 + x] = 0.98;
+            }
+        }
+        for y in 3..7 {
+            for x in 3..7 {
+                values[y * 10 + x] = 0.02;
+            }
+        }
+        values[44] = 0.98;
+        let mask = ProbabilityMap::new(values, 10, 10)?;
+        let regions = background_regions(&mask, 0.5);
+        assert_eq!(regions[0], 0);
+        assert_ne!(regions[33], 0);
+        let mut open = mask;
+        for y in 0..4 {
+            open.values[y * 10 + 3] = 0.02;
+        }
+        let regions = background_regions(&open, 0.5);
+        assert_eq!(regions[33], 0);
+        assert_eq!(regions[66], 0);
+        open.values[13] = 0.98;
+        open.values[23] = 0.98;
+        open.values[11] = 0.02;
+        open.values[22] = 0.02;
+        assert_eq!(background_regions(&open, 0.5)[33], 0);
+        Ok(())
+    }
+
+    #[test]
+    fn enclosing_rectangles_do_not_override_missing_foreground() -> OpResult<()> {
+        let p = [(30.0, 30.0), (226.0, 30.0), (226.0, 226.0), (30.0, 226.0)]
+            .map(|(x, y)| Point { x, y });
+        for island in [false, true] {
+            let mut mask = polygon_mask(p)?;
+            for y in 50..206 {
+                for x in 50..206 {
+                    mask.values[y * 256 + x] = 0.02;
+                }
+            }
+            if island {
+                for y in 100..156 {
+                    for x in 100..156 {
+                        mask.values[y * 256 + x] = 0.98;
+                    }
+                }
+            }
+            let before = mask.values.clone();
+            let found = components(&mask, 0.5, 4, true);
+            assert_eq!(mask.values, before);
+            assert_eq!(found.len(), if island { 2 } else { 1 });
+            assert_eq!(found[0].pixels.len(), 196 * 196 - 156 * 156);
+            if island {
+                assert!(!found[1].boundary.is_empty());
+            }
+            for budget in [SearchBudget::Live, SearchBudget::Capture] {
+                assert!(
+                    locate(&mask, SourceExtent::new(1200, 1600)?, budget)
+                        .quad
+                        .is_none()
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn dominant_page_inside_a_separate_foreground_ring_keeps_its_boundary() -> OpResult<()> {
+        let p = [(50.0, 50.0), (206.0, 50.0), (206.0, 206.0), (50.0, 206.0)]
+            .map(|(x, y)| Point { x, y });
+        let mut mask = polygon_mask(p)?;
+        for y in 10..246 {
+            for x in 10..246 {
+                if !(12..244).contains(&x) || !(12..244).contains(&y) {
+                    mask.values[y * 256 + x] = 0.98;
+                }
+            }
+        }
+        for budget in [SearchBudget::Live, SearchBudget::Capture] {
+            let quad = locate_with_boundaries(&mask, SourceExtent::new(1200, 1600)?, budget, true)
+                .quad
+                .ok_or("separate enclosing component hid the page")?;
+            for (actual, expected) in points(quad.corners).into_iter().zip(p) {
+                assert!(distance(actual, expected) < 2.0);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn outer_boundaries_retain_frame_edges_without_exterior_pixels() -> OpResult<()> {
+        for coordinates in [
+            [(0.0, 0.0), (256.0, 0.0), (256.0, 256.0), (0.0, 256.0)],
+            [(30.0, 0.0), (220.0, 0.0), (220.0, 226.0), (30.0, 226.0)],
+            [(0.0, 30.0), (226.0, 30.0), (226.0, 226.0), (0.0, 226.0)],
+        ] {
+            let p = coordinates.map(|(x, y)| Point { x, y });
+            for hole in [false, true] {
+                let mut mask = polygon_mask(p)?;
+                if hole {
+                    for y in 90..110 {
+                        for x in 90..110 {
+                            mask.values[y * 256 + x] = 0.02;
+                        }
+                    }
+                }
+                let found = locate_with_boundaries(
+                    &mask,
+                    SourceExtent::new(1200, 1600)?,
+                    SearchBudget::Capture,
+                    true,
+                )
+                .quad
+                .ok_or("frame-edge page rejected")?;
+                for (actual, expected) in points(found.corners).into_iter().zip(p) {
+                    assert!(distance(actual, expected) < 2.0);
+                }
+            }
+        }
+        Ok(())
     }
 
     #[test]
