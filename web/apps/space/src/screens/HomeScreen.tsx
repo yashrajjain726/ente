@@ -23,6 +23,7 @@ import {
 } from "components/post-like-animation";
 import { SpacePostPhotoInput } from "components/PostPhotoInput";
 import { SpacePostPhotosCounter } from "components/PostPhotosCounter";
+import { SpacePostPhotosDots } from "components/PostPhotosDots";
 import { SpacePWAInstallPrompt } from "components/PWAInstallPrompt";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
 import { SpaceShareInviteButton } from "components/ShareInviteButton";
@@ -616,13 +617,19 @@ const FeedLikeButton: React.FC<FeedLikeButtonProps> = ({
     );
 };
 
-const FeedPhotoCaption: React.FC<{ caption: string }> = ({ caption }) => {
+const FeedPhotoOverlay: React.FC<{
+    caption?: string;
+    photoIndex: number;
+    photoCount: number;
+}> = ({ caption, photoIndex, photoCount }) => {
     return (
         <Box
-            title={caption}
             sx={{
                 ...feedPhotoCaptionTextSx,
                 bottom: 20,
+                display: "grid",
+                gap: "16px",
+                justifyItems: "center",
                 left: "50%",
                 maxWidth: "78%",
                 pointerEvents: "none",
@@ -632,7 +639,12 @@ const FeedPhotoCaption: React.FC<{ caption: string }> = ({ caption }) => {
                 zIndex: 2,
             }}
         >
-            <SpaceCaptionText caption={caption} lineClamp={2} />
+            <SpacePostPhotosDots index={photoIndex} count={photoCount} />
+            {caption && (
+                <Box title={caption} sx={{ minWidth: 0, width: "100%" }}>
+                    <SpaceCaptionText caption={caption} lineClamp={2} />
+                </Box>
+            )}
         </Box>
     );
 };
@@ -1136,7 +1148,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 sx={{
                     aspectRatio: frameAspectRatio,
                     bgcolor: "transparent",
-                    borderRadius: "16px",
+                    borderRadius: showFooter ? "16px 16px 0 0" : "16px",
                     maxWidth: "100%",
                     minWidth: 0,
                     overflow: "hidden",
@@ -1529,8 +1541,12 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         )}
                     </Box>
                 </Box>
-                {!isPostUnavailable && displayCaption && (
-                    <FeedPhotoCaption caption={displayCaption} />
+                {(photoCount > 1 || (!isPostUnavailable && displayCaption)) && (
+                    <FeedPhotoOverlay
+                        caption={isPostUnavailable ? undefined : displayCaption}
+                        photoIndex={photoIndex}
+                        photoCount={photoCount}
+                    />
                 )}
             </Box>
             {showFooter && (
