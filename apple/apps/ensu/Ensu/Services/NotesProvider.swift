@@ -162,6 +162,17 @@ actor NotesProvider {
         }
     }
 
+    func reload(_ locator: PassageLocator) async throws -> NotesHit? {
+        guard case .localNote(let collectionId, _, _, _, _) = locator else { return nil }
+        return try await diskGate.withLock {
+            _ = try self.registration(collectionId)
+            let root = self.root
+            return try await Task.detached {
+                try Self.handle(root, collectionId).reloadPassage(locator: locator)
+            }.value
+        }
+    }
+
     func verify(_ reference: NoteSourceReference) async throws -> NoteSourceReference {
         try await diskGate.withLock {
             let record = try self.registration(reference.collectionId)

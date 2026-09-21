@@ -4,15 +4,19 @@ import io.ente.ensu.AppState
 import io.ente.ensu.bindings.AssetDownloadException
 import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.bindings.ConversationException
+import io.ente.ensu.bindings.ConversationFollowup
 import io.ente.ensu.bindings.ConversationProgressCallback
 import io.ente.ensu.bindings.ConversationRequest
 import io.ente.ensu.bindings.DbException
 import io.ente.ensu.bindings.GroundedExcerpt
 import io.ente.ensu.bindings.GroundedSource
+import io.ente.ensu.bindings.IncludedPassage
 import io.ente.ensu.bindings.LlmException
+import io.ente.ensu.bindings.PassageLocator
 import io.ente.ensu.bindings.buildGroundedPromptContext
 import io.ente.ensu.bindings.cleanAssistantText
 import io.ente.ensu.bindings.finalizeGroundedAssistantText
+import io.ente.ensu.bindings.parseGroundedAssistantText
 import io.ente.ensu.bindings.selectMixedGroundingCandidates
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.knowledge.KnowledgeProvider
@@ -68,6 +72,7 @@ internal class ChatStoreActions(
     private var sessionSummaryJob: Job? = null
     @Volatile private var stopRequested = false
     @Volatile private var activePreparation: ConversationPreparationControl? = null
+    @Volatile private var activeFollowup: ConversationFollowup? = null
     private var streamingParentId: String? = null
     private var activeGenerationToken = 0L
     private var pendingOverflow: PendingOverflow? = null
@@ -307,12 +312,13 @@ internal class ChatStoreActions(
 
     fun stopGeneration() {
         if (state.value.chat.preparationStatus != null) activePreparation?.cancel()
+        activeFollowup?.cancel()
         stopRequested = true
         llmProvider.stopGeneration()
         generationJob?.cancel()
     }
 
-    fun retryAssistantMessage(messageId: String) {
+    fun retryAssistantMessage(messageId: String, searchAsWritten: Boolean = false) {
         val priorGeneration = generationJob
         val priorSummary = sessionSummaryJob
         if (state.value.chat.isGenerating) {
@@ -341,7 +347,7 @@ internal class ChatStoreActions(
             priorGeneration?.join()
             priorSummary?.join()
             llmProvider.resetContext()
-            startGeneration(sessionId, parent)
+            startGeneration(sessionId, parent, searchAsWritten)
         }
     }
 
@@ -477,13 +483,18 @@ internal class ChatStoreActions(
         }
     }
 
-    private fun startGeneration(sessionId: String, userMessage: ChatMessage) {
+    private fun startGeneration(
+        sessionId: String,
+        userMessage: ChatMessage,
+        searchAsWritten: Boolean = false,
+    ) {
         val scope = scope ?: return
         if (!state.value.chat.deviceCapability.isChatSupported()) return
         val prompt = buildPrompt(userMessage.text, userMessage.attachments)
         val priorGeneration = generationJob
         val priorSummary = sessionSummaryJob
         activePreparation?.cancel()
+        activeFollowup?.cancel()
         priorGeneration?.cancel()
         priorSummary?.cancel()
         llmProvider.stopGeneration()
@@ -514,6 +525,7 @@ internal class ChatStoreActions(
         rebuildChatState(sessionId)
 
         val notesScope = notesStore.suspendMaintenance()
+        var followup: ConversationFollowup? = null
         val activeJob = scope.launch {
             notesStore.awaitMaintenance()
             priorGeneration?.join()
@@ -530,6 +542,55 @@ internal class ChatStoreActions(
             val progressTracker = DownloadProgressTracker()
             var embeddingAssetInvalid = false
             val enabledDatasets = state.value.knowledge.enabledReadyDatasets
+            try {
+                if (prompt.imageFiles.isEmpty()) {
+                    val history = buildSelectedPath(sessionId).takeWhile { it.id != userMessage.id }
+                    val hasCurrentSources =
+                        searchAsWritten ||
+                            enabledDatasets.isNotEmpty() ||
+                            notesStore.state.value.collections.isNotEmpty()
+                    val turn =
+                        withContext(Dispatchers.IO) {
+                            if (
+                                hasCurrentSources ||
+                                    history.any {
+                                        it.author == MessageAuthor.Assistant &&
+                                            parseGroundedAssistantText(it.text).sources.isNotEmpty()
+                                    }
+                            ) {
+                                chatRepository.startFollowup(
+                                    sessionId,
+                                    history.map { it.id } + userMessage.id,
+                                    userMessage.text,
+                                )
+                            } else null
+                        }
+                    if (!isActive() || stopRequested) {
+                        turn?.cancel()
+                        return@launch
+                    }
+                    followup = turn
+                    activeFollowup = turn
+                    if (turn != null)
+                        state.update {
+                            it.copy(chat = it.chat.copy(preparationStatus = "Finding sources"))
+                        }
+                }
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (_: ConversationException.Cancelled) {
+                return@launch
+            } catch (error: Throwable) {
+                if (!isActive() || stopRequested) return@launch
+                logRepository.log(
+                    LogLevel.Warning,
+                    "Unable to prepare source search",
+                    details = error.message,
+                    tag = "Chat",
+                    throwable = error,
+                )
+                if (showFollowupError(error, userMessage.id)) return@launch
+            }
             val retrievalQuery = userMessage.text.trim()
             val knowledgeHits =
                 if (
@@ -577,6 +638,40 @@ internal class ChatStoreActions(
                         emptyList()
                     }
                 } else {
+                    emptyList()
+                }
+
+            val reloaded =
+                try {
+                    followup
+                        ?.let { turn ->
+                            val resolution =
+                                withContext(Dispatchers.IO) {
+                                    if (searchAsWritten) turn.searchAsWritten()
+                                    else turn.searchWithHistory(knowledgeHits)
+                                }
+                            if (!isActive() || stopRequested) return@launch
+                            resolution.referencedPassages.mapNotNull { reloadPassage(it) }
+                        }
+                        .orEmpty()
+                } catch (error: kotlinx.coroutines.CancellationException) {
+                    throw error
+                } catch (_: ConversationException.Cancelled) {
+                    return@launch
+                } catch (error: Throwable) {
+                    if (!isActive() || stopRequested) return@launch
+                    logRepository.log(
+                        LogLevel.Warning,
+                        "Unable to resolve earlier sources",
+                        details = error.message,
+                        tag = "Chat",
+                        throwable = error,
+                    )
+                    if (showFollowupError(error, userMessage.id)) return@launch
+                    activeFollowup = null
+                    followup?.cancel()
+                    followup?.destroy()
+                    followup = null
                     emptyList()
                 }
 
@@ -654,6 +749,8 @@ internal class ChatStoreActions(
                     selection,
                     modelSettingsActions.resolveTemperature(settings),
                     knowledgeHits,
+                    followup,
+                    reloaded,
                     { isActive() && state.value.modelSettings == settings },
                 )
                 if (embeddingAssetInvalid) modelSettingsActions.refreshModelDownloadInfo()
@@ -830,8 +927,57 @@ internal class ChatStoreActions(
         }
         generationJob = activeJob
         activeJob.invokeOnCompletion {
+            if (activeFollowup === followup) activeFollowup = null
+            followup?.cancel()
+            followup?.destroy()
             notesScope.close()
             scope.launch { settleGenerationIfActive(generationToken, sessionId) }
+        }
+    }
+
+    private fun showFollowupError(error: Throwable, messageId: String): Boolean {
+        val message =
+            when (error) {
+                is ConversationException.Stale -> "Conversation changed. Retry the message."
+                is DbException -> "Conversation could not be read. Retry the message."
+                else -> return false
+            }
+        state.update {
+            it.copy(
+                chat =
+                    it.chat.copy(
+                        transientAssistantError = message,
+                        transientAssistantParentId = messageId,
+                    )
+            )
+        }
+        return true
+    }
+
+    private suspend fun reloadPassage(reference: IncludedPassage): GroundedExcerpt? {
+        return try {
+            when (val locator = reference.locator) {
+                is PassageLocator.EnsuPack ->
+                    knowledgeProvider.reload(locator, state.value.knowledge.enabledReadyDatasets)
+                is PassageLocator.LocalNote -> notesStore.reload(locator)
+            }
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (error: ConversationException.Cancelled) {
+            throw error
+        } catch (error: ConversationException.Stale) {
+            throw error
+        } catch (error: DbException) {
+            throw error
+        } catch (error: Exception) {
+            logRepository.log(
+                LogLevel.Warning,
+                "Unable to reload source",
+                details = error.message,
+                tag = "Chat",
+                throwable = error,
+            )
+            null
         }
     }
 
@@ -842,6 +988,8 @@ internal class ChatStoreActions(
         selection: LlmModelSelection,
         temperature: Float,
         searched: List<GroundedExcerpt>,
+        followup: ConversationFollowup?,
+        reloaded: List<GroundedExcerpt>,
         isActive: () -> Boolean,
     ) {
         val buffer = StringBuilder()
@@ -863,6 +1011,8 @@ internal class ChatStoreActions(
                             historyQuery = userMessage.text,
                             maxTokens = null,
                             searched = searched,
+                            followup = followup,
+                            reloaded = reloaded,
                         ),
                     )
                 val preparationControl = ConversationPreparationControl(preparation.work)
@@ -1649,6 +1799,7 @@ internal class ChatStoreActions(
     private fun cancelGeneration() {
         clearTransientAssistantError()
         activePreparation?.cancel()
+        activeFollowup?.cancel()
         generationJob?.cancel()
         llmProvider.stopGeneration()
         invalidateGenerationToken()

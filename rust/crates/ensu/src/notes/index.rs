@@ -13,6 +13,7 @@ const MAX_HITS_PER_DOCUMENT: usize = 3;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct NotesSearchHit {
+    pub locator: crate::retrieval::PassageLocator,
     pub collection_id: String,
     pub document_id: String,
     pub revision: String,
@@ -165,6 +166,77 @@ impl NotesCollectionIndex {
             }))
     }
 
+    fn passage_locator(
+        &self,
+        document: &IndexedDocument,
+        chunk_index: usize,
+    ) -> crate::retrieval::PassageLocator {
+        crate::retrieval::PassageLocator::LocalNote {
+            collection_id: self.collection_id.clone(),
+            document_id: document.document_id.clone(),
+            indexed_revision: document.revision.clone(),
+            shard_sha256: document.shard_sha256.clone(),
+            chunk_index: chunk_index as u64,
+        }
+    }
+
+    pub fn reload_passage(
+        &self,
+        locator: &crate::retrieval::PassageLocator,
+    ) -> Result<Option<NotesSearchHit>, NotesError> {
+        let crate::retrieval::PassageLocator::LocalNote {
+            collection_id,
+            document_id,
+            indexed_revision,
+            shard_sha256,
+            chunk_index,
+        } = locator
+        else {
+            return Ok(None);
+        };
+        if collection_id != &self.collection_id {
+            return Ok(None);
+        }
+        let Some(document) = self.documents.iter().find(|document| {
+            &document.document_id == document_id
+                && &document.revision == indexed_revision
+                && &document.shard_sha256 == shard_sha256
+        }) else {
+            return Ok(None);
+        };
+        let Ok(chunk_index) = usize::try_from(*chunk_index) else {
+            return Ok(None);
+        };
+        if chunk_index >= document.chunk_count {
+            return Ok(None);
+        }
+        let directory = shard_directory(
+            self.read_pin.collection_directory(),
+            document_id,
+            indexed_revision,
+        );
+        let shard = load_and_validate_shard_metadata(
+            &directory,
+            collection_id,
+            document_id,
+            indexed_revision,
+            document.chunk_count,
+            shard_sha256,
+            None,
+        )?;
+        let chunk = &shard.chunks[chunk_index];
+        Ok(Some(NotesSearchHit {
+            locator: locator.clone(),
+            collection_id: collection_id.clone(),
+            document_id: document_id.clone(),
+            revision: indexed_revision.clone(),
+            score: 0.0,
+            title: shard.title,
+            section: chunk.section.clone(),
+            text: chunk.text.clone(),
+        }))
+    }
+
     pub fn search(&self, query: &[f32]) -> Result<Vec<NotesSearchHit>, NotesError> {
         validate_search(query, self.dimension)?;
         let mut ranked = Vec::with_capacity(MAX_HITS_PER_COLLECTION);
@@ -244,6 +316,7 @@ impl NotesCollectionIndex {
                 NotesError::InvalidIndex("selected shard chunk is missing".to_string())
             })?;
             hits.push(NotesSearchHit {
+                locator: self.passage_locator(document, candidate.chunk_index),
                 collection_id: self.collection_id.clone(),
                 document_id: document.document_id.clone(),
                 revision: document.revision.clone(),
@@ -342,6 +415,56 @@ mod tests {
         let mut embedding = vec![0.0; 512];
         embedding[axis] = score;
         embedding
+    }
+
+    #[test]
+    fn passage_reload_checks_revision_chunk_and_shard_integrity() {
+        use crate::retrieval::PassageLocator;
+        let temp = tempfile::tempdir().unwrap();
+        let doc = document("trip.md", 2);
+        let mut writer = NotesIndexWriter::open(temp.path(), COLLECTION_ID.to_string()).unwrap();
+        writer
+            .commit_document(&doc, &[embedding(0, 1.0), embedding(0, 0.9)], &source(&doc))
+            .unwrap();
+        writer.publish(true).unwrap();
+        let index = NotesCollectionIndex::open(temp.path(), COLLECTION_ID.to_string()).unwrap();
+        let hits = index.search(&embedding(0, 1.0)).unwrap();
+        assert_eq!(hits.len(), 2);
+        assert_ne!(hits[0].locator, hits[1].locator);
+        drop(index);
+        let index = NotesCollectionIndex::open(temp.path(), COLLECTION_ID.to_string()).unwrap();
+        for hit in &hits {
+            let loaded = index.reload_passage(&hit.locator).unwrap().unwrap();
+            assert_eq!(loaded.text, hit.text);
+            assert_eq!(loaded.locator, hit.locator);
+        }
+        for field in ["revision", "shard", "chunk", "collection", "document"] {
+            let mut wrong = hits[0].locator.clone();
+            if let PassageLocator::LocalNote {
+                indexed_revision,
+                shard_sha256,
+                chunk_index,
+                collection_id,
+                document_id,
+            } = &mut wrong
+            {
+                match field {
+                    "revision" => *indexed_revision = "c".repeat(64),
+                    "shard" => *shard_sha256 = "c".repeat(64),
+                    "chunk" => *chunk_index = u64::MAX,
+                    "collection" => *collection_id = "other".to_string(),
+                    _ => *document_id = "other.md".to_string(),
+                }
+            }
+            assert!(index.reload_passage(&wrong).unwrap().is_none(), "{field}");
+        }
+        let directory = shard_directory(
+            &collection_directory(temp.path(), COLLECTION_ID),
+            &doc.document_id,
+            &doc.revision,
+        );
+        fs::write(directory.join(NOTES_SHARD_FILE), b"corrupt").unwrap();
+        assert!(index.reload_passage(&hits[0].locator).is_err());
     }
 
     #[test]

@@ -13,6 +13,7 @@ import io.ente.ensu.bindings.NotesCollection
 import io.ente.ensu.bindings.NotesException
 import io.ente.ensu.bindings.NotesIndexOptions
 import io.ente.ensu.bindings.NotesProgressCallback
+import io.ente.ensu.bindings.PassageLocator
 import io.ente.ensu.bindings.notesContentRevision
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -129,6 +130,11 @@ class NotesProvider(private val context: Context) {
     internal suspend fun search(id: String, query: List<Float>) = withAccess {
         registration(id)
         handle(id).use { it.search(query) }
+    }
+
+    internal suspend fun reload(locator: PassageLocator.LocalNote) = withAccess {
+        registration(locator.collectionId)
+        handle(locator.collectionId).use { it.reloadPassage(locator) }
     }
 
     internal suspend fun inspectFreshness(id: String, cancel: NotesCancellation) = withAccess {

@@ -661,18 +661,126 @@ pub async fn knowledge_retrieve(
         }
         check_cancelled()?;
 
-        let candidates = ente_ensu::conversation::GroundingCandidates::new(excerpts, context_budget as usize)
-            .map_err(|error| ApiError::new("conversation", error.to_string()))?;
+        let candidates = ente_ensu::conversation::GroundingCandidates::new(vec![], excerpts, context_budget as usize)
+            .map_err(|error| ApiError::new("followup", error.to_string()))?;
         candidates.pack(context_budget as usize)
             .map(|context| context.map(|context| {
                 let mut result = GroundedPromptContextDto::from(context);
                 result.candidates = Some(candidates);
                 result
             }))
-            .map_err(|error| ApiError::new("conversation", error.to_string()))
+            .map_err(|error| ApiError::new("followup", error.to_string()))
     })
     .await
     .map_err(|_| ApiError::new("llm_thread", "Knowledge retrieval task failed"))?
+}
+
+pub(crate) async fn reload_for_followup(
+    app: &AppHandle,
+    reference: retrieval::IncludedPassage,
+    enabled_stable_ids: Vec<String>,
+    retrieval_epoch: u64,
+) -> Result<Option<retrieval::ReferencedPassage>, ApiError> {
+    let app = app.clone();
+    let indexes = Arc::clone(&app.state::<State>().indexes);
+    let (collection_ids, notes) = app
+        .try_state::<crate::commands::notes::State>()
+        .map_or_else(
+            || (Vec::new(), None),
+            |state| {
+                (
+                    state.available_index_collection_ids(),
+                    Some(state.retrieval_handle()),
+                )
+            },
+        );
+    let cancellation_epoch = app.state::<crate::commands::llm::State>().retrieval_epoch();
+    async_runtime::spawn_blocking(move || {
+        let check_cancelled = || {
+            if cancellation_epoch.load(Ordering::Relaxed) == retrieval_epoch {
+                Ok(())
+            } else {
+                Err(ApiError::new("cancelled", "Knowledge reload cancelled"))
+            }
+        };
+        check_cancelled()?;
+        let mut packs = Vec::new();
+        let mut note_hits = Vec::new();
+        match &reference.locator {
+            retrieval::PassageLocator::EnsuPack { dataset_id, .. } => {
+                if !enabled_stable_ids.contains(dataset_id) {
+                    return Ok(None);
+                }
+                let indexes = indexes.lock().unwrap_or_else(PoisonError::into_inner);
+                let Some(open) = indexes.get(dataset_id) else {
+                    return Ok(None);
+                };
+                let Some(hit) = open
+                    .index
+                    .reload_passage(&reference.locator)
+                    .map_err(retrieval_error)?
+                else {
+                    return Ok(None);
+                };
+                packs.push(retrieval::KnowledgePromptHit {
+                    dataset_id: dataset_id.clone(),
+                    hit,
+                });
+            }
+            retrieval::PassageLocator::LocalNote { collection_id, .. } => {
+                if !collection_ids.contains(collection_id) {
+                    return Ok(None);
+                }
+                let Some(notes) = &notes else { return Ok(None) };
+                match notes.reload_passage(&reference.locator) {
+                    Ok(Some(hit)) => note_hits.push(hit),
+                    Ok(None) => return Ok(None),
+                    Err(error) => {
+                        crate::commands::notes::mark_index_unreadable(&app, collection_id);
+                        logging::log(
+                            "Knowledge",
+                            format!("Notes passage reload unavailable: {error}"),
+                        );
+                        return Ok(None);
+                    }
+                }
+            }
+        }
+        check_cancelled()?;
+        let mut selected = select_verified_mixed_grounding(&packs, &note_hits, |source| {
+            check_cancelled()?;
+            let valid = notes
+                .as_ref()
+                .is_some_and(|notes| notes.verify_source_reference(source));
+            if !valid {
+                crate::commands::notes::mark_reference_stale(
+                    &app,
+                    &source.collection_id,
+                    source.document_id.clone(),
+                );
+            }
+            Ok(valid)
+        })?;
+        let Some(mut excerpt) = selected.pop() else {
+            return Ok(None);
+        };
+        let Some(passages) = reference.verified_spans(&excerpt.text) else {
+            return Ok(None);
+        };
+        if let (Some(notes), retrieval::GroundedSource::LocalNote { reference }) =
+            (&notes, &mut excerpt.source)
+        {
+            reference.collection_label = notes.collection_label(&reference.collection_id);
+        }
+        check_cancelled()?;
+        Ok(Some(retrieval::ReferencedPassage {
+            reference,
+            source: excerpt.source,
+            passages,
+        }))
+    })
+    .await
+    .map_err(|_| ApiError::new("retrieval_thread", "Knowledge reload task failed"))?
 }
 
 pub(crate) fn clear_for_exit(app: &AppHandle) {
@@ -703,6 +811,13 @@ mod tests {
 
     fn note(index: usize) -> NotesSearchHit {
         NotesSearchHit {
+            locator: retrieval::PassageLocator::LocalNote {
+                collection_id: COLLECTION_ID.to_owned(),
+                document_id: format!("note-{index}.md"),
+                indexed_revision: "a".repeat(64),
+                shard_sha256: "b".repeat(64),
+                chunk_index: 0,
+            },
             collection_id: COLLECTION_ID.to_string(),
             document_id: format!("note-{index}.md"),
             revision: "a".repeat(64),

@@ -107,6 +107,7 @@ internal fun MessageList(
     branchSelections: Map<String, Int>,
     onEditMessage: (ChatMessage) -> Unit,
     onRetryMessage: (ChatMessage) -> Unit,
+    onSearchMessage: ((ChatMessage) -> Unit)?,
     onBranchChange: (String, Int) -> Unit,
     onOpenAttachment: (Attachment) -> Unit,
     onStartDownload: (Boolean) -> Unit,
@@ -319,6 +320,7 @@ internal fun MessageList(
                             isLastMessage = message == messages.last(),
                             branchSelections = branchSelections,
                             onRetry = { onRetryMessage(message) },
+                            onSearch = onSearchMessage?.let { search -> { search(message) } },
                             onBranchChange = onBranchChange,
                             showsMetadata = true,
                         )
@@ -639,6 +641,7 @@ private fun AssistantMessageBubble(
     isLastMessage: Boolean,
     branchSelections: Map<String, Int>,
     onRetry: () -> Unit,
+    onSearch: (() -> Unit)?,
     onBranchChange: (String, Int) -> Unit,
     showsMetadata: Boolean,
 ) {
@@ -668,6 +671,14 @@ private fun AssistantMessageBubble(
                         onRetry()
                     }
                 )
+                onSearch?.let { search ->
+                    add(
+                        MessageAction("Search as written", HugeIcons.Search01Icon) {
+                            haptic.perform(HapticFeedbackType.TextHandleMove)
+                            search()
+                        }
+                    )
+                }
             }
         }
 

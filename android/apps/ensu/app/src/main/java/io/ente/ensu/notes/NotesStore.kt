@@ -14,7 +14,9 @@ import io.ente.ensu.bindings.NotesIndexOptions
 import io.ente.ensu.bindings.NotesProgress
 import io.ente.ensu.bindings.NotesProgressCallback
 import io.ente.ensu.bindings.NotesSummary
+import io.ente.ensu.bindings.PassageLocator
 import io.ente.ensu.bindings.notesLimits
+import io.ente.ensu.bindings.selectMixedGroundingCandidates
 import io.ente.ensu.bindings.withNotesCollectionLabel
 import io.ente.ensu.coroutines.runCatchingCancellable
 import io.ente.ensu.llm.LlmProvider
@@ -280,6 +282,22 @@ class NotesStore(
                 }
             }
             hits
+        }
+
+    suspend fun reload(locator: PassageLocator.LocalNote): GroundedExcerpt? =
+        withContext(Dispatchers.Main.immediate) {
+            if (_state.value.collections.none { it.id == locator.collectionId && it.eligible })
+                return@withContext null
+            try {
+                val hit = provider.reload(locator) ?: return@withContext null
+                verify(selectMixedGroundingCandidates(emptyList(), listOf(hit), 1u)).singleOrNull()
+            } catch (_: NotesException.RebuildRequired) {
+                enqueue(locator.collectionId, rebuild = true, immediate = true)
+                update(locator.collectionId) {
+                    it.copy(status = NotesStatus.Pending, indexAvailable = false)
+                }
+                null
+            }
         }
 
     suspend fun verify(excerpts: List<GroundedExcerpt>): List<GroundedExcerpt> =

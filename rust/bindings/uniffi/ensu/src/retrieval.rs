@@ -27,8 +27,137 @@ fn knowledge_dataset(
     })
 }
 
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum PassageLocator {
+    EnsuPack {
+        dataset_id: String,
+        revision_sha256: String,
+        row: u64,
+    },
+    LocalNote {
+        collection_id: String,
+        document_id: String,
+        indexed_revision: String,
+        shard_sha256: String,
+        chunk_index: u64,
+    },
+}
+
+impl From<core::PassageLocator> for PassageLocator {
+    fn from(value: core::PassageLocator) -> Self {
+        match value {
+            core::PassageLocator::EnsuPack {
+                dataset_id,
+                revision_sha256,
+                row,
+            } => Self::EnsuPack {
+                dataset_id,
+                revision_sha256,
+                row,
+            },
+            core::PassageLocator::LocalNote {
+                collection_id,
+                document_id,
+                indexed_revision,
+                shard_sha256,
+                chunk_index,
+            } => Self::LocalNote {
+                collection_id,
+                document_id,
+                indexed_revision,
+                shard_sha256,
+                chunk_index,
+            },
+        }
+    }
+}
+
+impl From<PassageLocator> for core::PassageLocator {
+    fn from(value: PassageLocator) -> Self {
+        match value {
+            PassageLocator::EnsuPack {
+                dataset_id,
+                revision_sha256,
+                row,
+            } => Self::EnsuPack {
+                dataset_id,
+                revision_sha256,
+                row,
+            },
+            PassageLocator::LocalNote {
+                collection_id,
+                document_id,
+                indexed_revision,
+                shard_sha256,
+                chunk_index,
+            } => Self::LocalNote {
+                collection_id,
+                document_id,
+                indexed_revision,
+                shard_sha256,
+                chunk_index,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct PassageSpan {
+    pub start_utf8: u32,
+    pub end_utf8: u32,
+    pub text_sha256: String,
+}
+
+impl From<core::PassageSpan> for PassageSpan {
+    fn from(value: core::PassageSpan) -> Self {
+        Self {
+            start_utf8: value.start_utf8,
+            end_utf8: value.end_utf8,
+            text_sha256: value.text_sha256,
+        }
+    }
+}
+
+impl From<PassageSpan> for core::PassageSpan {
+    fn from(value: PassageSpan) -> Self {
+        Self {
+            start_utf8: value.start_utf8,
+            end_utf8: value.end_utf8,
+            text_sha256: value.text_sha256,
+        }
+    }
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct IncludedPassage {
+    pub locator: PassageLocator,
+    pub cleaning_version: u32,
+    pub spans: Vec<PassageSpan>,
+}
+
+impl From<core::IncludedPassage> for IncludedPassage {
+    fn from(value: core::IncludedPassage) -> Self {
+        Self {
+            locator: value.locator.into(),
+            cleaning_version: value.cleaning_version,
+            spans: value.spans.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<IncludedPassage> for core::IncludedPassage {
+    fn from(value: IncludedPassage) -> Self {
+        Self {
+            locator: value.locator.into(),
+            cleaning_version: value.cleaning_version,
+            spans: value.spans.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct RetrievalHit {
+    pub locator: PassageLocator,
     pub score: f32,
     pub text: String,
     pub title: String,
@@ -39,6 +168,7 @@ pub struct RetrievalHit {
 impl From<core::RetrievalHit> for RetrievalHit {
     fn from(value: core::RetrievalHit) -> Self {
         Self {
+            locator: value.locator.into(),
             score: value.score,
             text: value.text,
             title: value.title,
@@ -51,6 +181,7 @@ impl From<core::RetrievalHit> for RetrievalHit {
 impl From<RetrievalHit> for core::RetrievalHit {
     fn from(value: RetrievalHit) -> Self {
         Self {
+            locator: value.locator.into(),
             score: value.score,
             text: value.text,
             title: value.title,
@@ -89,6 +220,16 @@ impl RetrievalIndex {
     ) -> Result<Arc<Self>, KnowledgeRetrievalError> {
         let inner = core::RetrievalIndex::open(directory, &knowledge_dataset(&stable_id)?)?;
         Ok(Arc::new(Self { inner }))
+    }
+
+    pub fn reload_passage(
+        &self,
+        locator: PassageLocator,
+    ) -> Result<Option<RetrievalHit>, KnowledgeRetrievalError> {
+        self.inner
+            .reload_passage(&locator.into())
+            .map(|hit| hit.map(Into::into))
+            .map_err(Into::into)
     }
 
     pub fn search(
@@ -362,6 +503,7 @@ impl From<GroundedSource> for core::GroundedSource {
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct GroundedExcerpt {
+    pub locator: PassageLocator,
     pub score: f32,
     pub source: GroundedSource,
     pub text: String,
@@ -370,6 +512,7 @@ pub struct GroundedExcerpt {
 impl From<core::GroundedExcerpt> for GroundedExcerpt {
     fn from(value: core::GroundedExcerpt) -> Self {
         Self {
+            locator: value.locator.into(),
             score: value.score,
             source: value.source.into(),
             text: value.text,
@@ -380,6 +523,7 @@ impl From<core::GroundedExcerpt> for GroundedExcerpt {
 impl From<GroundedExcerpt> for core::GroundedExcerpt {
     fn from(value: GroundedExcerpt) -> Self {
         Self {
+            locator: value.locator.into(),
             score: value.score,
             source: value.source.into(),
             text: value.text,

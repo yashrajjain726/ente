@@ -15,6 +15,7 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavBackStackEntry
@@ -54,6 +55,7 @@ internal fun HomeNavigation(
     onAttachmentSelected: (AttachmentType) -> Unit,
     onOpenAttachment: (Attachment) -> Unit,
 ) {
+    val notesState by store.notesStore.state.collectAsState()
     Scaffold(
         containerColor = EnsuColor.backgroundBase(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -123,6 +125,15 @@ internal fun HomeNavigation(
                         onRemoveAttachment = store::removeAttachment,
                         onEditMessage = { message -> store.beginEditing(message.id) },
                         onRetryMessage = { message -> store.retryAssistantMessage(message.id) },
+                        onSearchMessage =
+                            if (
+                                appState.knowledge.enabledReadyDatasets.isNotEmpty() ||
+                                    notesState.collections.isNotEmpty()
+                            ) {
+                                { message ->
+                                    store.retryAssistantMessage(message.id, searchAsWritten = true)
+                                }
+                            } else null,
                         onCancelEdit = store::cancelEditing,
                         onBranchChange = store::updateBranchSelection,
                         onOpenAttachment = onOpenAttachment,

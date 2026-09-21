@@ -52,7 +52,9 @@ import {
 import { DEFAULT_WEB_CONTEXT_SIZE } from "@/services/llm/budget";
 import {
     prepareDesktopConversation,
+    resolveDesktopSourceFollowup,
     type PreparedReply,
+    type ResolvedSourceFollowup,
 } from "@/services/llm/conversation";
 import { stripHiddenPartsText } from "@/services/llm/history-text";
 import {
@@ -2848,6 +2850,12 @@ const Page: React.FC = () => {
                               activeKnowledgeSources,
                           ));
 
+                    if (assistantMessage.evidenceSaved === false) {
+                        log.warn(
+                            "Reply saved, but its source references could not be retained",
+                        );
+                    }
+
                     await updateBranchSelectionState(
                         parentMessageUuid,
                         assistantMessage.messageUuid,
@@ -2932,6 +2940,7 @@ const Page: React.FC = () => {
             sessionUuid,
             imagePaths,
             mediaMarker,
+            searchAsWritten = false,
         }: {
             promptText: string;
             parentMessage: ChatMessage;
@@ -2941,6 +2950,7 @@ const Page: React.FC = () => {
             sessionUuid?: string;
             imagePaths?: string[];
             mediaMarker?: string;
+            searchAsWritten?: boolean;
         }): Promise<void> => {
             const parentMessageUuid = parentMessage.messageUuid;
             const activeSessionId =
@@ -3092,6 +3102,16 @@ const Page: React.FC = () => {
                     .text.replaceAll(MEDIA_MARKER, "")
                     .replace(/\[\d+ image attachments? provided\]/gi, "")
                     .trim();
+                const selectedMessages = slicePathUntil(
+                    historyPath,
+                    stopAtMessageUuid,
+                );
+                const selectedPath = selectedMessages.map(
+                    (message) => message.messageUuid,
+                );
+                if (selectedPath.at(-1) !== parentMessageUuid)
+                    selectedPath.push(parentMessageUuid);
+                let followup: ResolvedSourceFollowup | undefined;
                 const remainingKnowledgeBytes = useConversationMemory
                     ? 6000
                     : Math.max(
@@ -3137,6 +3157,47 @@ const Page: React.FC = () => {
                     setConversationStatus(null);
                 }
                 if (!isActiveGeneration()) return;
+
+                if (
+                    useConversationMemory &&
+                    !searchAsWritten &&
+                    selectedMessages.some((message) => message.sources?.length)
+                ) {
+                    setConversationStatus("Finding sources");
+                    try {
+                        followup = await provider.withKnowledgeRetrieval(
+                            (cancellationEpoch) =>
+                                resolveDesktopSourceFollowup({
+                                    sessionUuid: activeSessionId,
+                                    path: selectedPath,
+                                    question: knowledgeQuery,
+                                    enabledStableIds: enabledReadyPackIds,
+                                    cancellationEpoch,
+                                    candidates: knowledgeContext?.candidates,
+                                }),
+                            isActiveGeneration,
+                        );
+                        if (!isActiveGeneration()) return;
+                        knowledgeContext = {
+                            text: "",
+                            sources: [],
+                            candidates: followup.candidates,
+                        };
+                    } catch (error) {
+                        const { name } = tauriCommandError(error);
+                        if (
+                            !isActiveGeneration() ||
+                            name === "cancelled" ||
+                            name === "stale"
+                        )
+                            return;
+                        log.warn(
+                            "Source followup failed; continuing with available sources",
+                            error,
+                        );
+                    }
+                    setConversationStatus(null);
+                }
 
                 await provider.ensureModelReady(settings);
                 setLoadedModelName(provider.getCurrentModel()?.name ?? null);
@@ -3207,6 +3268,7 @@ const Page: React.FC = () => {
                             historyQuery: knowledgeQuery,
                             maxTokens,
                             groundingCandidates: knowledgeContext?.candidates,
+                            resolutionToken: followup?.token,
                         },
                         provider,
                         {
@@ -3355,6 +3417,12 @@ const Page: React.FC = () => {
                       ));
 
                 if (!isActiveGeneration()) return;
+                if (assistantMessage.evidenceSaved === false) {
+                    log.warn(
+                        "Reply saved, but its source references could not be retained",
+                    );
+                }
+
                 void updateBranchSelectionState(
                     parentMessageUuid,
                     assistantMessage.messageUuid,
@@ -3433,11 +3501,12 @@ const Page: React.FC = () => {
             enabledKnowledgePackIds,
             knowledgePacks,
             loadEnabledKnowledgeCatalogOnce,
+            slicePathUntil,
         ],
     );
 
     const handleRetryMessage = useCallback(
-        async (message: ChatMessage) => {
+        async (message: ChatMessage, searchAsWritten = false) => {
             if (message.sender !== "assistant") return;
             if (!chatKey || !currentSessionId) return;
             if (isDownloading) {
@@ -3480,6 +3549,7 @@ const Page: React.FC = () => {
                 stopAtMessageUuid: parentUuid,
                 resetContext: true,
                 sessionUuid: currentSessionId,
+                searchAsWritten,
             });
         },
         [
@@ -4654,6 +4724,19 @@ const Page: React.FC = () => {
                             onEditMessage={handleEditMessage}
                             onCopyMessage={handleCopyMessage}
                             onRetryMessage={handleRetryMessage}
+                            canSearchSources={
+                                isTauriRuntime &&
+                                (notesCollections.length > 0 ||
+                                    knowledgePacks.some(
+                                        (pack) =>
+                                            enabledKnowledgePackIds.has(
+                                                pack.stableId,
+                                            ) &&
+                                            (pack.status === "ready" ||
+                                                pack.status ===
+                                                    "updateAvailable"),
+                                    ))
+                            }
                             onPrevBranch={handlePrevBranch}
                             onNextBranch={handleNextBranch}
                             onRequestPreview={loadAttachmentPreview}

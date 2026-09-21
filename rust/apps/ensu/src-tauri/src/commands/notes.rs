@@ -698,6 +698,34 @@ impl RetrievalHandle {
         Ok(hits)
     }
 
+    pub(crate) fn reload_passage(
+        &self,
+        locator: &ente_ensu::retrieval::PassageLocator,
+    ) -> Result<Option<ente_ensu::notes::NotesSearchHit>, NotesError> {
+        let ente_ensu::retrieval::PassageLocator::LocalNote { collection_id, .. } = locator else {
+            return Ok(None);
+        };
+        {
+            let mut cache = self
+                .cached_indexes
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            cache.clock = cache.clock.wrapping_add(1);
+            let clock = cache.clock;
+            if let Some(entry) = cache.entries.get_mut(collection_id) {
+                entry.last_used = clock;
+                return entry.index.reload_passage(locator);
+            }
+        }
+        let index = NotesCollectionIndex::open(&self.index_root, collection_id.clone())?;
+        let hit = index.reload_passage(locator)?;
+        self.cached_indexes
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(collection_id.clone(), index);
+        Ok(hit)
+    }
+
     pub(crate) fn verify_source_reference(&self, reference: &NoteSourceReference) -> bool {
         let collection = self
             .registry

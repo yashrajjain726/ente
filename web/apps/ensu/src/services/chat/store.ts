@@ -116,6 +116,7 @@ export interface ChatMessage {
     createdAt: number;
     attachments?: ChatAttachment[];
     sources?: GroundedSource[];
+    evidenceSaved?: boolean;
     isSynthetic?: boolean;
 }
 
@@ -143,6 +144,7 @@ interface NativeMessage {
     createdAt: number;
     attachments?: NativeAttachment[];
     sources?: GroundedSource[];
+    evidenceSaved?: boolean;
 }
 
 const nowMicros = () => Date.now() * 1000;
@@ -428,6 +430,7 @@ const listMessagesNative = async (
             size: attachment.size,
         })),
         sources: message.sources,
+        evidenceSaved: message.evidenceSaved,
     }));
 };
 
@@ -500,6 +503,7 @@ const addMessageNative = async (
             size: attachment.size,
         })),
         sources: message.sources,
+        evidenceSaved: message.evidenceSaved,
     };
 };
 

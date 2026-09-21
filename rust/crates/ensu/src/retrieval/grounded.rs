@@ -23,6 +23,7 @@ pub enum GroundedSource {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GroundedExcerpt {
+    pub locator: super::PassageLocator,
     pub score: f32,
     pub source: GroundedSource,
     pub text: String,
@@ -32,6 +33,7 @@ pub struct GroundedExcerpt {
 pub struct GroundedPromptContext {
     pub text: String,
     pub sources: Vec<GroundedSource>,
+    pub included_passages: Vec<super::IncludedPassage>,
 }
 
 pub fn select_mixed_grounding_candidates(
@@ -69,6 +71,7 @@ pub fn select_mixed_grounding_candidates(
                 })?;
             let title = display_title(&item.hit.title, item.hit.section.as_deref())?;
             Ok(GroundedExcerpt {
+                locator: item.hit.locator.clone(),
                 score: item.hit.score,
                 source: GroundedSource::EnsuPack {
                     citation: SourceCitation {
@@ -120,6 +123,7 @@ pub fn select_mixed_grounding_candidates(
             .validate()
             .map_err(|error| RetrievalError::InvalidInput(error.to_string()))?;
         selected.push(GroundedExcerpt {
+            locator: hit.locator.clone(),
             score: hit.score,
             source: GroundedSource::LocalNote { reference },
             text: hit.text.clone(),
@@ -152,7 +156,13 @@ pub fn build_grounded_prompt_context(
     let footer = format!("\n{END_CONTEXT_SENTINEL}");
     let mut text = header;
     let mut sources = Vec::new();
+    let mut included_passages = Vec::new();
     for excerpt in excerpts {
+        if !excerpt.locator.matches_source(&excerpt.source) {
+            return Err(RetrievalError::InvalidInput(
+                "passage locator does not match its source".to_string(),
+            ));
+        }
         let label = grounded_label(&excerpt.source)?;
         let prefix = format!("\n\n# {label}\n");
         let reserved = text
@@ -165,7 +175,7 @@ pub fn build_grounded_prompt_context(
         let Some(available) = max_utf8_bytes.checked_sub(reserved) else {
             continue;
         };
-        let sanitized = sanitize_excerpt(&excerpt.text);
+        let sanitized = super::clean_passage_text(&excerpt.text);
         let passage = truncate_utf8(&sanitized, available).trim();
         if passage.is_empty() {
             continue;
@@ -173,13 +183,21 @@ pub fn build_grounded_prompt_context(
         text.push_str(&prefix);
         text.push_str(passage);
         sources.push(excerpt.source.clone());
+        included_passages.push(super::IncludedPassage::prefix(
+            excerpt.locator.clone(),
+            passage,
+        )?);
     }
     if sources.is_empty() {
         return Ok(None);
     }
     text.push_str(&footer);
     debug_assert!(text.len() <= max_utf8_bytes);
-    Ok(Some(GroundedPromptContext { text, sources }))
+    Ok(Some(GroundedPromptContext {
+        text,
+        sources,
+        included_passages,
+    }))
 }
 
 fn display_title(title: &str, section: Option<&str>) -> Result<String, RetrievalError> {
@@ -224,30 +242,116 @@ fn grounded_label(source: &GroundedSource) -> Result<String, RetrievalError> {
     }
 }
 
-pub(crate) fn sanitize_excerpt(value: &str) -> String {
-    value
-        .replace("\r\n", "\n")
-        .replace('\r', "\n")
-        .lines()
-        .map(|line| {
-            let line = line
-                .chars()
-                .map(|character| {
-                    if character == '\t' || !character.is_control() {
-                        character
-                    } else {
-                        ' '
-                    }
-                })
-                .collect::<String>();
-            if matches!(line.as_str(), BEGIN_CONTEXT_SENTINEL | END_CONTEXT_SENTINEL) {
-                format!("[source] {line}")
-            } else {
-                line
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReferencedPassage {
+    pub reference: super::IncludedPassage,
+    pub source: GroundedSource,
+    pub passages: Vec<String>,
+}
+
+pub(crate) fn build_followup_prompt_context(
+    referenced: &[ReferencedPassage],
+    searched: &[GroundedExcerpt],
+    max_utf8_bytes: usize,
+) -> Result<Option<GroundedPromptContext>, RetrievalError> {
+    if referenced.is_empty() {
+        return build_grounded_prompt_context(searched, max_utf8_bytes);
+    }
+    let invalid = || {
+        RetrievalError::InvalidInput("Previously requested evidence does not fit or is invalid; identify a narrower source or increase context".into())
+    };
+    if referenced.len() > MAX_GROUNDING_HITS {
+        return Err(invalid());
+    }
+    let mut text = format!("{BEGIN_CONTEXT_SENTINEL}\n{CONTEXT_WARNING}");
+    let footer = format!("\n{END_CONTEXT_SENTINEL}");
+    let mut sources = Vec::new();
+    let mut included_passages = Vec::new();
+    let mut packs = 0;
+    let mut notes = 0;
+    for item in referenced {
+        if included_passages.contains(&item.reference) {
+            continue;
+        }
+        if !item.reference.valid_metadata()
+            || !item.reference.locator.matches_source(&item.source)
+            || item.reference.spans.len() != item.passages.len()
+        {
+            return Err(invalid());
+        }
+        for (span, passage) in item.reference.spans.iter().zip(&item.passages) {
+            if passage.len() != (span.end_utf8 - span.start_utf8) as usize
+                || super::passage::digest(passage.as_bytes()) != span.text_sha256
+            {
+                return Err(invalid());
             }
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+        }
+        match &item.source {
+            GroundedSource::EnsuPack { .. } => packs += 1,
+            GroundedSource::LocalNote { .. } => notes += 1,
+        }
+        if packs > MAX_PACK_HITS || notes > MAX_NOTES_GROUNDING_HITS {
+            return Err(invalid());
+        }
+        let prefix = format!("\n\n# {}\n", grounded_label(&item.source)?);
+        let passages = item.passages.join("\n[omitted source text]\n");
+        if text
+            .len()
+            .saturating_add(prefix.len())
+            .saturating_add(passages.len())
+            .saturating_add(footer.len())
+            > max_utf8_bytes
+        {
+            return Err(invalid());
+        }
+        text.push_str(&prefix);
+        text.push_str(&passages);
+        sources.push(item.source.clone());
+        included_passages.push(item.reference.clone());
+    }
+    for item in searched {
+        if included_passages
+            .iter()
+            .any(|reference| reference.locator == item.locator)
+        {
+            continue;
+        }
+        let is_pack = matches!(&item.source, GroundedSource::EnsuPack { .. });
+        if (is_pack && packs >= MAX_PACK_HITS) || (!is_pack && notes >= MAX_NOTES_GROUNDING_HITS) {
+            continue;
+        }
+        let prefix = format!("\n\n# {}\n", grounded_label(&item.source)?);
+        let Some(available) = max_utf8_bytes.checked_sub(text.len() + prefix.len() + footer.len())
+        else {
+            continue;
+        };
+        if !item.score.is_finite() || !item.locator.matches_source(&item.source) {
+            return Err(invalid());
+        }
+        let cleaned = super::clean_passage_text(&item.text);
+        let passage = truncate_utf8(&cleaned, available).trim_end();
+        if passage.is_empty() {
+            continue;
+        }
+        text.push_str(&prefix);
+        text.push_str(passage);
+        sources.push(item.source.clone());
+        included_passages.push(super::IncludedPassage::prefix(
+            item.locator.clone(),
+            passage,
+        )?);
+        if is_pack {
+            packs += 1;
+        } else {
+            notes += 1;
+        }
+    }
+    text.push_str(&footer);
+    Ok(Some(GroundedPromptContext {
+        text,
+        sources,
+        included_passages,
+    }))
 }
 
 #[cfg(test)]
@@ -261,6 +365,11 @@ mod tests {
         KnowledgePromptHit {
             dataset_id: dataset_id.to_string(),
             hit: RetrievalHit {
+                locator: crate::retrieval::PassageLocator::EnsuPack {
+                    dataset_id: dataset_id.to_owned(),
+                    revision_sha256: "b".repeat(64),
+                    row: 0,
+                },
                 score,
                 text: format!("{title} passage"),
                 title: title.to_string(),
@@ -272,6 +381,13 @@ mod tests {
 
     fn note(document_id: &str, score: f32) -> NotesSearchHit {
         NotesSearchHit {
+            locator: crate::retrieval::PassageLocator::LocalNote {
+                collection_id: COLLECTION.to_owned(),
+                document_id: document_id.to_owned(),
+                indexed_revision: "a".repeat(64),
+                shard_sha256: "b".repeat(64),
+                chunk_index: 0,
+            },
             collection_id: COLLECTION.to_string(),
             document_id: document_id.to_string(),
             revision: "a".repeat(64),
@@ -280,6 +396,14 @@ mod tests {
             section: Some("Section".to_string()),
             text: format!("{document_id} passage"),
         }
+    }
+
+    #[test]
+    fn mismatched_source_and_locator_are_rejected() {
+        let candidates = select_mixed_grounding_candidates(&[], &[note("one.md", 0.9)], 5).unwrap();
+        let mut wrong = candidates;
+        wrong[0].locator = note("other.md", 0.9).locator;
+        assert!(build_grounded_prompt_context(&wrong, 6000).is_err());
     }
 
     #[test]
@@ -347,5 +471,82 @@ mod tests {
             .unwrap();
         assert!(truncated.text.len() <= budget);
         assert!(!truncated.text.contains('🙂'));
+    }
+
+    fn previous() -> ReferencedPassage {
+        let fixtures: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/passage-references-v1.json"
+        ))
+        .unwrap();
+        let reference: super::super::IncludedPassage =
+            serde_json::from_value(fixtures[0]["reference"].clone()).unwrap();
+        let source = GroundedSource::LocalNote {
+            reference: NoteSourceReference {
+                collection_id: "123e4567-e89b-12d3-a456-426614174000".into(),
+                collection_label: None,
+                document_id: "trip.md".into(),
+                indexed_revision: "a".repeat(64),
+                title: "Trip".into(),
+                section: None,
+            },
+        };
+        ReferencedPassage {
+            passages: reference
+                .verified_spans(fixtures[0]["raw"].as_str().unwrap())
+                .unwrap(),
+            reference,
+            source,
+        }
+    }
+    #[test]
+    fn old_spans_keep_original_offsets_and_optional_search_hits_are_deduplicated() {
+        let old = previous();
+        let duplicate = GroundedExcerpt {
+            locator: old.reference.locator.clone(),
+            source: old.source.clone(),
+            score: 1.0,
+            text: "UNSUPPLIED source remainder".into(),
+        };
+        let mut fresh = duplicate.clone();
+        if let super::super::PassageLocator::LocalNote { chunk_index, .. } = &mut fresh.locator {
+            *chunk_index += 1;
+        }
+        fresh.text = "Fresh café🙂 context".into();
+        let full = build_followup_prompt_context(
+            std::slice::from_ref(&old),
+            &[duplicate, fresh.clone()],
+            6000,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(full.included_passages.len(), 2);
+        assert_eq!(full.included_passages[0], old.reference);
+        assert!(full.text.contains("[omitted source text]"));
+        assert!(!full.text.contains("UNSUPPLIED"));
+        let required = build_followup_prompt_context(std::slice::from_ref(&old), &[], 6000)
+            .unwrap()
+            .unwrap();
+        for budget in [
+            required.text.len(),
+            required.text.len() + 8,
+            full.text.len() - 1,
+        ] {
+            let packed = build_followup_prompt_context(
+                std::slice::from_ref(&old),
+                std::slice::from_ref(&fresh),
+                budget,
+            )
+            .unwrap()
+            .unwrap();
+            assert!(packed.text.len() <= budget);
+            assert_eq!(packed.included_passages[0], old.reference);
+        }
+        assert!(build_followup_prompt_context(&[old], &[], required.text.len() - 1).is_err());
+    }
+    #[test]
+    fn referenced_text_must_match_the_saved_digest() {
+        let mut old = previous();
+        old.passages[0] = "Changed text".into();
+        assert!(build_followup_prompt_context(&[old], &[], 6000).is_err());
     }
 }

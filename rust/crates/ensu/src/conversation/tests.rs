@@ -64,10 +64,9 @@ fn saved_memory_preserves_uuid_strings() {
             .covered_boundary_message_uuid,
         Uuid::from_u128(2)
     );
-    assert_eq!(
-        serde_json::to_value(&restored).unwrap(),
-        serde_json::from_str::<serde_json::Value>(encoded).unwrap()
-    );
+    let mut expected = serde_json::from_str::<serde_json::Value>(encoded).unwrap();
+    expected["evidence"] = serde_json::json!([]);
+    assert_eq!(serde_json::to_value(&restored).unwrap(), expected);
     let invalid = encoded.replace("00000000-0000-0000-0000-000000000002", "invalid");
     assert!(
         ConversationEnvelope::decode(invalid.as_bytes(), session)
@@ -622,7 +621,7 @@ fn turn_input(messages: Vec<Message>) -> TurnInput {
         context: 2048,
         output: None,
         state: None,
-        candidates: GroundingCandidates::new(vec![], MAX_GROUNDING_BYTES).unwrap(),
+        candidates: GroundingCandidates::new(vec![], vec![], MAX_GROUNDING_BYTES).unwrap(),
     }
 }
 

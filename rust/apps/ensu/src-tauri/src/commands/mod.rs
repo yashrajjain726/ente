@@ -22,3 +22,5 @@ pub fn cleanup_for_exit(app: &AppHandle) {
     chat_db::clear_for_exit(app);
     logging::log("App", "cleanup_for_exit complete");
 }
+
+pub mod followup;

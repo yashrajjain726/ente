@@ -9,6 +9,7 @@ use ente_ensu::{
     conversation::{self, Effects, PrepareError},
     db::{ChatDb, SqliteBackend, chat::ConversationSnapshot},
     llm,
+    retrieval::IncludedPassage,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State as TauriState, WebviewWindow, async_runtime};
@@ -22,6 +23,7 @@ struct Slot {
     token: String,
     snapshot: ConversationSnapshot,
     db: Arc<ChatDb<SqliteBackend>>,
+    grounded: Option<ente_ensu::retrieval::GroundedPromptContext>,
     model_epoch: u64,
     cancel_epoch: u64,
 }
@@ -64,7 +66,7 @@ impl State {
         app: &AppHandle,
         window: &str,
         token: &str,
-    ) -> Result<ConversationSnapshot, ApiError> {
+    ) -> Result<(ConversationSnapshot, Vec<IncludedPassage>), ApiError> {
         let mut slots = self
             .slots
             .lock()
@@ -78,7 +80,14 @@ impl State {
         }
         slots
             .remove(window)
-            .map(|slot| slot.snapshot)
+            .map(|slot| {
+                (
+                    slot.snapshot,
+                    slot.grounded
+                        .map(|context| context.included_passages)
+                        .unwrap_or_default(),
+                )
+            })
             .ok_or_else(|| error("Preparation has expired"))
     }
 }
@@ -96,6 +105,7 @@ pub struct Request {
     max_tokens: usize,
     preparation_token: String,
     cancellation_epoch: u64,
+    resolution_token: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -257,9 +267,18 @@ pub async fn conversation_prepare(
         let mut snapshot = db
             .conversation_snapshot(input.session_uuid, &input.path)
             .map_err(ApiError::from)?;
+        if let Some(token) = &input.resolution_token {
+            app.state::<super::followup::State>().validate(
+                work_window.label(),
+                token,
+                &db,
+                &snapshot,
+                input.grounding_candidates.as_ref(),
+            )?;
+        }
         let candidates = match input.grounding_candidates.take() {
             Some(candidates) => candidates,
-            None => conversation::GroundingCandidates::new(vec![], conversation::MAX_GROUNDING_BYTES)
+            None => conversation::GroundingCandidates::new(vec![], vec![], conversation::MAX_GROUNDING_BYTES)
                 .map_err(preparation_error)?,
         };
         let turn = conversation::TurnInput {
@@ -298,12 +317,13 @@ pub async fn conversation_prepare(
             Response {
                 preparation_token: token.clone(),
                 messages: result.messages,
-                grounded_context: grounded.map(Into::into),
+                grounded_context: grounded.clone().map(Into::into),
             },
             Slot {
                 token,
                 snapshot,
                 db,
+                grounded,
                 model_epoch,
                 cancel_epoch: expected_epoch,
             },

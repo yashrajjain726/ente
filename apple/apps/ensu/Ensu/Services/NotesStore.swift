@@ -202,6 +202,25 @@ final class NotesStore: ObservableObject, ModelMaintenance {
         return hits
     }
 
+    func reload(_ locator: PassageLocator) async throws -> GroundedExcerpt? {
+        guard case .localNote(let collectionId, _, _, _, _) = locator,
+            collections.contains(where: { $0.id == collectionId && $0.eligible })
+        else { return nil }
+        do {
+            guard let hit = try await provider.reload(locator) else { return nil }
+            return try await verify(
+                selectMixedGroundingCandidates(packHits: [], notesHits: [hit], notesLimit: 1)
+            ).first
+        } catch NotesError.RebuildRequired {
+            enqueue(collectionId, rebuild: true, due: .distantPast)
+            update(collectionId) {
+                $0.status = .pending
+                $0.indexAvailable = false
+            }
+            return nil
+        }
+    }
+
     func verify(_ excerpts: [GroundedExcerpt]) async throws -> [GroundedExcerpt] {
         var result: [GroundedExcerpt] = []
         var accepted = 0
@@ -218,12 +237,9 @@ final class NotesStore: ObservableObject, ModelMaintenance {
             }
             do {
                 let reference = try await provider.verify(reference)
-                result.append(
-                    GroundedExcerpt(
-                        score: excerpt.score,
-                        source: .localNote(reference: reference),
-                        text: excerpt.text
-                    ))
+                var verifiedExcerpt = excerpt
+                verifiedExcerpt.source = .localNote(reference: reference)
+                result.append(verifiedExcerpt)
                 accepted += 1
             } catch is CancellationError {
                 throw CancellationError()

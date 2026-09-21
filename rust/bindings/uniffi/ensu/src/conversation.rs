@@ -47,6 +47,8 @@ pub struct ConversationRequest {
     pub history_query: Option<String>,
     pub max_tokens: Option<u32>,
     pub searched: Vec<GroundedExcerpt>,
+    pub followup: Option<Arc<crate::followup::ConversationFollowup>>,
+    pub reloaded: Vec<GroundedExcerpt>,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -125,7 +127,7 @@ impl ConversationPreparation {
 
     fn start(
         &self,
-        input: ConversationRequest,
+        mut input: ConversationRequest,
         callback: &dyn ConversationProgressCallback,
     ) -> Result<PreparedWork, ConversationError> {
         self.check_cancelled()?;
@@ -141,7 +143,29 @@ impl ConversationPreparation {
             .conversation_snapshot(session, &path)
             .map_err(error)?;
         self.check_cancelled()?;
+        let mut referenced = Vec::new();
+        if let Some(turn) = &input.followup {
+            let (query, references) = turn.prepare(&self.db, &snapshot, &input.searched)?;
+            input.history_query = Some(query);
+            for reference in references {
+                self.check_cancelled()?;
+                let Some(hit) = input.reloaded.iter().find(|hit| {
+                    retrieval::PassageLocator::from(hit.locator.clone()) == reference.locator
+                }) else {
+                    continue;
+                };
+                let Some(passages) = reference.verified_spans(&hit.text) else {
+                    continue;
+                };
+                referenced.push(retrieval::ReferencedPassage {
+                    passages,
+                    source: hit.source.clone().into(),
+                    reference,
+                });
+            }
+        }
         let candidates = core::GroundingCandidates::new(
+            referenced,
             input.searched.into_iter().map(Into::into).collect(),
             core::MAX_GROUNDING_BYTES,
         )?;
@@ -240,6 +264,13 @@ impl ConversationPreparation {
             )
             .map_err(error)?;
         work.saved = true;
+        if let Some(grounded) = &work.grounded {
+            let _ = self.db.save_answer_evidence(
+                &work.snapshot,
+                answer.uuid,
+                grounded.included_passages.clone(),
+            );
+        }
         Ok(to_message(answer))
     }
 }
