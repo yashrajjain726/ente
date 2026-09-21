@@ -1148,7 +1148,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 sx={{
                     aspectRatio: frameAspectRatio,
                     bgcolor: "transparent",
-                    borderRadius: isOwnPost ? "16px" : "16px 16px 0 0",
+                    borderRadius: showFooter ? "16px 16px 0 0" : "16px",
                     maxWidth: "100%",
                     minWidth: 0,
                     overflow: "hidden",

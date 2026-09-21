@@ -9,6 +9,11 @@ const captionBubbleSx = {
     WebkitBoxDecorationBreak: "clone",
 } as const;
 
+const captionSegmenter =
+    typeof Intl !== "undefined" && "Segmenter" in Intl
+        ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
+        : null;
+
 export const SpaceCaptionText: React.FC<{
     caption: string;
     lineClamp?: number;
@@ -30,12 +35,12 @@ export const SpaceCaptionText: React.FC<{
                 return;
             }
 
-            const characters = Array.from(
-                new Intl.Segmenter(undefined, {
-                    granularity: "grapheme",
-                }).segment(caption),
-                ({ segment }) => segment,
-            );
+            const characters = captionSegmenter
+                ? Array.from(
+                      captionSegmenter.segment(caption),
+                      ({ segment }) => segment,
+                  )
+                : Array.from(caption);
             const truncated = (length: number) =>
                 `${characters.slice(0, length).join("").trimEnd()}…`;
             let start = 0;
