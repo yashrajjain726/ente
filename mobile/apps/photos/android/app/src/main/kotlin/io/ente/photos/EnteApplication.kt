@@ -23,12 +23,10 @@ class EnteApplication : Application() {
     BackgroundManagerPlugin.install(this) {
       val prefs = getSharedPreferences(FLUTTER_SHARED_PREFERENCES, Context.MODE_PRIVATE)
       !prefs.getBoolean(INTERNAL_USER_DISABLED_KEY, false) &&
-        (BuildConfig.DEBUG ||
-          runCatching {
-              JSONObject(prefs.getString(REMOTE_FLAGS_KEY, "{}") ?: "{}").opt("internalUser") ==
-                true
-            }
-            .getOrDefault(false))
+        runCatching {
+            JSONObject(prefs.getString(REMOTE_FLAGS_KEY, "{}") ?: "{}").opt("internalUser") == true
+          }
+          .getOrDefault(false)
     }
   }
 

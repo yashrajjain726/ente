@@ -56,9 +56,6 @@ configurations.configureEach {
 
 android {
     namespace = "io.ente.photos"
-    buildFeatures {
-        buildConfig = true
-    }
 
     compileOptions {
         coreLibraryDesugaringEnabled = true

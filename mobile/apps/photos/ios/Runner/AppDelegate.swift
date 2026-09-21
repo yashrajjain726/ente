@@ -77,17 +77,13 @@ import workmanager_apple
     guard !defaults.bool(forKey: "flutter.ls.internal_user_disabled") else {
       return false
     }
-    #if DEBUG
-      return true
-    #else
-      guard let remoteFlags = defaults.string(forKey: "flutter.remote_flags"),
-        let data = remoteFlags.data(using: .utf8),
-        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-      else {
-        return false
-      }
-      return json["internalUser"] as? Bool ?? false
-    #endif
+    guard let remoteFlags = defaults.string(forKey: "flutter.remote_flags"),
+      let data = remoteFlags.data(using: .utf8),
+      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      return false
+    }
+    return json["internalUser"] as? Bool ?? false
   }
 
   private func shouldEnableWorkmanagerDebugNotifications() -> Bool {

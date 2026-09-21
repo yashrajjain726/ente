@@ -214,7 +214,7 @@ class BackgroundTasks {
     if (prefs.getBool("ls.internal_user_disabled") == true) {
       return false;
     }
-    return kDebugMode || _isRemoteInternalUser(prefs);
+    return _isRemoteInternalUser(prefs);
   }
 
   static Future<bool> _acquirePipeline(BackgroundTask task) async {
