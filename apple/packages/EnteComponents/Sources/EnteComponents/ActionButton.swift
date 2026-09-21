@@ -24,7 +24,6 @@ public struct ActionButton: View {
     private let variant: ActionVariant
     private let size: ActionSize
     private let density: ActionDensity
-    private let enabled: Bool
     private let action: () -> Void
 
     public init(
@@ -32,14 +31,12 @@ public struct ActionButton: View {
         variant: ActionVariant = .primary,
         size: ActionSize = .large,
         density: ActionDensity = .regular,
-        enabled: Bool = true,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.variant = variant
         self.size = size
         self.density = density
-        self.enabled = enabled
         self.action = action
     }
 
@@ -60,7 +57,6 @@ public struct ActionButton: View {
                 cornerRadius: inlineLink ? 0 : EnteRadius.button
             )
         )
-        .disabled(!enabled)
     }
 }
 

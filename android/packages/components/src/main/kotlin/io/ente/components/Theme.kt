@@ -77,6 +77,7 @@ public object EnteTypography {
             lineHeight = 20.sp,
         )
     public val bodyBold: TextStyle = body.copy(fontWeight = FontWeight.SemiBold)
+    public val heading2: TextStyle = bodyBold.copy(fontSize = 18.sp, lineHeight = 24.sp)
     public val mini: TextStyle = body.copy(fontSize = 12.sp, lineHeight = 16.sp)
 }
 

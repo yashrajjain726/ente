@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.sp
 
 @Composable
 public fun SheetHeader(
@@ -34,11 +33,9 @@ public fun SheetHeader(
                 Modifier.weight(1f).semantics { heading() },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = sheetTitleStyle,
+                style = EnteTypography.heading2,
             )
             trailing?.invoke()
         }
     }
 }
-
-private val sheetTitleStyle = EnteTypography.bodyBold.copy(fontSize = 18.sp, lineHeight = 24.sp)
