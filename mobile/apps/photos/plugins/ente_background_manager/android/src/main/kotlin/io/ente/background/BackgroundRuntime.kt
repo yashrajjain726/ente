@@ -44,6 +44,7 @@ internal object BackgroundRuntime {
     private var isAllowed: () -> Boolean = { false }
     private var isForeground = false
     private var active: Run? = null
+    private var waiting: Run? = null
     var createEngine: (Context) -> FlutterEngine = { FlutterEngine(it) }
     var findCallback: (Long) -> FlutterCallbackInformation? =
         FlutterCallbackInformation::lookupCallbackInformation
@@ -121,10 +122,12 @@ internal object BackgroundRuntime {
 
     fun foreground() {
         isForeground = true
+        waiting?.let { finishWaiting(it, "stopped", "foreground") }
         active?.let { stop(it, "foreground") }
     }
 
     fun requestStop(result: MethodChannel.Result? = null) {
+        waiting?.let { finishWaiting(it, "stopped", "requested") }
         val run = active
         if (run == null) {
             result?.success(null)
@@ -159,6 +162,11 @@ internal object BackgroundRuntime {
             return
         }
         if (!enabled) requestStop()
+        waiting
+            ?.takeIf { run ->
+                configurations.none { it.identifier == run.configuration.identifier }
+            }
+            ?.let { finishWaiting(it, "skipped", "disabled") }
         scheduler.execute {
             try {
                 val preferences = app.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
@@ -191,6 +199,9 @@ internal object BackgroundRuntime {
                 }
                 val activeTask = FutureTask {
                     if (!enabled) requestStop()
+                    waiting
+                        ?.takeIf { it.configuration.identifier !in selected }
+                        ?.let { finishWaiting(it, "skipped", "disabled") }
                     active?.configuration?.identifier
                 }
                 main.post(activeTask)
@@ -292,6 +303,20 @@ internal object BackgroundRuntime {
         }
     }
 
+    private fun isEnabled(identifier: String): Boolean {
+        val saved =
+            application
+                ?.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+                ?.getString(CONFIGURATION, null)
+                ?.let(::JSONObject)
+        val tasks = saved?.optJSONArray("tasks") ?: JSONArray()
+        return saved?.optBoolean("enabled") == true &&
+            isAllowed() &&
+            (0 until tasks.length()).any {
+                tasks.getJSONObject(it).getString("identifier") == identifier
+            }
+    }
+
     fun start(worker: BackgroundWorker, startedAt: Long, completion: (Boolean) -> Unit) {
         onMain {
             if (worker.isStopped) return@onMain
@@ -307,27 +332,40 @@ internal object BackgroundRuntime {
                 }
             val enabled =
                 try {
-                    val saved =
-                        application
-                            ?.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-                            ?.getString(CONFIGURATION, null)
-                            ?.let(::JSONObject)
-                    val tasks = saved?.optJSONArray("tasks") ?: JSONArray()
-                    saved?.optBoolean("enabled") == true &&
-                        isAllowed() &&
-                        (0 until tasks.length()).any {
-                            tasks.getJSONObject(it).getString("identifier") ==
-                                configuration.identifier
-                        }
+                    isEnabled(configuration.identifier)
                 } catch (exception: Exception) {
                     report(configuration.identifier, "failed", "configuration", exception.message)
                     completion(false)
                     return@onMain
                 }
+            if (
+                enabled &&
+                    !isForeground &&
+                    waiting == null &&
+                    configuration.kind == "processing" &&
+                    active?.configuration?.kind == "refresh" &&
+                    active?.retiring == false &&
+                    active?.stopReason !in setOf("foreground", "requested", "system")
+            ) {
+                val run = Run(worker, configuration, startedAt, completion)
+                waiting = run
+                Log.i(TAG, "${configuration.identifier}: waiting for refresh")
+                configuration.runBudgetMs?.let { budget ->
+                    val remaining = budget - elapsed(run)
+                    if (remaining <= 0) {
+                        finishWaiting(run, "skipped", "waitBudget")
+                    } else {
+                        run.budgetTimer =
+                            Runnable { finishWaiting(run, "skipped", "waitBudget") }
+                                .also { main.postDelayed(it, remaining) }
+                    }
+                }
+                return@onMain
+            }
             val skip =
                 when {
                     !enabled -> "disabled"
-                    active != null -> "busy"
+                    active != null || waiting != null -> "busy"
                     isForeground -> "foreground"
                     else -> null
                 }
@@ -340,118 +378,164 @@ internal object BackgroundRuntime {
                 return@onMain
             }
             val run = Run(worker, configuration, startedAt, completion)
-            active = run
-            configuration.runBudgetMs?.let { budget ->
-                run.budgetTimer =
-                    Runnable { if (active === run) stop(run, "budget") }
-                        .also {
-                            main.postDelayed(it, (budget - elapsed(run)).coerceAtLeast(0))
-                        }
-            }
-            try {
-                val loader = FlutterInjector.instance().flutterLoader()
-                loader.startInitialization(worker.applicationContext)
-                loader.ensureInitializationCompleteAsync(worker.applicationContext, null, main) {
-                    if (active !== run || run.retiring) return@ensureInitializationCompleteAsync
-                    if (run.worker.isStopped) {
-                        retire(run, "stopped", "system")
-                        return@ensureInitializationCompleteAsync
+            startRun(run)
+        }
+    }
+
+    private fun startRun(run: Run) {
+        val worker = run.worker
+        val configuration = run.configuration
+        active = run
+        configuration.runBudgetMs?.let { budget ->
+            run.budgetTimer =
+                Runnable { if (active === run) stop(run, "budget") }
+                    .also {
+                        main.postDelayed(it, (budget - elapsed(run)).coerceAtLeast(0))
                     }
-                    run.stopReason?.let {
-                        retire(run, "stopped", it)
-                        return@ensureInitializationCompleteAsync
-                    }
-                    try {
-                        val callback =
-                            requireNotNull(findCallback(configuration.callbackHandle)) {
-                                "Background dispatcher is unavailable"
-                            }
-                        val engine = createEngine(worker.applicationContext)
-                        run.engine = engine
-                        val channel =
-                            MethodChannel(
-                                engine.dartExecutor.binaryMessenger,
-                                "io.ente.background/worker",
-                            )
-                        run.channel = channel
-                        channel.setMethodCallHandler { call, result ->
-                            if (active !== run || run.retiring) {
-                                result.success(null)
-                            } else
-                                when (call.method) {
-                                    "ready" -> {
-                                        if (run.ready) {
-                                            result.error(
-                                                "bootstrap",
-                                                "Dispatcher already started",
-                                                null,
-                                            )
-                                        } else {
-                                            run.ready = true
-                                            result.success(
-                                                mapOf(
-                                                    "invocation" to run.invocation,
-                                                    "identifier" to configuration.identifier,
-                                                    "elapsedMs" to elapsed(run),
-                                                    "runBudgetMs" to configuration.runBudgetMs,
-                                                    "stopReason" to run.stopReason,
-                                                )
-                                            )
-                                        }
-                                    }
-                                    "complete" -> {
-                                        val data = call.arguments as? Map<*, *>
-                                        if (data?.get("invocation") != run.invocation) {
-                                            result.error(
-                                                "invocation",
-                                                "Stale background completion",
-                                                null,
-                                            )
-                                        } else {
-                                            val outcome = data["outcome"] as? String
-                                            if (
-                                                outcome !in
-                                                    setOf(
-                                                        "completed",
-                                                        "skipped",
-                                                        "stopped",
-                                                        "failed",
-                                                    )
-                                            ) {
-                                                result.error(
-                                                    "outcome",
-                                                    "Unknown task outcome",
-                                                    null,
-                                                )
-                                            } else {
-                                                result.success(null)
-                                                retire(
-                                                    run,
-                                                    outcome!!,
-                                                    run.stopReason,
-                                                    data["error"] as? String,
-                                                )
-                                            }
-                                        }
-                                    }
-                                    else -> result.notImplemented()
-                                }
+        }
+        try {
+            val loader = FlutterInjector.instance().flutterLoader()
+            loader.startInitialization(worker.applicationContext)
+            loader.ensureInitializationCompleteAsync(worker.applicationContext, null, main) {
+                if (active !== run || run.retiring) return@ensureInitializationCompleteAsync
+                if (run.worker.isStopped) {
+                    retire(run, "stopped", "system")
+                    return@ensureInitializationCompleteAsync
+                }
+                run.stopReason?.let {
+                    retire(run, "stopped", it)
+                    return@ensureInitializationCompleteAsync
+                }
+                try {
+                    val callback =
+                        requireNotNull(findCallback(configuration.callbackHandle)) {
+                            "Background dispatcher is unavailable"
                         }
-                        engine.dartExecutor.executeDartCallback(
-                            DartExecutor.DartCallback(
-                                worker.applicationContext.assets,
-                                loader.findAppBundlePath(),
-                                callback,
-                            )
+                    val engine = createEngine(worker.applicationContext)
+                    run.engine = engine
+                    val channel =
+                        MethodChannel(
+                            engine.dartExecutor.binaryMessenger,
+                            "io.ente.background/worker",
                         )
-                    } catch (exception: Exception) {
-                        retire(run, "failed", "bootstrap", exception.message)
+                    run.channel = channel
+                    channel.setMethodCallHandler { call, result ->
+                        if (active !== run || run.retiring) {
+                            result.success(null)
+                        } else
+                            when (call.method) {
+                                "ready" -> {
+                                    if (run.ready) {
+                                        result.error(
+                                            "bootstrap",
+                                            "Dispatcher already started",
+                                            null,
+                                        )
+                                    } else {
+                                        run.ready = true
+                                        result.success(
+                                            mapOf(
+                                                "invocation" to run.invocation,
+                                                "identifier" to configuration.identifier,
+                                                "elapsedMs" to elapsed(run),
+                                                "runBudgetMs" to configuration.runBudgetMs,
+                                                "stopReason" to run.stopReason,
+                                            )
+                                        )
+                                    }
+                                }
+                                "complete" -> {
+                                    val data = call.arguments as? Map<*, *>
+                                    if (data?.get("invocation") != run.invocation) {
+                                        result.error(
+                                            "invocation",
+                                            "Stale background completion",
+                                            null,
+                                        )
+                                    } else {
+                                        val outcome = data["outcome"] as? String
+                                        if (
+                                            outcome !in
+                                                setOf(
+                                                    "completed",
+                                                    "skipped",
+                                                    "stopped",
+                                                    "failed",
+                                                )
+                                        ) {
+                                            result.error(
+                                                "outcome",
+                                                "Unknown task outcome",
+                                                null,
+                                            )
+                                        } else {
+                                            result.success(null)
+                                            retire(
+                                                run,
+                                                outcome!!,
+                                                run.stopReason,
+                                                data["error"] as? String,
+                                            )
+                                        }
+                                    }
+                                }
+                                else -> result.notImplemented()
+                            }
                     }
+                    engine.dartExecutor.executeDartCallback(
+                        DartExecutor.DartCallback(
+                            worker.applicationContext.assets,
+                            loader.findAppBundlePath(),
+                            callback,
+                        )
+                    )
+                } catch (exception: Exception) {
+                    retire(run, "failed", "bootstrap", exception.message)
+                }
+            }
+        } catch (exception: Exception) {
+            retire(run, "failed", "bootstrap", exception.message)
+        }
+    }
+
+    private fun finishWaiting(run: Run, outcome: String, reason: String) {
+        if (waiting !== run) return
+        waiting = null
+        run.retiring = true
+        run.budgetTimer?.let(main::removeCallbacks)
+        report(run.configuration.identifier, outcome, reason)
+        run.completion(outcome != "failed")
+    }
+
+    private fun startWaiting() {
+        if (active != null) return
+        val run = waiting ?: return
+        val reason =
+            try {
+                when {
+                    run.worker.isStopped -> "system"
+                    isForeground -> "foreground"
+                    !isEnabled(run.configuration.identifier) -> "disabled"
+                    run.configuration.runBudgetMs?.let { elapsed(run) >= it } == true ->
+                        "waitBudget"
+                    else -> null
                 }
             } catch (exception: Exception) {
-                retire(run, "failed", "bootstrap", exception.message)
+                finishWaiting(run, "failed", "configuration")
+                return
             }
+        if (reason != null) {
+            finishWaiting(run, "skipped", reason)
+            return
         }
+        waiting = null
+        run.budgetTimer?.let(main::removeCallbacks)
+        run.budgetTimer = null
+        Log.i(
+            TAG,
+            "${run.configuration.identifier}: refresh finished after ${elapsed(run)}ms waiting",
+        )
+        startRun(run)
     }
 
     private fun onMain(action: () -> Unit) {
@@ -460,6 +544,7 @@ internal object BackgroundRuntime {
 
     fun nativeStop(worker: BackgroundWorker) {
         main.post {
+            waiting?.takeIf { it.worker === worker }?.let { finishWaiting(it, "stopped", "system") }
             active
                 ?.takeIf { it.worker === worker }
                 ?.let {
@@ -521,6 +606,9 @@ internal object BackgroundRuntime {
         if (run.teardownFailure == null) {
             active = null
             retireUnselectedSchedule(run.configuration.identifier)
+            startWaiting()
+        } else {
+            waiting?.let { finishWaiting(it, "failed", "teardown") }
         }
         if (failure != null) {
             report(run.configuration.identifier, "failed", "teardown", failure.message)

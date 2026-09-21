@@ -14,6 +14,7 @@ final class BackgroundRuntime: NSObject {
   private let observers = NSHashTable<BackgroundManagerPlugin>.weakObjects()
   private var registrations: [String: Bool] = [:]
   private var active: Run?
+  private var waiting: Run?
   private var isForeground = false
   private var installed = false
   private var reconciling = false
@@ -90,6 +91,7 @@ final class BackgroundRuntime: NSObject {
 
   @objc private func foreground() {
     isForeground = true
+    if let run = waiting { finishWaiting(run, outcome: "stopped", reason: "foreground") }
     if let run = active { stop(run, reason: "foreground") }
   }
 
@@ -98,6 +100,7 @@ final class BackgroundRuntime: NSObject {
   }
 
   func requestStop(result: FlutterResult? = nil) {
+    if let run = waiting { finishWaiting(run, outcome: "stopped", reason: "requested") }
     guard let run = active else {
       result?(nil)
       return
@@ -152,6 +155,9 @@ final class BackgroundRuntime: NSObject {
         submitted: configuration.submitted?.filter { identifiers.contains($0.identifier) })
       try next.save()
       configuration = next
+      if let run = waiting, !identifiers.contains(run.configuration.identifier) {
+        finishWaiting(run, outcome: "skipped", reason: "disabled")
+      }
       if !enabled { requestStop() }
       configurationResults.append(result)
       reconcile()
@@ -260,10 +266,34 @@ final class BackgroundRuntime: NSObject {
         identifier: task.identifier, outcome: "failed", reason: "schedule",
         error: String(describing: error))
     }
+    if isAllowed(), !isForeground, UIApplication.shared.applicationState == .background,
+      policy.kind == "processing", let occupant = active,
+      occupant.configuration.kind == "refresh", !occupant.retiring, waiting == nil,
+      !["foreground", "requested", "system"].contains(occupant.stopReason ?? "")
+    {
+      let run = Run(task: task, configuration: policy, startedAt: startedAt)
+      waiting = run
+      observeExpiration(run)
+      Self.logger.info("\(policy.identifier, privacy: .public): waiting for refresh")
+      if let budget = policy.runBudgetMs {
+        let remaining = budget - elapsed(run)
+        if remaining <= 0 {
+          finishWaiting(run, outcome: "skipped", reason: "waitBudget")
+        } else {
+          let timer = DispatchWorkItem { [weak run] in
+            guard let run else { return }
+            self.finishWaiting(run, outcome: "skipped", reason: "waitBudget")
+          }
+          run.budgetTimer = timer
+          DispatchQueue.main.asyncAfter(deadline: .now() + Double(remaining) / 1000, execute: timer)
+        }
+      }
+      return
+    }
     let skip: String?
     if !isAllowed() {
       skip = "disabled"
-    } else if active != nil {
+    } else if active != nil || waiting != nil {
       skip = "busy"
     } else if isForeground || UIApplication.shared.applicationState != .background {
       skip = "foreground"
@@ -276,14 +306,27 @@ final class BackgroundRuntime: NSObject {
       return
     }
     let run = Run(task: task, configuration: policy, startedAt: startedAt)
-    active = run
-    task.expirationHandler = { [weak run] in
+    start(run)
+  }
+
+  private func observeExpiration(_ run: Run) {
+    run.task.expirationHandler = { [weak run] in
       DispatchQueue.main.async {
-        guard let run, self.active === run else { return }
-        self.stop(run, reason: "system")
-        self.retire(run, outcome: "stopped", reason: "expired", success: false)
+        guard let run else { return }
+        if self.waiting === run {
+          self.finishWaiting(run, outcome: "stopped", reason: "expired", success: false)
+        } else if self.active === run {
+          self.stop(run, reason: "system")
+          self.retire(run, outcome: "stopped", reason: "expired", success: false)
+        }
       }
     }
+  }
+
+  private func start(_ run: Run) {
+    let policy = run.configuration
+    active = run
+    observeExpiration(run)
     if let budget = policy.runBudgetMs {
       let timer = DispatchWorkItem { [weak run] in
         guard let run, self.active === run else { return }
@@ -353,6 +396,45 @@ final class BackgroundRuntime: NSObject {
     registrant(engine)
   }
 
+  private func finishWaiting(
+    _ run: Run, outcome: String, reason: String, success: Bool = true
+  ) {
+    guard waiting === run else { return }
+    waiting = nil
+    run.retiring = true
+    run.budgetTimer?.cancel()
+    run.task.expirationHandler = nil
+    run.task.setTaskCompleted(success: success)
+    report(identifier: run.configuration.identifier, outcome: outcome, reason: reason)
+  }
+
+  private func startWaiting() {
+    guard active == nil, let run = waiting else { return }
+    let reason: String?
+    if !configuration.enabled || !isAllowed()
+      || !configuration.tasks.contains(where: { $0.identifier == run.configuration.identifier })
+    {
+      reason = "disabled"
+    } else if isForeground || UIApplication.shared.applicationState != .background {
+      reason = "foreground"
+    } else if let budget = run.configuration.runBudgetMs, elapsed(run) >= budget {
+      reason = "waitBudget"
+    } else {
+      reason = nil
+    }
+    if let reason {
+      finishWaiting(run, outcome: "skipped", reason: reason)
+      return
+    }
+    waiting = nil
+    run.budgetTimer?.cancel()
+    run.budgetTimer = nil
+    Self.logger.info(
+      "\(run.configuration.identifier, privacy: .public): refresh finished after \(self.elapsed(run))ms waiting"
+    )
+    start(run)
+  }
+
   private func elapsed(_ run: Run) -> Int64 {
     Int64(max(0, ProcessInfo.processInfo.systemUptime - run.startedAt) * 1000)
   }
@@ -394,6 +476,7 @@ final class BackgroundRuntime: NSObject {
     run.task.setTaskCompleted(
       success: success ?? (terminal != "failed" && terminal != "forcedTeardown"))
     active = nil
+    startWaiting()
     if terminal != "completed" {
       report(
         identifier: run.configuration.identifier, outcome: terminal, reason: reason, error: error)
