@@ -11,8 +11,12 @@ image.workspace = true
 jxl-oxide = { version = "0.12.6", features = ["image"] }
 kamadak-exif = "0.6.1"
 moxcms = { version = "0.8.1", features = ["in_place"] }
+png = "0.18.1"
 thiserror.workspace = true
 tiff = "0.10.3"
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [lints]
 workspace = true
