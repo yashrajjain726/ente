@@ -5,7 +5,7 @@ public struct MenuRow: View {
     private let title: String
     private let subtitle: String?
     private let image: Image?
-    private let selected: Bool?
+    private let selected: Bool
     private let showsChevron: Bool
     private let action: () -> Void
 
@@ -13,7 +13,7 @@ public struct MenuRow: View {
         _ title: String,
         subtitle: String? = nil,
         image: Image? = nil,
-        selected: Bool? = nil,
+        selected: Bool = false,
         showsChevron: Bool = false,
         action: @escaping () -> Void
     ) {
@@ -47,17 +47,17 @@ public struct MenuRow: View {
                     }
                 }
                 Spacer(minLength: 0)
-                if selected == true || showsChevron {
+                if selected || showsChevron {
                     HStack(spacing: EnteSpacing.xs) {
-                        if selected == true {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 24))
+                        if selected {
+                            Glyph.check.image.resizable().scaledToFit()
+                                .frame(width: 24, height: 24)
                                 .foregroundStyle(palette.primary)
                         }
                         if showsChevron {
-                            Image(systemName: "chevron.forward")
-                                .font(.system(size: 18))
+                            Glyph.chevron.image.resizable().scaledToFit()
                                 .frame(width: 24, height: 24)
+                                .flipsForRightToLeftLayoutDirection(true)
                                 .foregroundStyle(palette.mutedText)
                         }
                     }
@@ -72,7 +72,7 @@ public struct MenuRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(MenuRowStyle())
-        .accessibilityAddTraits(selected == true ? .isSelected : [])
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

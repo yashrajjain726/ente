@@ -32,8 +32,9 @@ public struct SectionHeader: View {
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if action != nil {
-                Image(systemName: "chevron.forward")
-                    .font(.system(size: 18))
+                Glyph.chevron.image.resizable().scaledToFit()
+                    .frame(width: 24, height: 24)
+                    .flipsForRightToLeftLayoutDirection(true)
                     .frame(width: 38, height: 38)
                     .foregroundStyle(enabled ? palette.mutedText : palette.disabledText)
                     .accessibilityHidden(true)
