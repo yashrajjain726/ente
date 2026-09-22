@@ -109,6 +109,39 @@ class ScanSessionController extends ChangeNotifier {
     });
   }
 
+  Future<ScannedPage?> replaceCapture(String pageId, Uint8List capturedJpeg) {
+    _pendingCount++;
+    notifyListeners();
+    final task = _queue.then<ScannedPage?>((_) async {
+      try {
+        final replacement = await _service.processCapture(capturedJpeg);
+        final index = _pages.indexWhere((page) => page.id == pageId);
+        if (_disposed || index < 0) {
+          await _service.disposePage(replacement);
+          return null;
+        }
+        final previous = _pages[index];
+        _pages[index] = replacement;
+        notifyListeners();
+        try {
+          await _service.disposePage(previous);
+        } catch (e) {
+          _logger.warning('Failed to dispose replaced page', e);
+        }
+        return replacement;
+      } catch (e, s) {
+        _logger.severe('Failed to replace capture', e, s);
+        _lastError = e;
+        return null;
+      } finally {
+        _pendingCount--;
+        if (!_disposed) notifyListeners();
+      }
+    });
+    _queue = task.then((_) {});
+    return task;
+  }
+
   Future<void> waitForPending() async {
     while (_pendingCount > 0) {
       await _queue;
