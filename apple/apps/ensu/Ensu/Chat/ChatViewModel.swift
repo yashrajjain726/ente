@@ -16,6 +16,11 @@ final class ChatViewModel: ObservableObject {
         var updateTask: Task<Void, Never>?
     }
 
+    @MainActor
+    private final class ConversationPreparationState {
+        var preparation: ConversationPreparation?
+    }
+
     private static let defaultTemperature: Float = 0.5
     private static let systemPromptDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -1175,7 +1180,7 @@ final class ChatViewModel: ObservableObject {
             )
             var normalHistoryMessages: [LlmMessage] = []
             var activeCitations: [GroundedSource] = []
-            var preparation: ConversationPreparation?
+            let preparationState = ConversationPreparationState()
             var messages = [
                 LlmMessage(text: normalSystemPrompt, role: .system, hasAttachments: false),
                 userMessage,
@@ -1319,7 +1324,8 @@ final class ChatViewModel: ObservableObject {
                             ),
                             temperature: self.resolveTemperature(),
                             onProgress: {
-                                guard self.activeGenerationId == generationId, preparation == nil
+                                guard self.activeGenerationId == generationId,
+                                    preparationState.preparation == nil
                                 else { return }
                                 self.conversationStatus = "Remembering earlier messages"
                             },
@@ -1328,7 +1334,7 @@ final class ChatViewModel: ObservableObject {
                                     prepared.cancel()
                                     return
                                 }
-                                preparation = prepared
+                                preparationState.preparation = prepared
                                 self.conversationStatus = nil
                             },
                             onToken: onToken
@@ -1371,7 +1377,8 @@ final class ChatViewModel: ObservableObject {
                 finishGeneration(
                     parent: userNode, response: snapshot.text, tokenCount: snapshot.tokenCount,
                     totalTimeMs: summary.totalTimeMs, interrupted: false,
-                    generationId: generationId, citations: activeCitations, preparation: preparation
+                    generationId: generationId, citations: activeCitations,
+                    preparation: preparationState.preparation
                 )
             } catch {
                 let snapshot = buffer.withLock { $0 }
@@ -1391,7 +1398,7 @@ final class ChatViewModel: ObservableObject {
                 finishGeneration(
                     parent: userNode, response: snapshot.text, tokenCount: snapshot.tokenCount,
                     totalTimeMs: nil, interrupted: true, generationId: generationId,
-                    citations: activeCitations, preparation: preparation)
+                    citations: activeCitations, preparation: preparationState.preparation)
             }
             if embeddingAssetInvalid {
                 refreshModelDownloadInfo()
