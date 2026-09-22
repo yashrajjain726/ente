@@ -1,4 +1,3 @@
-import EnteFonts
 import SwiftUI
 
 public struct SheetHeader<Leading: View, Trailing: View>: View {
@@ -21,7 +20,7 @@ public struct SheetHeader<Leading: View, Trailing: View>: View {
         HStack(spacing: EnteSpacing.md) {
             leading
             Text(title)
-                .font(EnteFont.inter(size: 18, weight: .semibold, relativeTo: .title3))
+                .font(EnteTypography.heading2)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityAddTraits(.isHeader)

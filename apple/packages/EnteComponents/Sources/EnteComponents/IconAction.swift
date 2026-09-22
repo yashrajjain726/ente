@@ -2,20 +2,17 @@ import SwiftUI
 
 public struct IconAction<Content: View>: View {
     private let kind: IconActionKind
-    private let enabled: Bool
     private let size: CGFloat
     private let action: () -> Void
     private let content: Content
 
     public init(
         kind: IconActionKind = .unfilled,
-        enabled: Bool = true,
         size: CGFloat = 40,
         action: @escaping () -> Void,
         @ViewBuilder content: () -> Content
     ) {
         self.kind = kind
-        self.enabled = enabled
         self.size = size
         self.action = action
         self.content = content()
@@ -33,7 +30,6 @@ public struct IconAction<Content: View>: View {
                 cornerRadius: kind == .circular ? size / 2 : EnteRadius.medium
             )
         )
-        .disabled(!enabled)
     }
 }
 
