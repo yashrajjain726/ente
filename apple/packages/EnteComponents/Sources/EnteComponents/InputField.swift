@@ -60,6 +60,7 @@ public struct InputField: View {
             }
             .textFieldStyle(.plain)
             .accessibilityLabel(label ?? placeholder)
+            .accessibilityHint(state == .error ? message ?? "" : "")
             .focused($focused)
             .font(EnteTypography.body)
             .foregroundStyle(enabled ? palette.text : palette.disabledText)
