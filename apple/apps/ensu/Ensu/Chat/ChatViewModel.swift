@@ -133,6 +133,7 @@ final class ChatViewModel: ObservableObject {
             ?? FileManager.default.temporaryDirectory
 
         let config = ConfigDefaults.shared
+        // Must initialize after the asset store migrates the persisted selection.
         self.modelSettings = ModelSettingsStore.shared
         let transcription = transcriptionModelAsset()
         let transcriber = Transcriber(
@@ -1141,7 +1142,6 @@ final class ChatViewModel: ObservableObject {
                         return
                     }
                     embeddingAssetInvalid = error is EmbeddingAssetInvalidError
-                    logger.warning("Source search failed", details: "\(error)")
                 }
             }
 
@@ -1319,18 +1319,11 @@ final class ChatViewModel: ObservableObject {
             do {
                 let runGeneration: () async throws -> GenerationSummary = {
                     if prompt.imageFiles.isEmpty {
-                        let path =
-                            self.buildSelectedPath(
-                                for: userNode.sessionId,
-                                childrenMap: self.childrenByParent(sessionId: userNode.sessionId)
-                            ).prefix { $0.id != userNode.id }.map { $0.id.uuidString } + [
-                                userNode.id.uuidString
-                            ]
                         return try await self.generatePreparedChat(
                             selection,
                             request: ConversationRequest(
                                 sessionUuid: userNode.sessionId.uuidString,
-                                path: path,
+                                path: self.buildConversationPath(for: userNode),
                                 system: normalSystemPrompt,
                                 current: prompt.text,
                                 expectedUserText: userNode.text,
@@ -1444,7 +1437,6 @@ final class ChatViewModel: ObservableObject {
                 try control.checkCancellation()
                 return try preparation.run(callback: sink)
             }.value
-            try control.checkCancellation()
             try control.beginAnswer()
             onPrepared(preparation)
             try await Task.detached { try preparation.validate() }.value
@@ -1791,6 +1783,7 @@ final class ChatViewModel: ObservableObject {
             await MainActor.run {
                 guard self.messageStore[sessionId] != nil else { return }
                 self.messageStore[sessionId] = nodes
+                // Branch selection is computed in-memory.
                 self.branchSelections[sessionId] = [:]
                 self.invalidateChildrenCache(for: sessionId)
                 if self.currentSessionId == sessionId {
@@ -1853,6 +1846,19 @@ final class ChatViewModel: ObservableObject {
         uuid.0 ^= 0xA5
         uuid.15 ^= 0x5A
         return UUID(uuid: uuid)
+    }
+
+    private func buildConversationPath(for target: MessageNode) -> [String] {
+        let byId = Dictionary(
+            uniqueKeysWithValues: (messageStore[target.sessionId] ?? []).map { ($0.id, $0) })
+        var path: [String] = []
+        var visited = Set<UUID>()
+        var current: MessageNode? = target
+        while let node = current, visited.insert(node.id).inserted {
+            path.append(node.id.uuidString)
+            current = node.parentId.flatMap { byId[$0] }
+        }
+        return path.reversed()
     }
 
     private func buildSelectedPath(for sessionId: UUID, childrenMap: [UUID: [MessageNode]])

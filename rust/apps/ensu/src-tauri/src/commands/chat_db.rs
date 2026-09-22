@@ -504,6 +504,7 @@ pub async fn chat_db_compress_attachment_image_file(
 ) -> Result<Vec<u8>, ApiError> {
     let scope = app.fs_scope();
     async_runtime::spawn_blocking(move || {
+        // Read the same canonical path checked against the filesystem scope.
         let canonical_path = fs::canonicalize(&path).map_err(|_| {
             ApiError::new(
                 "io_scope",

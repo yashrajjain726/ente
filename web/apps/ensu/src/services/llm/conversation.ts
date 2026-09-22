@@ -14,22 +14,6 @@ export interface PreparedReply {
     saveAnswer: (text: string) => Promise<ChatMessage>;
 }
 
-const createPreparedReply = (
-    messages: LlmMessage[],
-    answer: PreparedAnswer,
-    provider: LlmProvider,
-): PreparedReply => {
-    let saved: Promise<ChatMessage> | undefined;
-    return {
-        generateChatStream: (request, onEvent) =>
-            provider.generateChatStream(
-                { ...request, messages, preparationToken: answer.token },
-                onEvent,
-            ),
-        saveAnswer: (text) => (saved ??= addPreparedAnswer(answer, text)),
-    };
-};
-
 interface PreparedConversation {
     preparationToken: string;
     messages: LlmMessage[];
@@ -46,7 +30,7 @@ export const prepareDesktopConversation = async (
         groundingCandidates?: unknown;
         maxTokens: number;
     },
-    provider: LlmProvider,
+    provider: Pick<LlmProvider, "generateChatStream">,
     callbacks: { isCurrent: () => boolean; onProgress: () => void },
 ): Promise<PreparedReply | undefined> => {
     const preparationToken = crypto.randomUUID();
@@ -77,16 +61,25 @@ export const prepareDesktopConversation = async (
             },
         );
         if (!callbacks.isCurrent()) return;
-        return createPreparedReply(
-            result.messages,
-            {
-                token: result.preparationToken,
-                sessionUuid: input.sessionUuid,
-                parentMessageUuid: input.path.at(-1)!,
-                sources: result.groundedContext?.sources ?? [],
-            },
-            provider,
-        );
+        const answer: PreparedAnswer = {
+            token: result.preparationToken,
+            sessionUuid: input.sessionUuid,
+            parentMessageUuid: input.path.at(-1)!,
+            sources: result.groundedContext?.sources ?? [],
+        };
+        let saved: Promise<ChatMessage> | undefined;
+        return {
+            generateChatStream: (request, onEvent) =>
+                provider.generateChatStream(
+                    {
+                        ...request,
+                        messages: result.messages,
+                        preparationToken: answer.token,
+                    },
+                    onEvent,
+                ),
+            saveAnswer: (text) => (saved ??= addPreparedAnswer(answer, text)),
+        };
     } finally {
         unlisten();
     }

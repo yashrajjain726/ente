@@ -466,6 +466,7 @@ pub async fn llm_load_model(
         "LLM",
         format!("load model requested model_path={}", params.model_path),
     );
+    // llama.cpp clamps this to the model's layer count.
     const DEFAULT_GPU_LAYERS: i32 = 999;
     let mut params = params;
     if params.n_gpu_layers.is_none() {

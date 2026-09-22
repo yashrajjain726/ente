@@ -4,7 +4,6 @@ import io.ente.ensu.AppState
 import io.ente.ensu.bindings.AssetDownloadException
 import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.bindings.ConversationException
-import io.ente.ensu.bindings.ConversationPreparation
 import io.ente.ensu.bindings.ConversationProgressCallback
 import io.ente.ensu.bindings.ConversationRequest
 import io.ente.ensu.bindings.DbException
@@ -69,7 +68,7 @@ internal class ChatStoreActions(
     @Volatile private var stopRequested = false
     private var isForeground = true
     private var preparingGenerationToken: Long? = null
-    @Volatile private var activePreparation: ConversationPreparation? = null
+    @Volatile private var activePreparation: ConversationPreparationControl? = null
     private var streamingParentId: String? = null
     private var activeGenerationToken = 0L
     private var pendingOverflow: PendingOverflow? = null
@@ -569,6 +568,9 @@ internal class ChatStoreActions(
                         hits
                     } catch (error: kotlinx.coroutines.CancellationException) {
                         throw error
+                    } catch (_: LlmProvider.EmbeddingAssetInvalid) {
+                        embeddingAssetInvalid = true
+                        emptyList()
                     } catch (error: Throwable) {
                         if (
                             !isActive() ||
@@ -578,11 +580,9 @@ internal class ChatStoreActions(
                         ) {
                             return@launch
                         }
-                        embeddingAssetInvalid = error is LlmProvider.EmbeddingAssetInvalid
                         logRepository.log(
                             LogLevel.Warning,
-                            "Source search failed",
-                            details = error.message,
+                            "Context retrieval failed",
                             tag = "Chat",
                             throwable = error,
                         )
@@ -858,9 +858,7 @@ internal class ChatStoreActions(
     ) {
         val buffer = StringBuilder()
         var tokens = 0
-        val path =
-            buildSelectedPath(sessionId).takeWhile { it.id != userMessage.id }.map { it.id } +
-                userMessage.id
+        val path = conversationPath(messageStore[sessionId].orEmpty(), userMessage)
         val system = buildSystemPrompt()
         try {
             llmProvider.withConversationContext(selection) { context ->
@@ -882,24 +880,26 @@ internal class ChatStoreActions(
                             searched = searched,
                         ),
                     )
-                activePreparation = preparation.work
-                if (!isActive() || stopRequested) preparation.work.cancel()
-                val progress =
-                    object : ConversationProgressCallback {
-                        override fun onProgress() {
-                            if (!isActive() || stopRequested) preparation.work.cancel()
-                            else
-                                state.update {
-                                    it.copy(
-                                        chat =
-                                            it.chat.copy(
-                                                preparationStatus = "Remembering earlier messages"
-                                            )
-                                    )
-                                }
-                        }
-                    }
+                val preparationControl = ConversationPreparationControl(preparation.work)
+                activePreparation = preparationControl
                 try {
+                    if (!isActive() || stopRequested) preparationControl.cancel()
+                    val progress =
+                        object : ConversationProgressCallback {
+                            override fun onProgress() {
+                                if (!isActive() || stopRequested) preparationControl.cancel()
+                                else
+                                    state.update {
+                                        it.copy(
+                                            chat =
+                                                it.chat.copy(
+                                                    preparationStatus =
+                                                        "Remembering earlier messages"
+                                                )
+                                        )
+                                    }
+                            }
+                        }
                     state.update {
                         it.copy(chat = it.chat.copy(preparationStatus = "Preparing conversation"))
                     }
@@ -951,8 +951,7 @@ internal class ChatStoreActions(
                     generated.getOrThrow()
                 } finally {
                     activePreparation = null
-                    preparation.work.cancel()
-                    preparation.work.destroy()
+                    preparationControl.close()
                 }
             }
         } catch (error: kotlinx.coroutines.CancellationException) {
@@ -970,7 +969,7 @@ internal class ChatStoreActions(
                     tag = "Chat",
                     throwable = error,
                 )
-                if (isActive() && buffer.isEmpty())
+                if (isActive() && buffer.isEmpty()) {
                     state.update {
                         it.copy(
                             chat =
@@ -983,6 +982,8 @@ internal class ChatStoreActions(
                                 )
                         )
                     }
+                    rebuildChatState(sessionId)
+                }
             }
         } finally {
             if (isActive()) state.update { it.copy(chat = it.chat.copy(preparationStatus = null)) }

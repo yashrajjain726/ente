@@ -9,6 +9,7 @@ import { useFileInput } from "@/components/utils/use-file-input";
 import { useNotesCollections } from "@/hooks/use-notes-collections";
 import { handleManualAppUpdateCheck } from "@/services/app-update";
 import {
+    buildConversationPath,
     buildSelectedPath,
     ROOT_SELECTION_KEY,
     STREAMING_SELECTION_KEY,
@@ -305,6 +306,7 @@ const buildDocumentBlocks = (documents: DocumentAttachment[]) => {
     return documents
         .map((doc, index) => {
             const name = doc.name || `Document ${index + 1}`;
+            // Remove null bytes which are invalid in C strings used by llama.cpp
             const content = doc.text.replace(/\0/g, "").trim();
             return `----- BEGIN DOCUMENT: ${name} -----\n${content}\n----- END DOCUMENT: ${name} -----`;
         })
@@ -1070,9 +1072,12 @@ const Page: React.FC = () => {
             setMaxTokens(settings.maxTokens);
         };
 
+        // Older builds persisted a model URL selection; llm_migrate_models
+        // converts it to a model id once.
         const loadSettings = async () => {
             let raw = window.localStorage.getItem(MODEL_SETTINGS_STORAGE_KEY);
             if (!raw) {
+                // Settings from even older builds live in IndexedDB.
                 const kvRaw = await getKV(MODEL_SETTINGS_STORAGE_KEY).catch(
                     () => undefined,
                 );
@@ -1930,7 +1935,15 @@ const Page: React.FC = () => {
         async (paths: string[]) => {
             if (!isTauriRuntime || paths.length === 0) return;
             const { remove } = await import("@tauri-apps/plugin-fs");
-            await Promise.allSettled(paths.map((path) => remove(path)));
+            await Promise.all(
+                paths.map(async (path) => {
+                    try {
+                        await remove(path);
+                    } catch {
+                        // Deleting the temporary file is best effort.
+                    }
+                }),
+            );
         },
         [isTauriRuntime],
     );
@@ -2925,7 +2938,7 @@ const Page: React.FC = () => {
     const startGeneration = useCallback(
         async ({
             promptText,
-            parentMessageUuid,
+            parentMessage,
             historyPath,
             stopAtMessageUuid,
             resetContext = false,
@@ -2934,7 +2947,7 @@ const Page: React.FC = () => {
             mediaMarker,
         }: {
             promptText: string;
-            parentMessageUuid: string;
+            parentMessage: ChatMessage;
             historyPath: ChatMessage[];
             stopAtMessageUuid?: string | null;
             resetContext?: boolean;
@@ -2942,6 +2955,7 @@ const Page: React.FC = () => {
             imagePaths?: string[];
             mediaMarker?: string;
         }): Promise<void> => {
+            const parentMessageUuid = parentMessage.messageUuid;
             const activeSessionId =
                 sessionUuid ?? currentSessionIdRef.current ?? currentSessionId;
             if (!chatKey || !activeSessionId) return;
@@ -3043,10 +3057,13 @@ const Page: React.FC = () => {
                     ...history,
                     { role: "user", content: promptText },
                 ];
-                const normalPromptTokenEstimate = normalMessages.reduce(
-                    (total, message) => total + approxTokens(message.content),
-                    0,
-                );
+                const countTokens = (messages: LlmMessage[]) =>
+                    messages.reduce(
+                        (total, message) =>
+                            total + approxTokens(message.content),
+                        0,
+                    );
+                const normalPromptTokenEstimate = countTokens(normalMessages);
                 if (
                     provider.getBackendKind() === "wasm" &&
                     normalPromptTokenEstimate > inputBudget
@@ -3122,6 +3139,9 @@ const Page: React.FC = () => {
                         ) {
                             return;
                         }
+                        if (name === "embedding_missing") {
+                            throw error;
+                        }
                         log.warn(
                             "Knowledge retrieval failed; continuing without source context",
                             error,
@@ -3165,13 +3185,7 @@ const Page: React.FC = () => {
                         normalMessages.length - 2,
                         ...history,
                     );
-                    if (
-                        normalMessages.reduce(
-                            (total, message) =>
-                                total + approxTokens(message.content),
-                            0,
-                        ) > inputBudget
-                    ) {
+                    if (countTokens(normalMessages) > inputBudget) {
                         throw new Error(
                             "Prompt exceeds the loaded model context window. Reduce history, lower max output, or increase context length.",
                         );
@@ -3188,28 +3202,19 @@ const Page: React.FC = () => {
                         },
                         ...normalMessages.slice(1),
                     ];
-                    if (
-                        candidateMessages.reduce(
-                            (total, message) =>
-                                total + approxTokens(message.content),
-                            0,
-                        ) <= inputBudget
-                    ) {
+                    if (countTokens(candidateMessages) <= inputBudget) {
                         messages = candidateMessages;
                         activeSources = knowledgeContext.sources;
                     }
                 }
                 if (useConversationMemory) {
-                    const selectedPath = slicePathUntil(
-                        historyPath,
-                        stopAtMessageUuid,
-                    ).map((message) => message.messageUuid);
-                    if (selectedPath.at(-1) !== parentMessageUuid)
-                        selectedPath.push(parentMessageUuid);
                     const prepared = await prepareDesktopConversation(
                         {
                             sessionUuid: activeSessionId,
-                            path: selectedPath,
+                            path: buildConversationPath(
+                                allMessages,
+                                parentMessage,
+                            ),
                             system: normalSystemPrompt,
                             current: promptText,
                             historyQuery: knowledgeQuery,
@@ -3425,7 +3430,7 @@ const Page: React.FC = () => {
             ensureProvider,
             getModelSettings,
             buildHistory,
-            slicePathUntil,
+            allMessages,
             branchSelections,
             updateBranchSelectionState,
             appendMessageToState,
@@ -3483,7 +3488,7 @@ const Page: React.FC = () => {
             const historyPath = slicePathUntil(messageState.path, parentUuid);
             await startGeneration({
                 promptText: parentMessage.text,
-                parentMessageUuid: parentUuid,
+                parentMessage,
                 historyPath,
                 stopAtMessageUuid: parentUuid,
                 resetContext: true,
@@ -4427,7 +4432,7 @@ const Page: React.FC = () => {
 
                 await startGeneration({
                     promptText,
-                    parentMessageUuid: newUserMessage.messageUuid,
+                    parentMessage: newUserMessage,
                     historyPath,
                     sessionUuid: activeSessionId,
                     imagePaths: inferenceImagePaths,
@@ -4462,7 +4467,7 @@ const Page: React.FC = () => {
 
             await startGeneration({
                 promptText,
-                parentMessageUuid: userMessage.messageUuid,
+                parentMessage: userMessage,
                 historyPath: basePath,
                 sessionUuid: activeSessionId,
                 imagePaths: inferenceImagePaths,

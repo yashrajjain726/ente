@@ -8,6 +8,7 @@ pub const ENVELOPE_VERSION: u32 = 2;
 #[derive(Debug, Serialize)]
 pub struct ConversationEnvelope {
     pub format_version: u32,
+    #[serde(serialize_with = "super::uuid_text::serialize")]
     pub session_uuid: Uuid,
     pub summary: Option<Summary>,
 }

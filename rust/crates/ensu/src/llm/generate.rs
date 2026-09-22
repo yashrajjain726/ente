@@ -199,12 +199,6 @@ fn tokenize_text_prompt(model: &LlamaModel, prompt: &str) -> Result<Vec<LlamaTok
     Ok(tokens)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TextPromptMeasurement {
-    pub prompt_tokens: usize,
-    pub context_size: u32,
-}
-
 fn drain_utf8(pending: &mut Vec<u8>) -> String {
     let mut output = String::new();
     loop {
@@ -337,6 +331,7 @@ impl GenerationJob<'_> {
             check_cancelled(self.cancel_flag)?;
 
             let token = sampler.sample(ctx, logits_index);
+            sampler.accept(token);
             check_cancelled(self.cancel_flag)?;
 
             if ctx.model.is_eog_token(token) {
@@ -420,11 +415,7 @@ impl GenerationJob<'_> {
     }
 }
 
-fn build_sampler(
-    model: &LlamaModel,
-    request: &SamplingParams,
-    prompt_tokens: &[LlamaToken],
-) -> Result<LlamaSampler, Error> {
+fn build_sampler(model: &LlamaModel, request: &SamplingParams) -> Result<LlamaSampler, Error> {
     let mut samplers = Vec::new();
 
     let mut repeat_penalty = request.repeat_penalty.unwrap_or(1.0);
@@ -444,10 +435,12 @@ fn build_sampler(
         || frequency_penalty != 0.0
         || presence_penalty != 0.0
     {
-        let mut penalties =
-            LlamaSampler::penalties(-1, repeat_penalty, frequency_penalty, presence_penalty);
-        penalties.accept_many(prompt_tokens.iter());
-        samplers.push(penalties);
+        samplers.push(LlamaSampler::penalties(
+            -1,
+            repeat_penalty,
+            frequency_penalty,
+            presence_penalty,
+        ));
     }
 
     if let Some(grammar) = request.grammar.as_deref() {
@@ -484,10 +477,7 @@ fn build_sampler(
 }
 
 impl Context {
-    pub fn measure_text_chat_prompt(
-        &self,
-        request: &ChatRequest,
-    ) -> Result<TextPromptMeasurement, Error> {
+    pub fn measure_text_chat_prompt(&self, request: &ChatRequest) -> Result<usize, Error> {
         if request
             .image_paths
             .as_ref()
@@ -504,10 +494,7 @@ impl Context {
                 request.template_override.clone(),
                 request.add_assistant.unwrap_or(true),
             )?;
-            Ok(TextPromptMeasurement {
-                prompt_tokens: tokenize_text_prompt(ctx.model, &prompt)?.len(),
-                context_size: ctx.n_ctx(),
-            })
+            Ok(tokenize_text_prompt(ctx.model, &prompt)?.len())
         })
     }
 
@@ -684,7 +671,8 @@ fn generate_chat_stream(
                     token_offset = end;
                 }
 
-                let mut sampler = build_sampler(ctx.model, &sampler_request, &prompt_tokens)?;
+                let mut sampler = build_sampler(ctx.model, &sampler_request)?;
+                sampler.accept_many(prompt_tokens.iter());
 
                 let pos = prompt_tokens.len() as i32;
                 job.run(ctx, &mut sampler, Some(cached_tokens), pos, logits_index)?;
@@ -770,6 +758,7 @@ fn generate_chat_stream(
                 })?;
             check_cancelled(&cancel_flag)?;
 
+            let mut sampler = build_sampler(ctx.model, &sampler_request)?;
             let mut prompt_tokens = Vec::new();
             for index in 0..chunks.len() {
                 if let Some(chunk) = chunks.get(index)
@@ -778,7 +767,7 @@ fn generate_chat_stream(
                     prompt_tokens.extend_from_slice(tokens);
                 }
             }
-            let mut sampler = build_sampler(ctx.model, &sampler_request, &prompt_tokens)?;
+            sampler.accept_many(prompt_tokens.iter());
 
             job.run(ctx, &mut sampler, None, n_past, -1)?;
 

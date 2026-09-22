@@ -481,7 +481,7 @@ class WasmInference implements InferenceBackend {
                     stopTokens.push(first);
                 }
             } catch {
-                continue;
+                // Skip stop sequences that fail to tokenize.
             }
         }
 

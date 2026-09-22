@@ -4,6 +4,7 @@ mod lookup;
 mod prepare;
 mod state;
 mod turn;
+mod uuid_text;
 
 pub use budget::{GenerationBudget, resolve_generation_budget};
 pub use grounding::{FittedGrounding, GroundingCandidates, MAX_GROUNDING_BYTES};
@@ -20,11 +21,10 @@ use std::collections::HashSet;
 use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::db::{AttachmentKind, Message, Sender};
-use crate::llm::{ChatMessage, FinishReason, strip_hidden_parts_text};
+use crate::llm::{ChatMessage, ChatRequest, FinishReason, strip_hidden_parts_text};
 
 pub(crate) const MAX_STATE_BYTES: usize = 32 * 1024;
 const MAX_SUMMARY_BYTES: usize = 16 * 1024;
@@ -33,12 +33,22 @@ pub const MAX_HISTORY_BYTES: usize = 32 * 1024 * 1024;
 const SAFETY_TOKENS: usize = 256;
 const SUMMARY_OUTPUT_TOKENS: usize = 512;
 
-pub fn summary_stop_sequences(prompt_tokens: usize, output: usize) -> Vec<String> {
-    if prompt_tokens > output.saturating_mul(2) {
-        vec!["{\"fragment_start_byte\":".into()]
-    } else {
-        Vec::new()
-    }
+pub fn summary_request(
+    messages: Vec<ChatMessage>,
+    output: usize,
+    prompt_tokens: usize,
+) -> Result<ChatRequest, Error> {
+    Ok(ChatRequest {
+        messages,
+        max_tokens: Some(i32::try_from(output).map_err(|_| Error::InvalidLimits)?),
+        temperature: Some(0.0),
+        stop_sequences: Some(if prompt_tokens > output.saturating_mul(2) {
+            vec!["{\"fragment_start_byte\":".into()]
+        } else {
+            Vec::new()
+        }),
+        ..Default::default()
+    })
 }
 
 fn summary_instruction(retry: bool) -> String {
@@ -73,6 +83,7 @@ pub enum Error {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Summary {
+    #[serde(with = "uuid_text")]
     pub covered_boundary_message_uuid: Uuid,
     pub covered_prefix_fingerprint: String,
     pub text: String,
@@ -111,7 +122,7 @@ impl ConversationState {
     }
 }
 
-pub fn fingerprint(messages: &[Message]) -> String {
+fn fingerprint(messages: &[Message]) -> String {
     let rows: Vec<_> = messages
         .iter()
         .map(|m| {
@@ -143,7 +154,7 @@ pub fn fingerprint(messages: &[Message]) -> String {
     let bytes = serde_json::json!(["ensu-history-v1", rows])
         .to_string()
         .into_bytes();
-    Sha256::digest(bytes)
+    ente_ensu_crypto::sha256(&bytes)
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
@@ -153,8 +164,10 @@ pub(crate) fn validate_path(messages: &[Message]) -> Result<(), Error> {
     if messages.len() > MAX_HISTORY_MESSAGES {
         return Err(Error::HistoryLimit);
     }
-    let mut seen = HashSet::new();
-    let mut previous = None;
+    let mut previous = messages
+        .first()
+        .and_then(|message| message.parent_message_uuid);
+    let mut seen = previous.into_iter().collect::<HashSet<_>>();
     let mut bytes = 0usize;
     for message in messages {
         if !seen.insert(message.uuid)

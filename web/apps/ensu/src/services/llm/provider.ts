@@ -15,6 +15,7 @@ import type {
     ModelSettings,
 } from "./types";
 
+// These fallback values must stay in sync with rust/crates/ensu/src/config.rs.
 export const DEFAULT_MODEL: ModelInfo = {
     id: "lfm-vl-1.6b",
     name: "LFM 2.5 VL 1.6B (Q4_0)",
@@ -347,7 +348,12 @@ export class LlmProvider {
                 }
                 return inFlight.promise;
             }
-            await this.ensureInFlight.promise.catch(() => undefined);
+            try {
+                await this.ensureInFlight.promise;
+            } catch {
+                // Wait only for settlement; the failure belongs to the
+                // original caller.
+            }
         }
 
         const ensurePromise = this.withExclusiveModelOperation(async () => {

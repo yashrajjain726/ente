@@ -81,15 +81,6 @@ pub struct ConversationPreparation {
     summary_job: AtomicI64,
 }
 
-fn request(messages: Vec<llm::ChatMessage>, max_tokens: usize) -> llm::ChatRequest {
-    llm::ChatRequest {
-        messages,
-        max_tokens: Some(max_tokens as i32),
-        temperature: Some(0.0),
-        ..Default::default()
-    }
-}
-
 #[uniffi::export]
 impl EnsuDb {
     pub fn prepare_conversation(
@@ -283,8 +274,10 @@ impl core::Effects for NativeEffects<'_> {
     fn measure(&mut self, messages: &[llm::ChatMessage]) -> Result<usize, core::PrepareError> {
         self.owner
             .context
-            .measure_text_chat_prompt(&request(messages.to_vec(), 1))
-            .map(|result| result.prompt_tokens)
+            .measure_text_chat_prompt(&llm::ChatRequest {
+                messages: messages.to_vec(),
+                ..Default::default()
+            })
             .map_err(|cause| core::PrepareError::Backend(cause.to_string()))
     }
 
@@ -296,9 +289,8 @@ impl core::Effects for NativeEffects<'_> {
         self.check_current()?;
         self.callback.on_progress();
         self.check_cancelled()?;
-        let stops = core::summary_stop_sequences(self.measure(&messages)?, output);
-        let mut generation = request(messages, output);
-        generation.stop_sequences = Some(stops);
+        let prompt_tokens = self.measure(&messages)?;
+        let generation = core::summary_request(messages, output, prompt_tokens)?;
         let mut text = String::new();
         let result = self
             .owner

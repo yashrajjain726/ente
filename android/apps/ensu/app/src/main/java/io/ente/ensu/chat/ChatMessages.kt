@@ -933,6 +933,7 @@ private fun StreamingMessageBubble(
             renderedText = ""
             return@LaunchedEffect
         }
+        // Throttle markdown re-rendering while streaming to reduce dropped frames.
         delay(33)
         renderedText = stripHiddenMessageParts(text)
     }

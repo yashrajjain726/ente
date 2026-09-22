@@ -115,14 +115,6 @@ fn preparation_error(cause: PrepareError) -> ApiError {
         _ => error(cause.to_string()),
     }
 }
-fn request(messages: Vec<llm::ChatMessage>, output: i32) -> llm::ChatRequest {
-    llm::ChatRequest {
-        messages,
-        max_tokens: Some(output),
-        temperature: Some(0.0),
-        ..Default::default()
-    }
-}
 
 struct NativeEffects<'a> {
     app: AppHandle,
@@ -162,8 +154,10 @@ impl Effects for NativeEffects<'_> {
     }
     fn measure(&mut self, messages: &[llm::ChatMessage]) -> Result<usize, PrepareError> {
         self.context
-            .measure_text_chat_prompt(&request(messages.to_vec(), 1))
-            .map(|m| m.prompt_tokens)
+            .measure_text_chat_prompt(&llm::ChatRequest {
+                messages: messages.to_vec(),
+                ..Default::default()
+            })
             .map_err(|e| PrepareError::Backend(e.to_string()))
     }
     fn summarize(
@@ -176,12 +170,8 @@ impl Effects for NativeEffects<'_> {
             "conversation-progress",
             serde_json::json!({"preparationToken": self.token}),
         );
-        let stops = conversation::summary_stop_sequences(self.measure(&messages)?, output);
-        let mut generation = request(
-            messages,
-            i32::try_from(output).map_err(|_| PrepareError::CannotFit)?,
-        );
-        generation.stop_sequences = Some(stops);
+        let prompt_tokens = self.measure(&messages)?;
+        let generation = conversation::summary_request(messages, output, prompt_tokens)?;
         let mut text = String::new();
         let epoch = self.epoch.clone();
         let expected = self.expected_epoch;

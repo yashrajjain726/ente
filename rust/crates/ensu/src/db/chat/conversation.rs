@@ -56,6 +56,11 @@ impl<B: Backend> ChatDb<B> {
                 }
                 rows.push(row);
             }
+            if has_existing_parent(tx, &rows)? {
+                return Err(Error::UnsupportedOperation(
+                    "Conversation history omits an existing ancestor".into(),
+                ));
+            }
             Ok((envelope, rows))
         })?;
         let messages = rows
@@ -214,6 +219,16 @@ fn message_row<T: BackendTx>(tx: &T, id: Uuid) -> Result<Option<crate::db::Row>>
     )
 }
 
+fn has_existing_parent<T: BackendTx>(tx: &T, rows: &[crate::db::Row]) -> Result<bool> {
+    let Some(root) = rows.first() else {
+        return Ok(false);
+    };
+    let Some(parent) = root.get_optional_string(2)? else {
+        return Ok(false);
+    };
+    Ok(message_row(tx, Uuid::parse_str(&parent)?)?.is_some())
+}
+
 pub(super) fn snapshot_matches<T: BackendTx>(
     tx: &T,
     snapshot: &ConversationSnapshot,
@@ -222,7 +237,9 @@ pub(super) fn snapshot_matches<T: BackendTx>(
     let Some(envelope) = session_envelope(tx, snapshot.session_uuid)? else {
         return Ok(false);
     };
-    if compare_envelope && envelope != snapshot.envelope {
+    if (compare_envelope && envelope != snapshot.envelope)
+        || has_existing_parent(tx, &snapshot.rows)?
+    {
         return Ok(false);
     }
     for (message, expected) in snapshot.messages.iter().zip(&snapshot.rows) {
@@ -233,8 +250,8 @@ pub(super) fn snapshot_matches<T: BackendTx>(
     Ok(true)
 }
 
-#[cfg(all(test, feature = "sqlite"))]
-#[expect(clippy::unwrap_used, reason = "Test fixture setup must succeed")]
+#[cfg(test)]
+#[cfg(feature = "sqlite")]
 mod tests {
     use super::*;
     fn seeded() -> (ChatDb<crate::db::SqliteBackend>, Uuid, Vec<Message>) {
@@ -279,18 +296,51 @@ mod tests {
     }
 
     #[test]
-    fn encrypted_summary_survives_reopen_and_branch_selection() {
+    fn migrated_orphan_history_supports_summary_restore_and_continuation() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("conversation.db");
         let db = ChatDb::open_sqlite_with_defaults(&file, vec![7; 32]).unwrap();
         let session = db.create_session("Memory").unwrap().uuid;
+        let deleted = db
+            .insert_message(session, "other", "Deleted parent", None, vec![])
+            .unwrap();
         let question = db
-            .insert_message(session, "self", "Keep data offline", None, vec![])
+            .insert_message(
+                session,
+                "self",
+                "Keep data offline",
+                Some(deleted.uuid),
+                vec![],
+            )
             .unwrap();
         let answer = db
             .insert_message(session, "other", "Understood", Some(question.uuid), vec![])
             .unwrap();
         let full = vec![question.clone(), answer];
+        db.backend
+            .execute_batch(
+                "ALTER TABLE sessions DROP COLUMN conversation_state;
+            ALTER TABLE sessions ADD COLUMN deleted_at INTEGER;
+            ALTER TABLE messages ADD COLUMN deleted_at INTEGER;
+            PRAGMA user_version = 4;",
+            )
+            .unwrap();
+        db.backend
+            .execute(
+                "UPDATE messages SET deleted_at = 1 WHERE message_uuid = ?",
+                &[Value::Text(deleted.uuid.to_string())],
+            )
+            .unwrap();
+        drop(db);
+        let db = ChatDb::open_sqlite_with_defaults(&file, vec![7; 32]).unwrap();
+        assert!(db.get_message(deleted.uuid).unwrap().is_none());
+        assert_eq!(
+            db.get_message(question.uuid)
+                .unwrap()
+                .unwrap()
+                .parent_message_uuid,
+            Some(deleted.uuid)
+        );
         let mut captured = snapshot(&db, session, &full);
         let memory = ConversationState::new(session, &full, "Keep data offline".into()).unwrap();
         assert!(
@@ -302,6 +352,24 @@ mod tests {
         let db = ChatDb::open_sqlite_with_defaults(&file, vec![7; 32]).unwrap();
         let reopened = snapshot(&db, session, &full);
         assert_eq!(reopened.state(), Some(&memory));
+        let user = db
+            .insert_message(session, "self", "Continue", Some(full[1].uuid), vec![])
+            .unwrap();
+        let mut continued = full.clone();
+        continued.push(user.clone());
+        let captured = snapshot(&db, session, &continued);
+        assert_eq!(captured.state(), Some(&memory));
+        assert!(
+            db.insert_message_guarded(
+                session,
+                "other",
+                "Reply",
+                Some(user.uuid),
+                vec![],
+                Some(&captured)
+            )
+            .is_ok()
+        );
         let sibling = db
             .insert_message(
                 session,
@@ -313,6 +381,57 @@ mod tests {
             .unwrap();
         assert!(memory.coverage(&[question, sibling]).is_none());
         assert_eq!(snapshot(&db, session, &full).state(), Some(&memory));
+    }
+
+    #[test]
+    fn snapshots_reject_omitted_ancestors_and_malformed_paths() {
+        let (db, session, messages) = seeded();
+        let other = db.create_session("Other").unwrap().uuid;
+        let foreign = db
+            .insert_message(other, "self", "Other root", None, vec![])
+            .unwrap();
+        for path in [
+            vec![messages[1].uuid, messages[2].uuid],
+            vec![messages[0].uuid, messages[2].uuid],
+            vec![messages[0].uuid, messages[0].uuid],
+            vec![messages[0].uuid, foreign.uuid],
+        ] {
+            assert!(db.conversation_snapshot(session, &path).is_err());
+        }
+    }
+
+    #[test]
+    fn restored_parent_invalidates_orphan_snapshots_and_guarded_writes() {
+        let (db, session, mut messages) = seeded();
+        let parent = messages.remove(0);
+        let row = message_row(&db.backend, parent.uuid).unwrap().unwrap();
+        db.backend
+            .execute(
+                "DELETE FROM messages WHERE message_uuid = ?",
+                &[Value::Text(parent.uuid.to_string())],
+            )
+            .unwrap();
+        let mut captured = snapshot(&db, session, &messages);
+        assert!(db.conversation_snapshot_matches(&captured).unwrap());
+        db.backend
+            .execute(
+                &format!("INSERT INTO messages ({MESSAGE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?)"),
+                &row,
+            )
+            .unwrap();
+        assert!(!db.conversation_snapshot_matches(&captured).unwrap());
+        assert!(!db.replace_conversation_state(&mut captured, None).unwrap());
+        assert!(
+            db.insert_message_guarded(
+                session,
+                "other",
+                "Stale reply",
+                Some(messages[1].uuid),
+                vec![],
+                Some(&captured)
+            )
+            .is_err()
+        );
     }
 
     #[test]

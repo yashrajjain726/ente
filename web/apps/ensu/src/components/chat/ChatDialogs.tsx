@@ -245,13 +245,14 @@ export const ChatDialogs = memo(
     }: ChatDialogsProps) => {
         const openExternalUrl = async (url: string) => {
             if (isTauriRuntime || detectTauriAppRuntime()) {
-                const opened = await import("@tauri-apps/plugin-opener")
-                    .then(({ openUrl }) => openUrl(url))
-                    .then(
-                        () => true,
-                        () => false,
-                    );
-                if (opened) return;
+                try {
+                    const { openUrl } =
+                        await import("@tauri-apps/plugin-opener");
+                    await openUrl(url);
+                    return;
+                } catch {
+                    // Fall through to window.open.
+                }
             }
 
             if (typeof window !== "undefined") {

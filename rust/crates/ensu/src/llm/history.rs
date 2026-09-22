@@ -38,16 +38,47 @@ mod tests {
     use super::*;
 
     #[test]
-    fn shared_hidden_text_fixtures() {
-        let fixtures: serde_json::Value =
-            serde_json::from_str(include_str!("../../tests/fixtures/history-text.json")).unwrap();
-        for case in fixtures.as_array().unwrap() {
-            assert_eq!(
-                strip_hidden_parts_text(case["input"].as_str().unwrap()),
-                case["expected"].as_str().unwrap(),
-                "{}",
-                case["name"]
-            );
+    fn strips_hidden_parts_preserving_visible_text() {
+        for (name, input, expected) in [
+            ("plain_unicode", " माया owns SQLite. ", "माया owns SQLite."),
+            (
+                "closed_reasoning",
+                "<think>Upload the data.</think>Keep data offline.",
+                "Keep data offline.",
+            ),
+            (
+                "interrupted_reasoning",
+                "Visible fact.<think>Unfinished private reasoning",
+                "Visible fact.",
+            ),
+            (
+                "control_block",
+                "<todo_list>Invent a purchase.</todo_list>No purchase approved.",
+                "No purchase approved.",
+            ),
+            (
+                "nested_blocks",
+                "<think>outer<todo_list>inner</todo_list>hidden</think>Visible",
+                "Visible",
+            ),
+            (
+                "mismatched_close",
+                "Before<think>hidden</todo_list>still hidden",
+                "Before",
+            ),
+            ("nul", "\0Safe\0 text", "Safe text"),
+            (
+                "unknown_markup",
+                "<example>Keep this</example>",
+                "<example>Keep this</example>",
+            ),
+            (
+                "multiple_blocks",
+                "A<think>x</think>B<todo_list>y</todo_list>C",
+                "ABC",
+            ),
+        ] {
+            assert_eq!(strip_hidden_parts_text(input), expected, "{name}");
         }
     }
 }

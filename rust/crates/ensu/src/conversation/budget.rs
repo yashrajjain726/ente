@@ -26,36 +26,39 @@ pub fn resolve_generation_budget(
 mod tests {
     use super::*;
 
-    #[derive(serde::Deserialize)]
-    struct Case {
-        name: String,
-        context: usize,
-        configured: Option<usize>,
-        output: Option<usize>,
-        input: Option<usize>,
-    }
-
     #[test]
-    fn shared_generation_budget_fixtures() {
-        let cases: Vec<Case> = serde_json::from_str(include_str!(
-            "../../tests/fixtures/generation-budgets-v1.json"
-        ))
-        .unwrap();
-        for case in cases {
-            let result = resolve_generation_budget(case.context, case.configured);
-            if let Some(output) = case.output {
+    fn resolves_generation_budgets() {
+        for (name, context, configured, expected) in [
+            ("native Auto", 12000, None, Some((2048, 9696))),
+            ("native small", 2048, None, Some((512, 1280))),
+            ("Auto impossible", 300, None, None),
+            (
+                "preserve long output",
+                12000,
+                Some(6000),
+                Some((6000, 5744)),
+            ),
+            ("reject oversized override", 2048, Some(2048), None),
+            ("zero output", 12000, Some(0), None),
+            ("too small context", 257, Some(1), None),
+            ("small explicit valid", 258, Some(1), Some((1, 1))),
+            ("no prompt room", 4096, Some(3840), None),
+            ("last token room", 4096, Some(3839), Some((3839, 1))),
+            ("context too large", 2147483648, None, None),
+        ] {
+            let result = resolve_generation_budget(context, configured);
+            if let Some((output, input)) = expected {
                 assert_eq!(
                     result.unwrap(),
                     GenerationBudget {
-                        context: case.context,
+                        context,
                         output,
-                        input: case.input.unwrap()
+                        input,
                     },
-                    "{}",
-                    case.name
+                    "{name}"
                 );
             } else {
-                assert!(result.is_err(), "{}", case.name);
+                assert!(result.is_err(), "{name}");
             }
         }
     }

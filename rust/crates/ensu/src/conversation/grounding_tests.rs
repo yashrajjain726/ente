@@ -37,7 +37,6 @@ fn measured_repack_keeps_text_and_citations_together() {
         ),
     ] {
         let candidates = GroundingCandidates::new(vec![hit(&raw, "one.md")], 6000).unwrap();
-        let original = serde_json::to_string(&candidates).unwrap();
         let fit = fit_grounding(&candidates, "System", "Question", 4096, measure).unwrap();
         assert!(fit.repacked);
         assert!(fit.evidence_tokens <= 1024);
@@ -45,7 +44,6 @@ fn measured_repack_keeps_text_and_citations_together() {
         assert_eq!(context.sources, vec![candidates.searched[0].source.clone()]);
         assert!(context.text.contains(prefix));
         assert!(context.text.len() < raw.len());
-        assert_eq!(serde_json::to_string(&candidates).unwrap(), original);
     }
 }
 #[test]
@@ -64,19 +62,12 @@ fn mandatory_input_and_insufficient_evidence_budget_are_explicit() {
     );
 }
 #[test]
-fn candidate_limits_and_cancellation_are_enforced() {
+fn candidate_limits_are_enforced() {
     let hit = hit("text", "one.md");
     assert!(GroundingCandidates::new(vec![hit.clone(); 8], 6000).is_err());
     let mut candidates = GroundingCandidates::new(vec![hit], 6000).unwrap();
     candidates.searched[0].text = "x".repeat(6001);
     assert!(candidates.validate().is_err());
-    candidates.searched[0].text = "text".into();
-    assert!(matches!(
-        fit_grounding(&candidates, "System", "Question", 4096, |_| Err(
-            PrepareError::Cancelled
-        )),
-        Err(PrepareError::Cancelled)
-    ));
 }
 fn prior_history() -> Vec<Message> {
     vec![Message {

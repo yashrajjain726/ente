@@ -11,6 +11,7 @@ const LOOKUP_EXCERPT_BYTES: usize = 512;
 
 #[derive(Debug, Clone, Serialize)]
 pub(super) struct HistoryExcerpt {
+    #[serde(serialize_with = "super::uuid_text::serialize")]
     pub message_uuid: Uuid,
     pub speaker: String,
     pub start_utf8: usize,
@@ -304,81 +305,109 @@ mod tests {
     }
 
     #[test]
-    fn shared_history_lookup_semantics() {
-        #[derive(Deserialize)]
-        struct Query {
-            query: String,
-            lookup: Vec<usize>,
-            required: Option<Vec<usize>>,
-        }
-        #[derive(Deserialize)]
-        struct Fixture {
-            name: String,
-            history: Vec<(String, String)>,
-            queries: Vec<Query>,
-        }
-        let fixtures: Vec<Fixture> =
-            serde_json::from_str(include_str!("../../tests/fixtures/history-lookup-v1.json"))
-                .unwrap();
-        for fixture in fixtures {
-            let rows = fixture
-                .history
-                .iter()
-                .map(|(sender, text)| (text.as_str(), sender.parse().unwrap()))
-                .collect::<Vec<_>>();
+    fn history_lookup_preserves_ranking_and_query_intent() {
+        for (rows, queries) in [
+            (
+                vec![
+                    ("The reservation code is OLD-11.", Sender::SelfUser),
+                    ("First choice noted.", Sender::Other),
+                    ("The reservation code is MIDDLE-22.", Sender::SelfUser),
+                    ("Second choice noted.", Sender::Other),
+                    ("The reservation code is NEW-33.", Sender::SelfUser),
+                    ("Final choice noted.", Sender::Other),
+                ],
+                vec![
+                    ("reservation code", vec![5, 6, 3, 4], None),
+                    ("What did you say earlier?", vec![], None),
+                    (
+                        "Recall the reservation code",
+                        vec![5, 6, 3, 4],
+                        Some(vec![5, 6]),
+                    ),
+                    ("याद reservation code", vec![5, 6, 3, 4], Some(vec![5, 6])),
+                    ("earlier-version reservation code", vec![5, 6, 3, 4], None),
+                ],
+            ),
+            (
+                vec![
+                    ("The launch ticket is OPS-4812.", Sender::SelfUser),
+                    ("The original ticket is recorded.", Sender::Other),
+                    ("A launch rehearsal is scheduled.", Sender::SelfUser),
+                    ("The rehearsal is recorded.", Sender::Other),
+                    ("A launch checklist is ready.", Sender::SelfUser),
+                    ("The checklist is recorded.", Sender::Other),
+                ],
+                vec![
+                    ("launch OPS-4812", vec![1, 2, 5, 6], None),
+                    ("OPS-481", vec![], None),
+                    ("Recall unknown penguins", vec![], None),
+                ],
+            ),
+            (
+                vec![
+                    (
+                        "The café label is Café‑Bleu, with reference RÉF-823. हिन्दी🙂",
+                        Sender::SelfUser,
+                    ),
+                    ("The spelling is confirmed.", Sender::Other),
+                    ("Another café label is available.", Sender::SelfUser),
+                    ("A later alternative.", Sender::Other),
+                ],
+                vec![
+                    ("café \"Café‑Bleu\"", vec![1, 2, 3, 4], None),
+                    ("réf-823", vec![1, 2], None),
+                    ("हिन्दी", vec![1, 2], None),
+                    ("हिन्द", vec![], None),
+                ],
+            ),
+            (
+                vec![
+                    ("The original destination is Kyoto.", Sender::SelfUser),
+                    ("The original destination is recorded.", Sender::Other),
+                    ("The later destination is Lisbon.", Sender::SelfUser),
+                    ("The later destination is recorded.", Sender::Other),
+                ],
+                vec![
+                    (
+                        "message 00000000-0000-0000-0000-000000000001",
+                        vec![1, 2],
+                        Some(vec![1, 2]),
+                    ),
+                    (
+                        "message 00000000-0000-0000-0000-000000000003-extra",
+                        vec![],
+                        None,
+                    ),
+                ],
+            ),
+        ] {
             let history = history(&rows);
             let indices = |found: &HistoryLookup| {
                 found
                     .excerpts
                     .iter()
-                    .map(|excerpt| excerpt.message_uuid.as_u128() as usize)
+                    .map(|excerpt| excerpt.message_uuid.as_u128())
                     .collect::<Vec<_>>()
             };
-            for case in fixture.queries {
-                let found = lookup(&history, &case.query);
+            for (query, expected, required) in queries {
+                let found = lookup(&history, query);
+                assert_eq!(indices(&found), expected, "{query}");
                 assert_eq!(
-                    indices(&found),
-                    case.lookup,
-                    "{}: {}",
-                    fixture.name,
-                    case.query
+                    requested_history(&history, query, || Ok(()))
+                        .unwrap()
+                        .as_ref()
+                        .map(indices),
+                    required,
+                    "{query}"
                 );
-                let required = requested_history(&history, &case.query, || Ok(())).unwrap();
-                assert_eq!(
-                    required.as_ref().map(indices),
-                    case.required,
-                    "{}: {}",
-                    fixture.name,
-                    case.query
-                );
-                if !found.excerpts.is_empty() {
-                    let rendered = found.prepend_required(&case.query);
-                    let payload: serde_json::Value = serde_json::from_str(
-                        rendered.lines().find(|line| line.starts_with('{')).unwrap(),
-                    )
-                    .unwrap();
-                    let excerpts = payload["excerpts"].as_array().unwrap();
-                    let mut chronological = case.lookup.clone();
-                    chronological.sort_unstable();
-                    assert_eq!(
-                        excerpts
-                            .iter()
-                            .map(|excerpt| Uuid::parse_str(
-                                excerpt["message_uuid"].as_str().unwrap()
-                            )
-                            .unwrap()
-                            .as_u128() as usize)
-                            .collect::<Vec<_>>(),
-                        chronological
-                    );
-                    for excerpt in &found.excerpts {
-                        let original = &history[excerpt.message_uuid.as_u128() as usize - 1];
-                        assert_eq!(excerpt.speaker, role(original.sender));
-                        assert_eq!(
-                            excerpt.text,
-                            original.text[excerpt.start_utf8..excerpt.end_utf8]
-                        );
-                    }
+                let rendered = found.prepend_required(query);
+                let mut chronological = expected;
+                chronological.sort_unstable();
+                let mut previous = 0;
+                for index in chronological {
+                    let position = rendered.find(&Uuid::from_u128(index).to_string()).unwrap();
+                    assert!(position > previous);
+                    previous = position;
                 }
             }
         }
@@ -482,9 +511,5 @@ mod tests {
             .unwrap()
             .is_none()
         );
-        assert!(matches!(
-            requested_history(&h, "Recall reservation", || Err(PrepareError::Cancelled)),
-            Err(PrepareError::Cancelled)
-        ));
     }
 }

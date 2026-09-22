@@ -13,77 +13,68 @@ fn message(index: u128, sender: Sender, text: &str) -> Message {
 }
 
 #[test]
-fn shared_conversation_fingerprints_and_exchange_boundaries() {
-    #[derive(Deserialize)]
-    struct Attachment {
-        id: String,
-        kind: AttachmentKind,
-        size: i64,
-        name: String,
-    }
-    #[derive(Deserialize)]
-    struct Row {
-        uuid: Uuid,
-        session_uuid: Uuid,
-        parent_message_uuid: Option<Uuid>,
-        sender: String,
-        text: String,
-        attachments: Vec<Attachment>,
-    }
-    #[derive(Deserialize)]
-    struct Fixture {
-        name: String,
-        messages: Vec<Row>,
-        fingerprint: String,
-        exchange_ends: Vec<usize>,
-    }
-    let fixtures: Vec<Fixture> = serde_json::from_str(include_str!(
-        "../../tests/fixtures/conversation-core-v1.json"
-    ))
-    .unwrap();
-    for fixture in fixtures {
-        let history: Vec<_> = fixture
-            .messages
-            .into_iter()
-            .map(|row| Message {
-                uuid: row.uuid,
-                session_uuid: row.session_uuid,
-                parent_message_uuid: row.parent_message_uuid,
-                sender: row.sender.parse().unwrap(),
-                text: row.text,
-                attachments: row
-                    .attachments
-                    .into_iter()
-                    .map(|attachment| crate::db::AttachmentMeta {
-                        id: attachment.id,
-                        kind: attachment.kind,
-                        size: attachment.size,
-                        name: attachment.name,
-                    })
-                    .collect(),
-                created_at: 0,
-            })
-            .collect();
-        assert_eq!(
-            fingerprint(&history),
-            fixture.fingerprint,
-            "{}",
-            fixture.name
-        );
-        assert_eq!(
-            exchanges(&history)
-                .into_iter()
-                .map(|range| range.end)
-                .collect::<Vec<_>>(),
-            fixture.exchange_ends,
-            "{}",
-            fixture.name
-        );
-        assert!(validate_path(&history).is_ok());
-        let mut invalid = history;
-        invalid[1].parent_message_uuid = None;
-        assert!(validate_path(&invalid).is_err());
-    }
+fn history_fingerprints_and_exchange_boundaries() {
+    let mut history = vec![
+        message(1, Sender::SelfUser, "Café🙂"),
+        message(2, Sender::Other, &"x".repeat(20)),
+    ];
+    history[0].attachments.push(crate::db::AttachmentMeta {
+        id: "file".into(),
+        kind: AttachmentKind::Document,
+        name: "notes.md".into(),
+        size: 12,
+    });
+    assert_eq!(
+        fingerprint(&history),
+        "711773b8c54ac4b3b13bd9f2ff6da94956549422b10a66ca105c3f775f28740e"
+    );
+    assert_eq!(exchanges(&history), vec![0..2]);
+    assert!(validate_path(&history).is_ok());
+    let state = ConversationState::new(Uuid::from_u128(100), &history, "Memory".into()).unwrap();
+    history[0].attachments[0].name = "renamed.md".into();
+    assert!(state.coverage(&history).is_none());
+    history[1].parent_message_uuid = None;
+    assert!(validate_path(&history).is_err());
+
+    let history = vec![
+        message(1, Sender::Other, "Legacy prefix"),
+        message(2, Sender::SelfUser, "Unanswered"),
+        message(3, Sender::SelfUser, "Next"),
+        message(4, Sender::Other, "Partial"),
+    ];
+    assert_eq!(exchanges(&history), vec![0..1, 1..2, 2..4]);
+    assert!(validate_path(&history).is_ok());
+}
+
+#[test]
+fn saved_memory_preserves_uuid_strings() {
+    let session = Uuid::from_u128(100);
+    let encoded = concat!(
+        "{\"format_version\":2,\"session_uuid\":\"00000000-0000-0000-0000-000000000064\",",
+        "\"summary\":{\"covered_boundary_message_uuid\":\"00000000-0000-0000-0000-000000000002\",",
+        "\"covered_prefix_fingerprint\":\"711773b8c54ac4b3b13bd9f2ff6da94956549422b10a66ca105c3f775f28740e\",",
+        "\"text\":\"Memory\"}}"
+    );
+    let restored = ConversationEnvelope::decode(encoded.as_bytes(), session).unwrap();
+    assert_eq!(
+        restored
+            .summary
+            .as_ref()
+            .unwrap()
+            .covered_boundary_message_uuid,
+        Uuid::from_u128(2)
+    );
+    assert_eq!(
+        serde_json::to_value(&restored).unwrap(),
+        serde_json::from_str::<serde_json::Value>(encoded).unwrap()
+    );
+    let invalid = encoded.replace("00000000-0000-0000-0000-000000000002", "invalid");
+    assert!(
+        ConversationEnvelope::decode(invalid.as_bytes(), session)
+            .unwrap()
+            .summary
+            .is_none()
+    );
 }
 
 #[test]
@@ -218,6 +209,34 @@ fn work(history: Vec<Message>, state: Option<ConversationState>) -> Preparation 
 }
 
 #[test]
+fn orphan_history_compacts_without_rewriting_parent_metadata() {
+    let mut history = long_history(6, 800);
+    history[0].parent_message_uuid = Some(Uuid::from_u128(999));
+    history.push(message(13, Sender::SelfUser, "Next question"));
+    let mut effects = Fake::default();
+    let mut prepared = prepare_turn(turn_input(history.clone()), &mut effects).unwrap();
+    prepared.preparation.run(&mut effects).unwrap();
+    assert!(!effects.checkpoints.is_empty());
+    let state = effects.checkpoints.last().unwrap();
+    assert!(state.coverage(&history).is_some());
+    history[0].parent_message_uuid = None;
+    assert!(state.coverage(&history).is_none());
+}
+
+#[test]
+fn orphan_roots_do_not_allow_self_references_or_cycles() {
+    let mut history = vec![
+        message(2, Sender::SelfUser, "Question"),
+        message(3, Sender::Other, "Answer"),
+    ];
+    assert!(validate_path(&history).is_ok());
+    for parent in [history[0].uuid, history[1].uuid] {
+        history[0].parent_message_uuid = Some(parent);
+        assert!(validate_path(&history).is_err());
+    }
+}
+
+#[test]
 fn required_original_excerpt_survives_compaction_without_duplicate_lookup() {
     let mut history = long_history(8, 800);
     history[0].text = "The reservation code is ZX-82Q.".into();
@@ -341,7 +360,7 @@ fn rebuilds_context_when_a_branch_extends_a_summarized_unanswered_user() {
 }
 
 #[test]
-fn recovers_omitted_details_within_measured_allowance_without_new_summary_or_tail_duplication() {
+fn recovers_omitted_details_without_resummarizing_or_duplicating_tail() {
     let mut history = vec![
         message(
             1,
@@ -413,7 +432,7 @@ fn recovers_omitted_details_within_measured_allowance_without_new_summary_or_tai
 }
 
 #[test]
-fn recovery_never_displaces_current_input_or_triggers_extra_compaction_to_fit() {
+fn history_recovery_respects_remaining_input_budget() {
     let history = vec![message(
         1,
         Sender::SelfUser,
