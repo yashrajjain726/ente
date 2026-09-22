@@ -17,9 +17,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
@@ -29,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -109,12 +107,17 @@ public fun MenuRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (selected == true) {
-                    Icon(Icons.Default.Check, null, Modifier.size(24.dp), tint = palette.primary)
+                    Icon(
+                        painterResource(R.drawable.component_check),
+                        null,
+                        Modifier.size(24.dp),
+                        tint = palette.primary,
+                    )
                 }
                 if (showsChevron) {
                     if (selected == true) Spacer(Modifier.width(EnteSpacing.xs))
                     Icon(
-                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        painterResource(R.drawable.component_chevron),
                         null,
                         Modifier.size(24.dp),
                         tint = palette.mutedText,
