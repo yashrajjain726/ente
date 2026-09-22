@@ -86,7 +86,13 @@ public fun FilterChip(
                 Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) { it() }
                 Spacer(Modifier.width(EnteSpacing.sm))
             }
-            Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, style = EnteTypography.mini)
+            Text(
+                label,
+                modifier = Modifier.weight(1f, fill = false),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = EnteTypography.mini,
+            )
             if (trailing != null || selected) {
                 Spacer(Modifier.width(EnteSpacing.sm))
                 if (trailing != null) {
@@ -144,7 +150,13 @@ public fun Tag(
                 Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) { it() }
                 Spacer(Modifier.width(EnteSpacing.xs))
             }
-            Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, style = EnteTypography.body)
+            Text(
+                label,
+                modifier = Modifier.weight(1f, fill = false),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = EnteTypography.body,
+            )
             trailing?.let {
                 Spacer(Modifier.width(EnteSpacing.xs))
                 Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) { it() }
