@@ -115,8 +115,6 @@ final class ChatViewModel: ObservableObject {
     private var stopRequested = false
     private var activeGenerationId: UUID?
     private var activeGenerationSessionId: UUID?
-    private var activeTextPreparation = false
-    private var isForeground = true
     private var modelDownloadLoggedStart = false
     private let downloadProgressTracker = DownloadProgressTracker()
     private var pendingOverflow: PendingOverflow?
@@ -300,7 +298,6 @@ final class ChatViewModel: ObservableObject {
         self.stopRequested = stopRequested
         activeGenerationId = nil
         activeGenerationSessionId = nil
-        activeTextPreparation = false
         isGenerating = false
         isDownloading = false
         streamingResponse = ""
@@ -719,14 +716,6 @@ final class ChatViewModel: ObservableObject {
         refreshModelDownloadInfo()
     }
 
-    func setForeground(_ foreground: Bool) {
-        isForeground = foreground
-        if !foreground && activeTextPreparation {
-            resetGenerationState()
-            if let currentSessionId { rebuildMessages(for: currentSessionId) }
-        }
-    }
-
     func confirmOverflowTrim() {
         guard let pendingOverflow else { return }
         guard
@@ -1074,7 +1063,6 @@ final class ChatViewModel: ObservableObject {
         }
         let selection = modelSettings.currentSelection()
         let prompt = buildPrompt(text: userNode.text, attachments: userNode.attachments)
-        guard isForeground || !prompt.imageFiles.isEmpty else { return }
         let priorGeneration = generationTask
         let priorSummary = sessionSummaryTask
         priorGeneration?.cancel()
@@ -1086,7 +1074,6 @@ final class ChatViewModel: ObservableObject {
         let generationId = UUID()
         activeGenerationId = generationId
         activeGenerationSessionId = userNode.sessionId
-        activeTextPreparation = prompt.imageFiles.isEmpty
         isGenerating = true
         isDownloading = false
         hasRequestedModelDownload = true
@@ -1152,7 +1139,6 @@ final class ChatViewModel: ObservableObject {
                     self.sharedModelReadyTask?.cancel()
                     self.clearSharedModelReadyTask()
                     if self.activeGenerationId == generationId {
-                        activeTextPreparation = false
                         isGenerating = false
                         isDownloading = false
                         streamingParentId = nil
@@ -1163,7 +1149,6 @@ final class ChatViewModel: ObservableObject {
                     return
                 }
                 if self.activeGenerationId == generationId {
-                    activeTextPreparation = false
                     isGenerating = false
                     isDownloading = false
                     streamingParentId = nil
@@ -1343,7 +1328,6 @@ final class ChatViewModel: ObservableObject {
                                     return
                                 }
                                 preparation = prepared
-                                self.activeTextPreparation = false
                                 self.conversationStatus = nil
                             },
                             onToken: onToken
@@ -1562,7 +1546,6 @@ final class ChatViewModel: ObservableObject {
         }
 
         if isActiveGeneration {
-            activeTextPreparation = false
             conversationStatus = nil
             isGenerating = false
             isDownloading = false
@@ -1583,7 +1566,6 @@ final class ChatViewModel: ObservableObject {
 
     private func settleGenerationIfActive(generationId: UUID, sessionId: UUID) {
         guard activeGenerationId == generationId, isGenerating else { return }
-        activeTextPreparation = false
         conversationStatus = nil
         isGenerating = false
         isDownloading = false

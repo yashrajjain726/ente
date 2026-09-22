@@ -66,8 +66,6 @@ internal class ChatStoreActions(
     private var generationJob: Job? = null
     private var sessionSummaryJob: Job? = null
     @Volatile private var stopRequested = false
-    private var isForeground = true
-    private var preparingGenerationToken: Long? = null
     @Volatile private var activePreparation: ConversationPreparationControl? = null
     private var streamingParentId: String? = null
     private var activeGenerationToken = 0L
@@ -431,14 +429,6 @@ internal class ChatStoreActions(
         rebuildChatState(state.value.chat.currentSessionId)
     }
 
-    fun setForeground(foreground: Boolean) {
-        isForeground = foreground
-        if (!foreground && preparingGenerationToken != null) {
-            resetGenerationState()
-            rebuildChatState(state.value.chat.currentSessionId)
-        }
-    }
-
     fun loadSessionsFromDb() {
         val scope = scope ?: return
         scope.launch(Dispatchers.IO) {
@@ -490,7 +480,6 @@ internal class ChatStoreActions(
         val scope = scope ?: return
         if (!state.value.chat.deviceCapability.isChatSupported()) return
         val prompt = buildPrompt(userMessage.text, userMessage.attachments)
-        if (!isForeground && prompt.imageFiles.isEmpty()) return
         val priorGeneration = generationJob
         val priorSummary = sessionSummaryJob
         activePreparation?.cancel()
@@ -504,7 +493,6 @@ internal class ChatStoreActions(
 
         clearTransientAssistantError()
         val generationToken = nextGenerationToken()
-        preparingGenerationToken = generationToken.takeIf { prompt.imageFiles.isEmpty() }
         streamingParentId = userMessage.id
         state.update { appState ->
             appState.copy(
@@ -908,9 +896,8 @@ internal class ChatStoreActions(
                         throw kotlinx.coroutines.CancellationException()
                     chatRepository.validateConversation(preparation)
                     withContext(Dispatchers.Main) {
-                        if (!isActive() || !isForeground || stopRequested)
+                        if (!isActive() || stopRequested)
                             throw kotlinx.coroutines.CancellationException()
-                        preparingGenerationToken = null
                         state.update { it.copy(chat = it.chat.copy(preparationStatus = null)) }
                     }
                     val generated = runCatching {
@@ -1664,7 +1651,6 @@ internal class ChatStoreActions(
 
     private fun cancelGeneration() {
         clearTransientAssistantError()
-        preparingGenerationToken = null
         activePreparation?.cancel()
         generationJob?.cancel()
         llmProvider.stopGeneration()
@@ -1674,7 +1660,6 @@ internal class ChatStoreActions(
     }
 
     private fun settleGenerationIfActive(token: Long, sessionId: String) {
-        if (preparingGenerationToken == token) preparingGenerationToken = null
         if (!isGenerationActive(token, sessionId) || !state.value.chat.isGenerating) return
         streamingParentId = null
         state.update { appState ->

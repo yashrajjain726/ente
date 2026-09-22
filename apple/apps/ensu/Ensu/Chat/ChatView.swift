@@ -144,7 +144,6 @@ struct ChatView: View {
                 viewModel.modelSelectionChanged()
             }
             .onChange(of: scenePhase) { newValue in
-                viewModel.setForeground(newValue == .active)
                 viewModel.notesStore.setForeground(newValue == .active)
                 if newValue == .active {
                     viewModel.refreshModelDownloadInfo()
@@ -154,10 +153,7 @@ struct ChatView: View {
             }
         }
         .environmentObject(viewModel.notesStore)
-        .onAppear {
-            viewModel.setForeground(scenePhase == .active)
-            viewModel.notesStore.setForeground(scenePhase == .active)
-        }
+        .onAppear { viewModel.notesStore.setForeground(scenePhase == .active) }
         .sheet(isPresented: $viewState.showSettings) {
             SettingsView(
                 knowledgeStore: viewModel.knowledgeStore,

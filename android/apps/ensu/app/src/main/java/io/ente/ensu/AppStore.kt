@@ -144,11 +144,6 @@ class AppStore(
             )
     }
 
-    fun setForeground(foreground: Boolean, chatVisible: Boolean) {
-        chatActions.setForeground(foreground && chatVisible)
-        notesStore.setForeground(foreground)
-    }
-
     fun createNewSession(): String = chatActions.createNewSession()
 
     fun startNewSessionDraft() = chatActions.startNewSessionDraft()
