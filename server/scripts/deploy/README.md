@@ -57,7 +57,8 @@ scp scripts/deploy/museum.service <instance>:
 
 scp scripts/deploy/update-and-restart-museum.sh <instance>:
 
-sudo mv museum.service /etc/systemd/system
+sudo install -o root -g root -m 0644 museum.service \
+    /etc/systemd/system/museum.service && rm museum.service
 sudo install -o root -g root -m 0755 update-and-restart-museum.sh \
     /usr/local/sbin/update-and-restart-museum.sh && rm update-and-restart-museum.sh
 sudo systemctl daemon-reload
