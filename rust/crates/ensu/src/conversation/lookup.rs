@@ -207,7 +207,7 @@ pub(super) fn lookup_history(
             ));
         }
     }
-    candidates.sort_by(|a, b| (b.0, b.1, b.2).cmp(&(a.0, a.1, a.2)));
+    candidates.sort_by_key(|a| std::cmp::Reverse((a.0, a.1, a.2)));
     let mut included = HashSet::new();
     for (_, _, index, hit) in candidates {
         if result.excerpts.len() >= LOOKUP_MAX_EXCERPTS {

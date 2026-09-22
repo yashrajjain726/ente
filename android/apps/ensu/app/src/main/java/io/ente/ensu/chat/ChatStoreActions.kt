@@ -559,13 +559,12 @@ internal class ChatStoreActions(
                     } catch (_: LlmProvider.EmbeddingAssetInvalid) {
                         embeddingAssetInvalid = true
                         emptyList()
+                    } catch (_: LlmException.Cancelled) {
+                        return@launch
+                    } catch (_: AssetDownloadException.Cancelled) {
+                        return@launch
                     } catch (error: Throwable) {
-                        if (
-                            !isActive() ||
-                                stopRequested ||
-                                error is LlmException.Cancelled ||
-                                error is AssetDownloadException.Cancelled
-                        ) {
+                        if (!isActive() || stopRequested) {
                             return@launch
                         }
                         logRepository.log(
@@ -943,12 +942,12 @@ internal class ChatStoreActions(
             }
         } catch (error: kotlinx.coroutines.CancellationException) {
             throw error
+        } catch (_: LlmException.Cancelled) {
+            return
+        } catch (_: ConversationException.Cancelled) {
+            return
         } catch (error: Throwable) {
-            val cancelled =
-                stopRequested ||
-                    error is LlmException.Cancelled ||
-                    error is ConversationException.Cancelled
-            if (!cancelled) {
+            if (!stopRequested) {
                 logRepository.log(
                     LogLevel.Error,
                     "Conversation preparation failed",

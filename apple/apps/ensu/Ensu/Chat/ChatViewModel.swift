@@ -1302,7 +1302,8 @@ final class ChatViewModel: ObservableObject {
                 }
             }
             do {
-                let runGeneration: () async throws -> GenerationSummary = {
+                let runGeneration: @MainActor ([LlmMessage]) async throws -> GenerationSummary = {
+                    messages in
                     if prompt.imageFiles.isEmpty {
                         return try await self.generatePreparedChat(
                             selection,
@@ -1344,7 +1345,7 @@ final class ChatViewModel: ObservableObject {
                 }
                 let summary: GenerationSummary
                 do {
-                    summary = try await runGeneration()
+                    summary = try await runGeneration(messages)
                 } catch {
                     if case LlmError.PromptTooLong = error,
                         !prompt.imageFiles.isEmpty,
@@ -1360,7 +1361,7 @@ final class ChatViewModel: ObservableObject {
                                     hasAttachments: false
                                 )
                             ] + normalHistoryMessages + [userMessage]
-                        summary = try await runGeneration()
+                        summary = try await runGeneration(messages)
                     } else {
                         throw error
                     }
