@@ -94,7 +94,10 @@ async fn space_bootstrap_posts_and_friend_share_suite(endpoint: &str) {
         .get_space_profile_decrypted(&owner_space.space_id, None, None)
         .await
         .expect("owner should decrypt profile");
-    assert_eq!(decrypted_profile.profile, owner_profile);
+    assert_eq!(
+        decrypted_profile.profile,
+        Some(ente_space::SpaceProfile::from_bytes(&owner_profile).unwrap())
+    );
     assert_eq!(decrypted_profile.space_slug, owner_slug);
 
     space::assert_http_status(
@@ -146,12 +149,13 @@ async fn space_bootstrap_posts_and_friend_share_suite(endpoint: &str) {
         .await
         .expect("post creation should succeed");
     let owner_post = owner_ctx
-        .fetch_post_decrypted(&owner_space.space_id, post_id, None)
+        .get_post(&owner_space.space_id, post_id, None)
         .await
         .expect("owner should decrypt post");
+    let owner_content = owner_post.content.as_ref().expect("owner post content");
     assert_eq!(
-        owner_post.caption_plaintext.as_deref(),
-        Some(br#"{"caption":"hello world"}"#.as_slice())
+        owner_content.caption.as_deref(),
+        Some(r#"{"caption":"hello world"}"#)
     );
     let owner_feed = owner_ctx
         .list_feed(&owner_space.space_id, None, Some(10))
@@ -159,14 +163,11 @@ async fn space_bootstrap_posts_and_friend_share_suite(endpoint: &str) {
         .expect("owner feed should load");
     assert_eq!(owner_feed.items.len(), 1);
     assert_eq!(owner_feed.items[0].post_id, post_id);
-    let own_feed_post = owner_ctx
-        .decrypt_post_for_space(&owner_space.space_id, &owner_feed.items[0])
-        .await
+    let own_feed_post = owner_feed.items[0]
+        .content
+        .as_ref()
         .expect("own feed post should decrypt");
-    assert_eq!(
-        own_feed_post.caption_plaintext,
-        owner_post.caption_plaintext
-    );
+    assert_eq!(own_feed_post.caption, owner_content.caption);
 
     space::assert_http_status(
         owner_ctx
@@ -214,14 +215,20 @@ async fn space_bootstrap_posts_and_friend_share_suite(endpoint: &str) {
         .get_space_profile_decrypted(&owner_space.space_id, Some(&friend_space.space_id), None)
         .await
         .expect("approved friend should decrypt profile");
-    assert_eq!(friend_profile.profile, updated_profile);
+    assert_eq!(
+        friend_profile.profile,
+        Some(ente_space::SpaceProfile::from_bytes(&updated_profile).unwrap())
+    );
     assert_eq!(friend_profile.space_slug, updated_slug);
 
     let owner_view_of_friend = owner_ctx
         .get_space_profile_decrypted(&friend_space.space_id, Some(&owner_space.space_id), None)
         .await
         .expect("approved owner should decrypt friend profile");
-    assert_eq!(owner_view_of_friend.profile, friend_profile_payload);
+    assert_eq!(
+        owner_view_of_friend.profile,
+        Some(ente_space::SpaceProfile::from_bytes(&friend_profile_payload).unwrap())
+    );
     assert_eq!(owner_view_of_friend.space_slug, friend_slug);
 
     let friend_feed = friend_ctx
@@ -232,22 +239,20 @@ async fn space_bootstrap_posts_and_friend_share_suite(endpoint: &str) {
     assert_eq!(friend_feed.items[0].post_id, post_id);
     assert_eq!(friend_feed.items[0].author.space_id, owner_space.space_id);
     assert_eq!(friend_feed.items[0].author.space_slug, updated_slug);
-    let feed_post_author_profile = friend_ctx
-        .decrypt_actor_profile(&friend_feed.items[0].author)
-        .await
+    let feed_post_author_profile = friend_feed.items[0]
+        .author
+        .profile
+        .as_ref()
         .expect("friend should decrypt feed post author profile");
     assert_eq!(
-        feed_post_author_profile.as_deref(),
-        Some(updated_profile.as_slice())
+        feed_post_author_profile.as_ref(),
+        Some(&ente_space::SpaceProfile::from_bytes(&updated_profile).unwrap())
     );
-    let friend_feed_post = friend_ctx
-        .decrypt_post_for_space(&owner_space.space_id, &friend_feed.items[0])
-        .await
+    let friend_feed_post = friend_feed.items[0]
+        .content
+        .as_ref()
         .expect("friend feed post should decrypt");
-    assert_eq!(
-        friend_feed_post.caption_plaintext,
-        owner_post.caption_plaintext
-    );
+    assert_eq!(friend_feed_post.caption, owner_content.caption);
 
     let liked = friend_ctx
         .like_post(&friend_space.space_id, post_id, true)
@@ -276,7 +281,7 @@ async fn space_bootstrap_posts_and_friend_share_suite(endpoint: &str) {
 
     space::assert_http_status(
         outsider_ctx
-            .fetch_post_decrypted(&owner_space.space_id, post_id, None)
+            .get_post(&owner_space.space_id, post_id, None)
             .await,
         403,
     );
@@ -340,12 +345,18 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite(endpoint: &str) 
         .get_space_profile_decrypted(&owner_space.space_id, Some(&friend_space.space_id), None)
         .await
         .expect("friend should decrypt owner profile before unfriend");
-    assert_eq!(friend_owner_profile.profile, owner_profile);
+    assert_eq!(
+        friend_owner_profile.profile,
+        Some(ente_space::SpaceProfile::from_bytes(&owner_profile).unwrap())
+    );
     let owner_friend_profile = owner_ctx
         .get_space_profile_decrypted(&friend_space.space_id, Some(&owner_space.space_id), None)
         .await
         .expect("owner should decrypt friend profile before unfriend");
-    assert_eq!(owner_friend_profile.profile, friend_profile);
+    assert_eq!(
+        owner_friend_profile.profile,
+        Some(ente_space::SpaceProfile::from_bytes(&friend_profile).unwrap())
+    );
     let friend_feed = friend_ctx
         .list_feed(&friend_space.space_id, None, Some(10))
         .await
@@ -503,7 +514,7 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite(endpoint: &str) 
     );
     space::assert_http_status(
         friend_ctx
-            .fetch_post_decrypted(&owner_space.space_id, post_id, Some(&friend_space.space_id))
+            .get_post(&owner_space.space_id, post_id, Some(&friend_space.space_id))
             .await,
         403,
     );

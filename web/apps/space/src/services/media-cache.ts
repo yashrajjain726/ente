@@ -2,7 +2,6 @@ import { savedPartialLocalUser } from "ente-accounts/services/accounts-db";
 import { blobCache, clearBlobCache } from "ente-base/blob-cache";
 import log from "ente-base/log";
 import { apiOrigin } from "ente-base/origins";
-import { blobPartForBytes } from "services/profile-payload";
 
 const maxSpaceMediaCacheEntries = 128;
 const spaceMediaURLCache = new Map<string, Promise<string>>();
@@ -30,7 +29,7 @@ const trimSpaceMediaURLCache = () => {
 };
 
 const blobForBytes = (bytes: Uint8Array, mediaType?: string) =>
-    new Blob([blobPartForBytes(bytes)], { type: mediaType || undefined });
+    new Blob([new Uint8Array(bytes).buffer], { type: mediaType || undefined });
 
 const sha256Hex = async (value: string) => {
     const digest = await crypto.subtle.digest(

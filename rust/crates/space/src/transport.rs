@@ -254,7 +254,7 @@ pub struct PostResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PostPage {
+pub struct PostPageResponse {
     pub items: Vec<PostResponse>,
     #[serde(default)]
     pub next_cursor: String,

@@ -13,16 +13,16 @@ pub use client::{
 };
 pub use error::{Error, Result};
 pub use models::{
-    CreatedSpace, CreatedSpaceLink, DecryptedFriendShare, DecryptedMessage, DecryptedPost,
-    DecryptedSpaceProfile, HydratedKeys, MessagePayload, OpenAccountSpaceCtxInput,
-    OpenSpaceLinkCtxInput, PostObjectMetadata,
+    CreatedSpace, CreatedSpaceLink, DecryptedFriendShare, DecryptedMessage, DecryptedSpaceProfile,
+    HydratedKeys, MessagePayload, OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, Post, PostAsset,
+    PostContent, PostObjectMetadata, PostPage, PostPhoto, SpaceActor, SpaceProfile,
 };
 pub use transport::{
     ConversationChatSummaryResponse, ConversationsResponse, EntityKeyPayload,
     FriendRelationshipResponse, FriendShareResponse, FriendStatusResponse, LikeMessageResponse,
     LikePostResponse, MessageConversationActivity, MessagePage, MessageResponse, PostObjectPayload,
-    PostPage, PostResponse, PresignUploadResponse, ProfileAvatarPayload, ProfileAvatarResponse,
-    ProfileCoverPayload, ProfileCoverResponse, SpaceActorResponse, SpaceFriendRequestResponse,
-    SpaceFriendResponse, SpaceKeyResponse, SpaceKeyVersionResponse, SpaceLookupResponse,
-    SpaceProfileResponse, SpaceSentFriendRequestResponse, SpaceUnreadStatusResponse,
+    PresignUploadResponse, ProfileAvatarPayload, ProfileAvatarResponse, ProfileCoverPayload,
+    ProfileCoverResponse, SpaceActorResponse, SpaceFriendRequestResponse, SpaceFriendResponse,
+    SpaceKeyResponse, SpaceKeyVersionResponse, SpaceLookupResponse, SpaceProfileResponse,
+    SpaceSentFriendRequestResponse, SpaceUnreadStatusResponse,
 };

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use super::{AccountSpaceCtx, build_space_key_history_map};
-use crate::crypto::{encrypt_secretbox_payload, generate_key};
+use crate::crypto::{decrypt_secretbox_payload, encrypt_secretbox_payload, generate_key};
 use crate::error::{Error, Result};
 use crate::models::CreatedSpace;
 use crate::transport::{RotateSpaceKeyRequest, SpaceKeyResponse, SpaceKeyVersionResponse};
@@ -80,20 +80,21 @@ impl AccountSpaceCtx {
             .ok_or_else(|| {
                 Error::InvalidInput(format!("space {space_id} is not owned by the account"))
             })?;
-        let current_profile = if profile.is_none() {
-            Some(
-                self.get_space_profile_decrypted(space_id, None, None)
-                    .await?,
-            )
-        } else {
-            None
-        };
         let next_profile = match profile {
             Some(value) => value.to_vec(),
-            None => current_profile
-                .as_ref()
-                .map(|value| value.profile.clone())
-                .ok_or_else(|| Error::InvalidInput("missing current profile".into()))?,
+            None => {
+                let profile = self.get_space_profile_raw(space_id, None, None).await?;
+                let key = self
+                    .resolve_space_key_for_version(space_id, Some(profile.version))
+                    .await?
+                    .ok_or_else(|| Error::InvalidInput("missing current profile key".into()))?;
+                // Preserve unknown profile fields during key rotation.
+                if profile.encrypted_profile.is_empty() {
+                    Vec::new()
+                } else {
+                    decrypt_secretbox_payload(&key, &b64::decode(&profile.encrypted_profile)?)?
+                }
+            }
         };
         let next_space_key = generate_key();
         let space_root_key = self.get_or_create_space_root_key()?;

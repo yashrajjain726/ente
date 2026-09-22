@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use ente_core::b64;
-use ente_space::{AccountSpaceCtx, DecryptedMessage, DecryptedPost, MessagePayload, SpaceLinkCtx};
+use ente_space::{AccountSpaceCtx, DecryptedMessage, MessagePayload, SpaceLinkCtx};
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen as swb;
 use tsify::Tsify;
@@ -178,7 +178,8 @@ pub struct DecryptedSpaceProfile {
     friends: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     posts: Option<i64>,
-    profile: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    profile: Option<SpaceProfile>,
     avatar: Option<ProfileAvatarResponse>,
     cover: Option<ProfileAvatarResponse>,
     updated_at: Option<String>,
@@ -230,7 +231,9 @@ struct SpaceActorResponse {
     space_slug: String,
     public_key: String,
     key_version: i32,
-    profile: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    profile: Option<SpaceProfile>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     avatar: Option<ProfileAvatarResponse>,
 }
 
@@ -242,12 +245,10 @@ pub struct PostResponse {
     space_slug: String,
     author: SpaceActorResponse,
     caption: Option<String>,
-    encrypted_post_key: String,
-    key_version: i32,
-    objects: Vec<PostObjectPayload>,
+    photos: Vec<PostPhoto>,
+    is_unavailable: bool,
     created_at: String,
     viewer_liked: bool,
-    is_unavailable: bool,
 }
 
 #[derive(Serialize, Tsify)]
@@ -302,10 +303,8 @@ struct MessageConversationActivity {
 
 #[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
-struct PostObjectPayload {
-    object_key: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    size: Option<i64>,
+struct PostPhoto {
+    asset: PostAsset,
     #[serde(skip_serializing_if = "Option::is_none")]
     position: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -454,16 +453,6 @@ fn decode_b64_field(value: &str) -> Result<Vec<u8>, Error> {
         .map_err(Into::into)
 }
 
-fn utf8_field(bytes: Vec<u8>, field: &str) -> Result<String, Error> {
-    String::from_utf8(bytes).map_err(|err| {
-        ente_space::Error::InvalidInput(format!("invalid {field} utf8: {err}")).into()
-    })
-}
-
-fn optional_utf8_field(bytes: Option<Vec<u8>>, field: &str) -> Result<Option<String>, Error> {
-    bytes.map(|value| utf8_field(value, field)).transpose()
-}
-
 fn created_space_to_js(value: ente_space::CreatedSpace) -> CreatedSpace {
     CreatedSpace {
         space_id: value.space_id,
@@ -471,183 +460,171 @@ fn created_space_to_js(value: ente_space::CreatedSpace) -> CreatedSpace {
     }
 }
 
-fn profile_to_js(value: ente_space::DecryptedSpaceProfile) -> Result<DecryptedSpaceProfile, Error> {
-    let profile = String::from_utf8(value.profile).unwrap_or_else(|error| {
-        log::warn!(
-            "Space profile {} has invalid UTF-8: {error}",
-            value.space_id
-        );
-        String::new()
-    });
-    Ok(DecryptedSpaceProfile {
+fn profile_to_js(value: ente_space::DecryptedSpaceProfile) -> DecryptedSpaceProfile {
+    DecryptedSpaceProfile {
         space_id: value.space_id,
         space_slug: value.space_slug,
         version: value.version,
         friends: value.friends,
         posts: None,
-        profile,
+        profile: value.profile.map(Into::into),
         avatar: value.avatar.map(Into::into),
         cover: value.cover.map(Into::into),
         updated_at: value.updated_at,
-    })
+    }
 }
 
 fn actor_to_js(
     actor: ente_space::SpaceActorResponse,
-    profile: Option<Vec<u8>>,
-) -> Result<SpaceActorResponse, Error> {
-    Ok(SpaceActorResponse {
+    profile: Option<ente_space::SpaceProfile>,
+) -> SpaceActorResponse {
+    SpaceActorResponse {
         space_id: actor.space_id,
         space_slug: actor.space_slug,
         public_key: actor.public_key,
         key_version: actor.key_version,
-        profile: optional_utf8_field(profile, "actor profile")?,
+        profile: profile.map(Into::into),
         avatar: actor.avatar.map(Into::into),
-    })
+    }
 }
 
 async fn account_actor_to_js(
     ctx: &AccountSpaceCtx,
     actor: ente_space::SpaceActorResponse,
 ) -> Result<SpaceActorResponse, Error> {
-    let fallback = actor.clone();
-    let converted = match ctx.decrypt_actor_profile(&actor).await {
-        Ok(profile) => actor_to_js(actor, profile),
-        Err(error) => Err(error.into()),
-    };
-    match converted {
-        Ok(actor) => Ok(actor),
+    match ctx.decrypt_actor_profile(&actor).await.map_err(Error::from) {
+        Ok(profile) => Ok(actor_to_js(actor, profile)),
         Err(error) if error.is_content_error() => {
             log::warn!(
                 "Space profile {} fell back to public fields: {}",
-                fallback.space_id,
+                actor.space_id,
                 error.message()
             );
-            public_actor_to_js(fallback)
+            Ok(public_actor_to_js(actor))
         }
         Err(error) => Err(error),
     }
 }
 
-fn public_actor_to_js(actor: ente_space::SpaceActorResponse) -> Result<SpaceActorResponse, Error> {
+fn public_actor_to_js(actor: ente_space::SpaceActorResponse) -> SpaceActorResponse {
     actor_to_js(actor, None)
 }
 
-fn post_object_to_js(
-    post_key: Option<&[u8]>,
-    object: ente_space::PostObjectPayload,
-) -> Result<PostObjectPayload, Error> {
-    let metadata = match post_key {
-        Some(post_key) => ente_space::client::decrypt_post_object_metadata(post_key, &object)?,
-        None => None,
+fn post_to_js(post: ente_space::Post) -> PostResponse {
+    let (caption, photos, is_unavailable) = match post.content {
+        Ok(content) => (
+            content.caption,
+            content.photos.into_iter().map(Into::into).collect(),
+            false,
+        ),
+        Err(error) => {
+            log::warn!(
+                "Space post {} is unavailable: {}",
+                post.post_id,
+                ente_core::error::chain(&error)
+            );
+            (None, Vec::new(), true)
+        }
     };
-    Ok(PostObjectPayload {
-        object_key: object.object_key,
-        size: object.size,
-        position: object.position,
-        variant: metadata.as_ref().and_then(|value| value.variant.clone()),
-        blur_hash: metadata.as_ref().and_then(|value| value.blur_hash.clone()),
-        thumb_hash: metadata.as_ref().and_then(|value| value.thumb_hash.clone()),
-        width: metadata.as_ref().and_then(|value| value.width),
-        height: metadata.as_ref().and_then(|value| value.height),
-        media_type: metadata.and_then(|value| value.media_type),
-    })
-}
-
-fn post_objects_to_js(
-    post_key: Option<&[u8]>,
-    objects: Vec<ente_space::PostObjectPayload>,
-) -> Result<Vec<PostObjectPayload>, Error> {
-    objects
-        .into_iter()
-        .map(|object| post_object_to_js(post_key, object))
-        .collect()
-}
-
-async fn account_post_to_js(
-    ctx: &AccountSpaceCtx,
-    post: ente_space::PostResponse,
-    decrypted: DecryptedPost,
-) -> Result<PostResponse, Error> {
-    let author = account_actor_to_js(ctx, post.author).await?;
-    Ok(PostResponse {
+    let profile = post.author.profile.unwrap_or_else(|error| {
+        log::warn!(
+            "Space profile {} fell back to public fields: {}",
+            post.author.space_id,
+            ente_core::error::chain(&error)
+        );
+        None
+    });
+    PostResponse {
         post_id: post.post_id,
         space_id: post.space_id,
         space_slug: post.space_slug,
-        author,
-        caption: optional_utf8_field(decrypted.caption_plaintext, "caption")?,
-        encrypted_post_key: post.encrypted_post_key,
-        key_version: post.key_version,
-        objects: post_objects_to_js(Some(&decrypted.post_key), post.objects)?,
+        author: SpaceActorResponse {
+            space_id: post.author.space_id,
+            space_slug: post.author.space_slug,
+            public_key: post.author.public_key,
+            key_version: post.author.key_version,
+            profile: profile.map(Into::into),
+            avatar: post.author.avatar.map(Into::into),
+        },
+        caption,
+        photos,
+        is_unavailable,
         created_at: post.created_at,
         viewer_liked: post.viewer_liked,
-        is_unavailable: false,
-    })
+    }
 }
 
-fn unavailable_post_to_js(post: ente_space::PostResponse) -> Result<PostResponse, Error> {
-    Ok(PostResponse {
-        post_id: post.post_id,
-        space_id: post.space_id,
-        space_slug: post.space_slug,
-        author: public_actor_to_js(post.author)?,
-        caption: None,
-        encrypted_post_key: post.encrypted_post_key,
-        key_version: post.key_version,
-        objects: Vec::new(),
-        created_at: post.created_at,
-        viewer_liked: post.viewer_liked,
-        is_unavailable: true,
-    })
+#[derive(Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+struct SpaceProfile {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    full_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    display_name: Option<String>,
 }
 
-async fn account_post_page_to_js(
-    ctx: &AccountSpaceCtx,
-    page: ente_space::PostPage,
-) -> Result<PostPage, Error> {
-    let mut items = Vec::with_capacity(page.items.len());
-    for post in page.items {
-        let fallback = post.clone();
-        let converted = match ctx.decrypt_post_for_space(&post.space_id, &post).await {
-            Ok(decrypted) => account_post_to_js(ctx, post, decrypted).await,
-            Err(error) => Err(error.into()),
-        };
-        match converted {
-            Ok(post) => items.push(post),
-            Err(error) if error.is_content_error() => {
-                log::warn!(
-                    "Space post {} is unavailable: {}",
-                    fallback.post_id,
-                    error.message()
-                );
-                items.push(unavailable_post_to_js(fallback)?);
-            }
-            Err(error) => return Err(error),
+impl From<ente_space::SpaceProfile> for SpaceProfile {
+    fn from(profile: ente_space::SpaceProfile) -> Self {
+        Self {
+            full_name: profile.full_name,
+            display_name: profile.display_name,
         }
     }
-    Ok(PostPage {
-        items,
-        next_cursor: page.next_cursor,
-    })
 }
 
-fn link_post_to_js(
-    post: ente_space::PostResponse,
-    decrypted: DecryptedPost,
-) -> Result<PostResponse, Error> {
-    Ok(PostResponse {
-        post_id: post.post_id,
-        space_id: post.space_id,
-        space_slug: post.space_slug,
-        author: public_actor_to_js(post.author)?,
-        caption: optional_utf8_field(decrypted.caption_plaintext, "caption")?,
-        encrypted_post_key: post.encrypted_post_key,
-        key_version: post.key_version,
-        objects: post_objects_to_js(Some(&decrypted.post_key), post.objects)?,
-        created_at: post.created_at,
-        viewer_liked: false,
-        is_unavailable: false,
-    })
+#[derive(Serialize, Deserialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+pub struct PostAsset {
+    space_id: String,
+    post_id: i64,
+    object_key: String,
+    encrypted_post_key: String,
+    key_version: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    size: Option<i64>,
+}
+
+impl From<PostAsset> for ente_space::PostAsset {
+    fn from(asset: PostAsset) -> Self {
+        Self {
+            space_id: asset.space_id,
+            post_id: asset.post_id,
+            object_key: asset.object_key,
+            encrypted_post_key: asset.encrypted_post_key,
+            key_version: asset.key_version,
+            size: asset.size,
+        }
+    }
+}
+
+impl From<ente_space::PostPhoto> for PostPhoto {
+    fn from(photo: ente_space::PostPhoto) -> Self {
+        let metadata = photo.metadata.unwrap_or_default();
+        Self {
+            asset: PostAsset {
+                space_id: photo.asset.space_id,
+                post_id: photo.asset.post_id,
+                object_key: photo.asset.object_key,
+                encrypted_post_key: photo.asset.encrypted_post_key,
+                key_version: photo.asset.key_version,
+                size: photo.asset.size,
+            },
+            position: photo.position,
+            variant: metadata.variant,
+            blur_hash: metadata.blur_hash,
+            thumb_hash: metadata.thumb_hash,
+            width: metadata.width,
+            height: metadata.height,
+            media_type: metadata.media_type,
+        }
+    }
+}
+
+fn post_page_to_js(page: ente_space::PostPage) -> PostPage {
+    PostPage {
+        items: page.items.into_iter().map(post_to_js).collect(),
+        next_cursor: page.next_cursor,
+    }
 }
 
 fn account_message_to_js(
@@ -884,7 +861,7 @@ pub struct SpaceLinkCtxHandle {
 impl SpaceLinkCtxHandle {
     #[wasm_bindgen(js_name = getProfile)]
     pub fn get_profile(&self) -> Result<<DecryptedSpaceProfile as Tsify>::JsType, Error> {
-        let mut profile = profile_to_js(self.inner.profile().clone())?;
+        let mut profile = profile_to_js(self.inner.profile().clone());
         profile.posts = Some(self.inner.posts());
         profile.into_js().map_err(Into::into)
     }
@@ -892,32 +869,7 @@ impl SpaceLinkCtxHandle {
     #[wasm_bindgen(js_name = listPosts)]
     pub async fn list_posts(&self) -> Result<<PostPage as Tsify>::JsType, Error> {
         let page = self.inner.list_posts().await?;
-        let mut items = Vec::with_capacity(page.items.len());
-        for post in page.items {
-            let fallback = post.clone();
-            let converted = match self.inner.decrypt_post(&post) {
-                Ok(decrypted) => link_post_to_js(post, decrypted),
-                Err(error) => Err(error.into()),
-            };
-            match converted {
-                Ok(post) => items.push(post),
-                Err(error) if error.is_content_error() => {
-                    log::warn!(
-                        "Space post {} is unavailable: {}",
-                        fallback.post_id,
-                        error.message()
-                    );
-                    items.push(unavailable_post_to_js(fallback)?);
-                }
-                Err(error) => return Err(error),
-            }
-        }
-        PostPage {
-            items,
-            next_cursor: page.next_cursor,
-        }
-        .into_js()
-        .map_err(Into::into)
+        post_page_to_js(page).into_js().map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = subscribeWebPush)]
@@ -944,12 +896,11 @@ impl SpaceLinkCtxHandle {
     #[wasm_bindgen(js_name = downloadPostAsset)]
     pub async fn download_post_asset(
         &self,
-        encrypted_post_key: String,
-        key_version: i32,
-        object_key: String,
+        asset: <PostAsset as Tsify>::JsType,
     ) -> Result<Vec<u8>, Error> {
+        let asset = PostAsset::from_js(asset)?;
         self.inner
-            .download_post_asset(&encrypted_post_key, key_version, &object_key)
+            .download_post_asset(&asset.into())
             .await
             .map_err(Into::into)
     }
@@ -1028,7 +979,7 @@ impl SpaceAccountCtxHandle {
             self.inner
                 .get_space_profile_for_display(&space_id, viewer_space_id.as_deref(), None)
                 .await?,
-        )?
+        )
         .into_js()
         .map_err(Into::into)
     }
@@ -1162,10 +1113,7 @@ impl SpaceAccountCtxHandle {
         limit: Option<i32>,
     ) -> Result<<PostPage as Tsify>::JsType, Error> {
         let page = self.inner.list_feed(&space_id, cursor, limit).await?;
-        account_post_page_to_js(&self.inner, page)
-            .await?
-            .into_js()
-            .map_err(Into::into)
+        post_page_to_js(page).into_js().map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = unreadStatus)]
@@ -1201,13 +1149,11 @@ impl SpaceAccountCtxHandle {
         cursor: Option<String>,
         limit: Option<i32>,
     ) -> Result<<PostPage as Tsify>::JsType, Error> {
-        account_post_page_to_js(
-            &self.inner,
+        post_page_to_js(
             self.inner
                 .list_posts(&space_id, viewer_space_id.as_deref(), cursor, limit)
                 .await?,
         )
-        .await?
         .into_js()
         .map_err(Into::into)
     }
@@ -1223,14 +1169,7 @@ impl SpaceAccountCtxHandle {
             .inner
             .get_post(&space_id, post_id, viewer_space_id.as_deref())
             .await?;
-        let decrypted = self
-            .inner
-            .decrypt_post_for_viewer(&post.space_id, viewer_space_id.as_deref(), &post)
-            .await?;
-        account_post_to_js(&self.inner, post, decrypted)
-            .await?
-            .into_js()
-            .map_err(Into::into)
+        post_to_js(post).into_js().map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = createPhotoPost)]
@@ -1282,33 +1221,18 @@ impl SpaceAccountCtxHandle {
             .inner
             .get_post(&space_id, post_id, Some(&space_id))
             .await?;
-        let decrypted = self
-            .inner
-            .decrypt_post_for_viewer(&post.space_id, Some(&space_id), &post)
-            .await?;
-        account_post_to_js(&self.inner, post, decrypted)
-            .await?
-            .into_js()
-            .map_err(Into::into)
+        post_to_js(post).into_js().map_err(Into::into)
     }
 
-    #[wasm_bindgen(js_name = downloadPostAssetWithKey)]
-    pub async fn download_post_asset_with_key(
+    #[wasm_bindgen(js_name = downloadPostAsset)]
+    pub async fn download_post_asset(
         &self,
-        space_id: String,
-        encrypted_post_key: String,
-        key_version: i32,
+        asset: <PostAsset as Tsify>::JsType,
         viewer_space_id: Option<String>,
-        object_key: String,
     ) -> Result<Vec<u8>, Error> {
+        let asset = PostAsset::from_js(asset)?;
         self.inner
-            .download_post_asset_with_key(
-                &space_id,
-                &encrypted_post_key,
-                key_version,
-                viewer_space_id.as_deref(),
-                &object_key,
-            )
+            .download_post_asset(&asset.into(), viewer_space_id.as_deref())
             .await
             .map_err(Into::into)
     }
@@ -1493,7 +1417,7 @@ impl SpaceAccountCtxHandle {
         for request in response.pending_requests {
             pending_requests.push(SpaceFriendRequestResponse {
                 request_id: request.request_id,
-                requester: public_actor_to_js(request.requester)?,
+                requester: public_actor_to_js(request.requester),
                 created_at: request.created_at,
             });
         }
@@ -1565,21 +1489,8 @@ impl SpaceAccountCtxHandle {
         post_id: i64,
         caption: Option<String>,
     ) -> Result<(), Error> {
-        let post = self
-            .inner
-            .get_post(&space_id, post_id, Some(&space_id))
-            .await?;
-        let decrypted_post = self
-            .inner
-            .decrypt_post_for_viewer(&post.space_id, Some(&space_id), &post)
-            .await?;
         self.inner
-            .update_post_caption(
-                &space_id,
-                post_id,
-                &decrypted_post.post_key,
-                caption.as_ref().map(String::as_bytes),
-            )
+            .update_post_caption(&space_id, post_id, caption.as_ref().map(String::as_bytes))
             .await
             .map_err(Into::into)
     }
@@ -1623,7 +1534,7 @@ impl SpaceAccountCtxHandle {
             items.push(
                 SpaceFriendRequestResponse {
                     request_id: request.request_id,
-                    requester: public_actor_to_js(request.requester)?,
+                    requester: public_actor_to_js(request.requester),
                     created_at: request.created_at,
                 }
                 .into_js()?,
@@ -1643,7 +1554,7 @@ impl SpaceAccountCtxHandle {
             items.push(
                 SpaceSentFriendRequestResponse {
                     request_id: request.request_id,
-                    target: public_actor_to_js(request.target)?,
+                    target: public_actor_to_js(request.target),
                     created_at: request.created_at,
                 }
                 .into_js()?,
@@ -1698,25 +1609,6 @@ mod tests {
 
     use super::*;
 
-    fn post(post_id: i64, encrypted_post_key: String) -> ente_space::PostResponse {
-        ente_space::PostResponse {
-            post_id,
-            space_id: "space-1".into(),
-            space_slug: "alice".into(),
-            author: ente_space::SpaceActorResponse {
-                space_id: "space-1".into(),
-                space_slug: "alice".into(),
-                ..Default::default()
-            },
-            encrypted_post_key,
-            caption_cipher: String::new(),
-            key_version: 1,
-            objects: Vec::new(),
-            created_at: format!("2026-08-0{post_id}T00:00:00Z"),
-            viewer_liked: false,
-        }
-    }
-
     fn message(
         message_id: &str,
         encrypted_message_key: &str,
@@ -1738,54 +1630,6 @@ mod tests {
             created_at: "2026-08-01T00:00:00Z".into(),
             updated_at: "2026-08-01T00:00:00Z".into(),
         }
-    }
-
-    #[tokio::test]
-    async fn corrupt_post_does_not_reject_account_page() {
-        let root_key = Key::generate();
-        let space_key = Key::generate();
-        let wrapped_space_key = secretbox::encrypt_combined(space_key.as_bytes(), &root_key);
-        let valid_post_key = secretbox::encrypt_combined(Key::generate().as_bytes(), &space_key);
-        let ctx = AccountSpaceCtx::open(ente_space::OpenAccountSpaceCtxInput {
-            base_url: "http://localhost".into(),
-            space_session_token: None,
-            space_root_key: root_key.as_bytes().to_vec(),
-            initial_owned_spaces: Some(vec![ente_space::SpaceKeyResponse {
-                space_id: "space-1".into(),
-                space_slug: "alice".into(),
-                root_wrapped_space_key: b64::encode(&wrapped_space_key),
-                public_key: String::new(),
-                encrypted_secret_key: String::new(),
-                encrypted_profile: String::new(),
-                key_version: 1,
-            }]),
-            user_agent: None,
-            client_package: None,
-            client_version: None,
-        })
-        .unwrap();
-        let mut post_with_corrupt_actor_profile = post(1, b64::encode(&valid_post_key));
-        post_with_corrupt_actor_profile.author.key_version = 1;
-        post_with_corrupt_actor_profile.author.encrypted_profile = "not-base64".into();
-        let page = ente_space::PostPage {
-            items: vec![
-                post_with_corrupt_actor_profile,
-                post(2, "not-base64".into()),
-                post(3, b64::encode(&valid_post_key)),
-            ],
-            next_cursor: "next".into(),
-        };
-
-        let converted = match account_post_page_to_js(&ctx, page).await {
-            Ok(converted) => converted,
-            Err(error) => panic!("{error}"),
-        };
-
-        assert_eq!(converted.items.len(), 3);
-        assert!(!converted.items[0].is_unavailable);
-        assert!(converted.items[1].is_unavailable);
-        assert!(!converted.items[2].is_unavailable);
-        assert_eq!(converted.next_cursor, "next");
     }
 
     fn message_context() -> (AccountSpaceCtx, Key, String) {
@@ -1967,23 +1811,5 @@ mod tests {
         }));
 
         assert!(!error.is_content_error());
-    }
-
-    #[test]
-    fn invalid_profile_utf8_uses_empty_payload() {
-        let profile = profile_to_js(ente_space::DecryptedSpaceProfile {
-            space_id: "space-1".into(),
-            space_slug: "alice".into(),
-            version: 1,
-            friends: 2,
-            profile: vec![0xff],
-            avatar: None,
-            cover: None,
-            updated_at: None,
-        })
-        .unwrap_or_else(|error| panic!("{error}"));
-
-        assert!(profile.profile.is_empty());
-        assert_eq!(profile.space_slug, "alice");
     }
 }

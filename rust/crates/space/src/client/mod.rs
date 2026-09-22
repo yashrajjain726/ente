@@ -666,7 +666,7 @@ fn encrypt_post_object_metadata(post_key: &[u8], metadata: &PostObjectMetadata) 
     )?))
 }
 
-pub fn decrypt_post_object_metadata(
+fn decrypt_post_object_metadata(
     post_key: &[u8],
     object: &PostObjectPayload,
 ) -> Result<Option<PostObjectMetadata>> {
@@ -779,7 +779,11 @@ pub(super) fn decrypt_space_profile(
         space_slug: profile.space_slug.clone(),
         version: profile.version,
         friends: profile.friends,
-        profile: profile_bytes,
+        profile: if profile_bytes.is_empty() {
+            None
+        } else {
+            Some(crate::SpaceProfile::from_bytes(&profile_bytes)?)
+        },
         avatar: profile.avatar.clone(),
         cover: profile.cover.clone(),
         updated_at: if profile.updated_at.is_empty() {
@@ -798,7 +802,7 @@ pub(super) fn space_profile_without_payload(
         space_slug: profile.space_slug.clone(),
         version: profile.version,
         friends: profile.friends,
-        profile: Vec::new(),
+        profile: None,
         avatar: profile.avatar.clone(),
         cover: profile.cover.clone(),
         updated_at: if profile.updated_at.is_empty() {
