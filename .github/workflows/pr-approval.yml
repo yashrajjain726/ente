@@ -240,18 +240,9 @@ jobs:
                       const review = process.env.CODEX_REVIEW.trim();
                       if (!review) throw new Error("Codex returned an empty review.");
 
-                      const marker = "<!-- codex-action-review -->";
-                      const body = `${marker}\n## Codex review\n\nCommit ${head}.\n\n${review}`;
-                      const issue = { ...context.repo, issue_number: pr.number };
-                      const comments = await github.paginate(github.rest.issues.listComments, issue);
-                      const previous = comments.find(
-                          (comment) => comment.user.login === "github-actions[bot]" &&
-                              comment.body.startsWith(marker),
-                      );
-                      if (previous) {
-                          await github.rest.issues.updateComment({
-                              ...context.repo, comment_id: previous.id, body,
-                          });
-                      } else {
-                          await github.rest.issues.createComment({ ...issue, body });
-                      }
+                      const repository = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}`;
+                      const run = `${repository}/actions/runs/${context.runId}`;
+                      const body = `## Codex review\n\nCommit [${head.slice(0, 7)}](${repository}/commit/${head}) · [Review run](${run})\n\n${review}`;
+                      await github.rest.issues.createComment({
+                          ...context.repo, issue_number: pr.number, body,
+                      });
