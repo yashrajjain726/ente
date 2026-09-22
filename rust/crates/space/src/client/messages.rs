@@ -176,7 +176,7 @@ impl AccountSpaceCtx {
         object_key: Option<&str>,
     ) -> Result<MessageResponse> {
         let post = self
-            .get_post(post_space_id, post_id, Some(sender_space_id))
+            .get_post_raw(post_space_id, post_id, Some(sender_space_id))
             .await?;
         if self
             .resolve_owned_space_access(&post.space_id)

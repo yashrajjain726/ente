@@ -121,7 +121,8 @@ async fn account_space_key_resolution_is_cached_within_context() {
     let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
     let friend_space_key = generate_key();
     let encrypted_profile = b64::encode(
-        &encrypt_secretbox_payload(&friend_space_key, b"friend-profile").expect("profile wrap"),
+        &encrypt_secretbox_payload(&friend_space_key, br#"{"fullName":"Friend"}"#)
+            .expect("profile wrap"),
     );
     let sealed_share =
         seal_with_public_key(&friend_space_key, &test_public_key(&ctx)).expect("friend share seal");
@@ -184,8 +185,8 @@ async fn account_space_key_resolution_is_cached_within_context() {
         .await
         .expect("second profile decrypt");
 
-    assert_eq!(first.as_deref(), Some(b"friend-profile".as_slice()));
-    assert_eq!(second.as_deref(), Some(b"friend-profile".as_slice()));
+    assert_eq!(first.unwrap().full_name.as_deref(), Some("Friend"));
+    assert_eq!(second.unwrap().full_name.as_deref(), Some("Friend"));
     spaces.assert_async().await;
     shares.assert_async().await;
 }
@@ -290,8 +291,7 @@ async fn upload_post_photo_asset_attaches_photo_metadata() {
 
     assert_eq!(payload.object_key, "photo-object");
     assert_eq!(payload.position, Some(0));
-    let metadata = ctx
-        .decrypt_post_object_metadata(&post_key, &payload)
+    let metadata = decrypt_post_object_metadata(&post_key, &payload)
         .expect("metadata should decrypt")
         .expect("metadata should exist");
     assert_eq!(metadata.width, Some(4032));
@@ -1118,8 +1118,9 @@ async fn get_space_profile_decrypted_loads_and_decrypts_profile() {
     let space_root_key = generate_key();
     let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
     let space_key = generate_key();
-    let encrypted_profile =
-        b64::encode(&encrypt_secretbox_payload(&space_key, b"profile-json").expect("profile wrap"));
+    let encrypted_profile = b64::encode(
+        &encrypt_secretbox_payload(&space_key, br#"{"fullName":"Owner"}"#).expect("profile wrap"),
+    );
     let profile = server
         .mock("GET", "/spaces/space_owner_main/profile")
         .match_header("x-space-session-token", "space-session-token")
@@ -1160,7 +1161,10 @@ async fn get_space_profile_decrypted_loads_and_decrypts_profile() {
     assert_eq!(decrypted.space_slug, "owner-main");
     assert_eq!(decrypted.version, 3);
     assert_eq!(decrypted.friends, 2);
-    assert_eq!(decrypted.profile, b"profile-json");
+    assert_eq!(
+        decrypted.profile.unwrap().full_name.as_deref(),
+        Some("Owner")
+    );
     profile.assert_async().await;
     spaces.assert_async().await;
 }
@@ -1264,7 +1268,7 @@ async fn get_space_profile_for_display_keeps_envelope_on_decryption_error() {
     assert_eq!(decrypted.space_slug, "owner-main");
     assert_eq!(decrypted.version, 3);
     assert_eq!(decrypted.friends, 2);
-    assert!(decrypted.profile.is_empty());
+    assert!(decrypted.profile.is_none());
     profile.assert_async().await;
     spaces.assert_async().await;
 }
@@ -1317,7 +1321,42 @@ async fn space_status_mutations_accept_empty_server_responses() {
 #[tokio::test]
 async fn update_post_caption_uses_caption_endpoint() {
     let mut server = Server::new_async().await;
-    let ctx = test_account_ctx(&server.url());
+    let root_key = generate_key();
+    let space_key = generate_key();
+    let post_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), root_key.clone());
+    let spaces = server
+        .mock("GET", "/account/space")
+        .with_body(owned_space_response(
+            &root_key,
+            &space_key,
+            "space_owner_main",
+            "owner",
+            1,
+        ))
+        .create_async()
+        .await;
+    let mut post = json!({
+        "postId": 42,
+        "spaceId": "space_owner_main",
+        "spaceSlug": "owner",
+        "author": { "spaceSlug": "owner" },
+        "encryptedPostKey": b64::encode(&encrypt_secretbox_payload(&space_key, &post_key).unwrap()),
+        "captionCipher": b64::encode(&encrypt_secretbox_payload(&post_key, b"old caption").unwrap()),
+        "keyVersion": 1,
+        "objects": [],
+        "createdAt": "2026-04-16T00:00:00Z",
+        "viewerLiked": false,
+    });
+    let read = server
+        .mock("GET", "/spaces/space_owner_main/posts/42")
+        .match_query(Matcher::UrlEncoded(
+            "viewerSpaceId".into(),
+            "space_owner_main".into(),
+        ))
+        .with_body(post.to_string())
+        .create_async()
+        .await;
     let update = server
         .mock("POST", "/spaces/space_owner_main/posts/42/caption")
         .match_header("x-space-session-token", "space-session-token")
@@ -1328,15 +1367,26 @@ async fn update_post_caption_uses_caption_endpoint() {
         .create_async()
         .await;
 
-    ctx.update_post_caption(
-        "space_owner_main",
-        42,
-        &generate_key(),
-        Some(b"updated caption".as_slice()),
-    )
-    .await
-    .expect("caption update should succeed");
+    ctx.update_post_caption("space_owner_main", 42, Some(b"updated caption".as_slice()))
+        .await
+        .expect("caption update should succeed");
 
+    spaces.assert_async().await;
+    read.assert_async().await;
+    read.remove_async().await;
+    post["captionCipher"] = "not-base64".into();
+    let corrupt = server
+        .mock("GET", "/spaces/space_owner_main/posts/42")
+        .match_query(Matcher::Any)
+        .with_body(post.to_string())
+        .create_async()
+        .await;
+    assert!(matches!(
+        ctx.update_post_caption("space_owner_main", 42, Some(b"updated caption"))
+            .await,
+        Err(Error::Base64Decode(_))
+    ));
+    corrupt.assert_async().await;
     update.assert_async().await;
 }
 
@@ -1831,7 +1881,21 @@ async fn refresh_friend_shares_accepts_empty_server_response() {
 #[tokio::test]
 async fn list_feed_uses_feed_endpoint() {
     let mut server = Server::new_async().await;
-    let ctx = test_account_ctx(&server.url());
+    let root_key = generate_key();
+    let space_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), root_key.clone());
+    let spaces = server
+        .mock("GET", "/account/space")
+        .with_status(200)
+        .with_body(owned_space_response(
+            &root_key,
+            &space_key,
+            "space_friend_gallery",
+            "gallery",
+            3,
+        ))
+        .create_async()
+        .await;
     let shares = server
         .mock("GET", "/spaces/space_owner_main/friends/shares")
         .match_header("x-space-session-token", "space-session-token")
@@ -1857,10 +1921,10 @@ async fn list_feed_uses_feed_endpoint() {
                         "spaceId": "space_owner_gallery",
                         "spaceSlug": "owner-gallery"
                     },
-                    "encryptedPostKey": "cGFja2Vk",
+                    "encryptedPostKey": b64::encode(&encrypt_secretbox_payload(&space_key, &generate_key()).unwrap()),
                     "captionCipher": "",
                     "keyVersion": 3,
-                    "objects": [],
+                    "objects": [{"objectKey": "photo"}],
                     "createdAt": "2026-04-16T00:00:00Z",
                     "viewerLiked": true
                 }],
@@ -1877,6 +1941,8 @@ async fn list_feed_uses_feed_endpoint() {
         .expect("feed should load");
 
     assert_eq!(page.items.len(), 1);
+    assert!(page.items[0].content.is_ok());
+    spaces.assert_async().await;
     assert_eq!(page.items[0].post_id, 42);
     assert_eq!(page.next_cursor, "cursor-2");
     shares.assert_async().await;
@@ -1886,7 +1952,21 @@ async fn list_feed_uses_feed_endpoint() {
 #[tokio::test]
 async fn list_posts_uses_space_posts_page_endpoint() {
     let mut server = Server::new_async().await;
-    let ctx = test_account_ctx(&server.url());
+    let root_key = generate_key();
+    let space_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), root_key.clone());
+    let spaces = server
+        .mock("GET", "/account/space")
+        .with_status(200)
+        .with_body(owned_space_response(
+            &root_key,
+            &space_key,
+            "space_owner_main",
+            "gallery",
+            3,
+        ))
+        .create_async()
+        .await;
     let posts = server
         .mock("GET", "/spaces/space_owner_gallery/posts")
         .match_header("x-space-session-token", "space-session-token")
@@ -1906,10 +1986,10 @@ async fn list_posts_uses_space_posts_page_endpoint() {
                         "spaceId": "space_owner_gallery",
                         "spaceSlug": "owner-gallery"
                     },
-                    "encryptedPostKey": "cGFja2Vk",
+                    "encryptedPostKey": b64::encode(&encrypt_secretbox_payload(&space_key, &generate_key()).unwrap()),
                     "captionCipher": "",
                     "keyVersion": 3,
-                    "objects": [],
+                    "objects": [{"objectKey": "photo"}],
                     "createdAt": "2026-04-16T00:00:00Z",
                     "viewerLiked": true
                 }],
@@ -1931,13 +2011,15 @@ async fn list_posts_uses_space_posts_page_endpoint() {
         .expect("post page should load");
 
     assert_eq!(page.items.len(), 1);
+    assert!(page.items[0].content.is_ok());
+    spaces.assert_async().await;
     assert_eq!(page.items[0].post_id, 41);
     assert_eq!(page.next_cursor, "41");
     posts.assert_async().await;
 }
 
 #[tokio::test]
-async fn fetch_post_decrypted_uses_post_by_id_endpoint() {
+async fn get_post_returns_decrypted_content() {
     let mut server = Server::new_async().await;
     let space_root_key = generate_key();
     let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
@@ -1977,7 +2059,7 @@ async fn fetch_post_decrypted_uses_post_by_id_endpoint() {
                     "encryptedPostKey": b64::encode(&encrypt_secretbox_payload(&space_key, &post_key).expect("post key wrap")),
                     "captionCipher": b64::encode(&encrypt_secretbox_payload(&post_key, caption).expect("caption wrap")),
                     "keyVersion": 3,
-                    "objects": [],
+                    "objects": [{"objectKey": "photo"}],
                     "createdAt": "2026-04-16T00:00:00Z",
                     "viewerLiked": false
                 })
@@ -1987,14 +2069,14 @@ async fn fetch_post_decrypted_uses_post_by_id_endpoint() {
             .await;
 
     let decrypted = ctx
-        .fetch_post_decrypted("space_owner_gallery", 42, None)
+        .get_post("space_owner_gallery", 42, None)
         .await
         .expect("post should decrypt");
 
-    assert_eq!(decrypted.post_key, post_key);
+    assert_eq!(decrypted.post_id, 42);
     assert_eq!(
-        decrypted.caption_plaintext.as_deref(),
-        Some(caption.as_slice())
+        decrypted.content.unwrap().caption.as_deref(),
+        Some("hello from post")
     );
     spaces.assert_async().await;
     post.assert_async().await;

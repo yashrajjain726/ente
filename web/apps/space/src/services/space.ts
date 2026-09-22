@@ -8,8 +8,9 @@ import {
     type DecryptedSpaceProfile,
     type MessageConversationActivity,
     type MessageResponse,
-    type PostObjectPayload,
+    type PostAsset,
     type PostPage,
+    type PostPhoto,
     type PostResponse,
     type ProfileAvatarResponse,
     type SpaceAccountCtxHandle,
@@ -38,10 +39,6 @@ import {
     persistCurrentOwnedSpaces,
     releaseCurrentSpaceContext,
 } from "services/profile";
-import {
-    parseSpaceProfilePayload,
-    spaceProfileTextField,
-} from "services/profile-payload";
 import { normalizeSpaceMessageText } from "utils/message-limits";
 import { spacePostDeletedEvent } from "utils/post-events";
 import { postQuoteErrorState, postQuotePhotoIndex } from "utils/post-quote";
@@ -72,14 +69,7 @@ interface SpacePostBase {
     isUnavailable?: boolean;
 }
 
-export interface SpacePostAsset {
-    encryptedPostKey: string;
-    keyVersion: number;
-    mediaType?: string;
-    objectKey: string;
-    postId: number;
-    spaceId: string;
-}
+export type SpacePostAsset = PostAsset & { mediaType?: string };
 
 export interface SpacePostPhoto {
     height?: number;
@@ -262,11 +252,9 @@ const messageActorForSpace = (
 };
 
 const actorProfile = (actor: SpaceActorResponse): FriendProfile => {
-    const payload = parseSpaceProfilePayload(actor.profile ?? "");
+    const payload = actor.profile;
     const fullName =
-        spaceProfileTextField(payload.fullName) ||
-        spaceProfileTextField(payload.displayName) ||
-        actor.spaceSlug;
+        payload?.fullName || payload?.displayName || actor.spaceSlug;
     const username = actor.spaceSlug;
 
     return {
@@ -287,11 +275,9 @@ const actorProfile = (actor: SpaceActorResponse): FriendProfile => {
 const profileFromSpaceProfile = (
     spaceProfile: DecryptedSpaceProfile,
 ): FriendProfile => {
-    const payload = parseSpaceProfilePayload(spaceProfile.profile);
+    const payload = spaceProfile.profile;
     const fullName =
-        spaceProfileTextField(payload.fullName) ||
-        spaceProfileTextField(payload.displayName) ||
-        spaceProfile.spaceSlug;
+        payload?.fullName || payload?.displayName || spaceProfile.spaceSlug;
 
     return {
         avatarKeyVersion: spaceProfile.avatar?.keyVersion,
@@ -387,16 +373,9 @@ const cachedAccountAvatarURLIfPresent = async (
     );
 };
 
-const postAssetFrom = (
-    post: PostResponse,
-    object: PostObjectPayload,
-): SpacePostAsset => ({
-    encryptedPostKey: post.encryptedPostKey,
-    keyVersion: post.keyVersion,
-    mediaType: object.mediaType,
-    objectKey: object.objectKey,
-    postId: post.postId,
-    spaceId: post.spaceId,
+const postAssetFrom = (photo: PostPhoto): SpacePostAsset => ({
+    ...photo.asset,
+    mediaType: photo.mediaType,
 });
 
 const postAssetCacheKey = (asset: SpacePostAsset) =>
@@ -409,47 +388,27 @@ const accountPostAssetURLFromAsset = (
 ) =>
     cachedSpaceMediaBlobURL(
         postAssetCacheKey(asset),
-        () =>
-            ctx.downloadPostAssetWithKey(
-                asset.spaceId,
-                asset.encryptedPostKey,
-                asset.keyVersion,
-                viewerSpaceId ?? null,
-                asset.objectKey,
-            ),
+        () => ctx.downloadPostAsset(asset, viewerSpaceId ?? null),
         asset.mediaType,
     );
 
 const accountPostAssetURL = (
     ctx: SpaceAccountCtxHandle,
-    post: PostResponse,
-    object: PostObjectPayload,
+    photo: PostPhoto,
     viewerSpaceId?: string,
-) =>
-    accountPostAssetURLFromAsset(
-        ctx,
-        postAssetFrom(post, object),
-        viewerSpaceId,
-    );
+) => accountPostAssetURLFromAsset(ctx, postAssetFrom(photo), viewerSpaceId);
 
-const cacheAccountPostAssetURL = async (
-    post: PostResponse,
-    object: PostObjectPayload,
-    blob: Blob,
-) => {
-    const key = postAssetCacheKey(postAssetFrom(post, object));
+const cacheAccountPostAssetURL = async (photo: PostPhoto, blob: Blob) => {
+    const key = postAssetCacheKey(postAssetFrom(photo));
     await rememberCachedSpaceMediaBlobURL(key, blob);
 };
 
-const firstObject = (post: PostResponse) =>
-    post.objects.find((object) => object.objectKey.trim()) ?? null;
-
 const postPhotosFromResponse = (post: PostResponse): SpacePostPhoto[] =>
-    post.objects.map((object) => ({
-        height: object.height,
-        imageAsset: postAssetFrom(post, object),
-        thumbHash: object.thumbHash,
-        width: object.width,
+    post.photos.map((photo) => ({
+        height: photo.height,
+        imageAsset: postAssetFrom(photo),
+        thumbHash: photo.thumbHash,
+        width: photo.width,
     }));
 
 const postBaseFromResponse = (
@@ -478,12 +437,12 @@ const postFromAccountPost = async (
     loadMedia = true,
     viewerSpaceId?: string,
 ): Promise<SpacePost> => {
-    const object = firstObject(post);
     const author = actorProfile(post.author);
     const base = postBaseFromResponse(post, author);
-    if (post.isUnavailable || !object) {
+    if (post.isUnavailable) {
         return { ...base, isUnavailable: true };
     }
+    const photo = post.photos[0]!;
     if (loadMedia) {
         author.avatarUrl = await accountAvatarURL(
             ctx,
@@ -494,35 +453,35 @@ const postFromAccountPost = async (
     }
 
     const imageUrl = loadMedia
-        ? await accountPostAssetURL(ctx, post, object, viewerSpaceId)
+        ? await accountPostAssetURL(ctx, photo, viewerSpaceId)
         : undefined;
     return {
         ...base,
         avatarUrl: author.avatarUrl,
-        height: object.height,
-        imageAsset: postAssetFrom(post, object),
+        height: photo.height,
+        imageAsset: postAssetFrom(photo),
         imageUrl,
         photos: postPhotosFromResponse(post),
-        thumbHash: object.thumbHash,
-        width: object.width,
+        thumbHash: photo.thumbHash,
+        width: photo.width,
     };
 };
 
 const profilePostFromPost = (post: PostResponse): SpaceProfilePost => {
-    const object = firstObject(post);
     const author = actorProfile(post.author);
     const base = postBaseFromResponse(post, author);
-    if (post.isUnavailable || !object) {
+    if (post.isUnavailable) {
         return { ...base, avatarUrl: null, isUnavailable: true };
     }
+    const photo = post.photos[0]!;
     return {
         ...base,
         avatarUrl: null,
-        height: object.height,
-        imageAsset: postAssetFrom(post, object),
+        height: photo.height,
+        imageAsset: postAssetFrom(photo),
         photos: postPhotosFromResponse(post),
-        thumbHash: object.thumbHash,
-        width: object.width,
+        thumbHash: photo.thumbHash,
+        width: photo.width,
     };
 };
 
@@ -576,12 +535,7 @@ export const openPublicSpaceLink = async (
             loadPostImage: (asset) =>
                 cachedSpaceMediaBlobURL(
                     postAssetCacheKey(asset),
-                    () =>
-                        ctx.downloadPostAsset(
-                            asset.encryptedPostKey,
-                            asset.keyVersion,
-                            asset.objectKey,
-                        ),
+                    () => ctx.downloadPostAsset(asset),
                     asset.mediaType,
                 ),
             loadProfileMedia: async () => {
@@ -635,24 +589,22 @@ const messageQuoteFromPostResponse = async (
     viewerSpaceId?: string,
     objectKey?: string,
 ): Promise<SpaceMessageQuote> => {
-    const photoIndex = postQuotePhotoIndex(post.objects, objectKey);
-    const object = post.objects[photoIndex];
+    const photoIndex = postQuotePhotoIndex(
+        post.photos.map((photo) => photo.asset),
+        objectKey,
+    );
+    const photo = post.photos[photoIndex];
     const quote: SpaceMessageQuote = {
         objectKey,
-        photoCount: post.objects.length,
+        photoCount: post.photos.length,
         postId: post.postId,
         spaceId: post.spaceId,
     };
-    if (!object || post.isUnavailable) return { ...quote, isUnavailable: true };
+    if (!photo || post.isUnavailable) return { ...quote, isUnavailable: true };
     if (!includeImage) return quote;
 
     try {
-        const imageUrl = await accountPostAssetURL(
-            ctx,
-            post,
-            object,
-            viewerSpaceId,
-        );
+        const imageUrl = await accountPostAssetURL(ctx, photo, viewerSpaceId);
         if (!imageUrl) {
             quote.isUnavailable = true;
             return quote;
@@ -1180,8 +1132,8 @@ export const createCurrentPhotoPost = async ({
             caption?.trim() || null,
         );
         await Promise.all(
-            created.objects.map((object, index) =>
-                cacheAccountPostAssetURL(created, object, images[index]!.file),
+            created.photos.map((photo, index) =>
+                cacheAccountPostAssetURL(photo, images[index]!.file),
             ),
         );
         const post = await postFromAccountPost(ctx, created, true, spaceId);

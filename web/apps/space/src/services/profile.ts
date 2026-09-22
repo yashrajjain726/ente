@@ -28,10 +28,6 @@ import {
     saveSpaceOwnedSpaces,
     saveSpaceProfileAvatar,
 } from "services/persistent-session";
-import {
-    parseSpaceProfilePayload,
-    spaceProfileTextField,
-} from "services/profile-payload";
 import { spaceRootKeyFromSpaceSession } from "services/secure-session-storage";
 
 const usernamePattern = /^[a-z0-9][a-z0-9._]*$/;
@@ -255,11 +251,9 @@ const coverURLForRemoteCover = async (
 const profileFromDecryptedSpaceProfile = (
     spaceProfile: DecryptedSpaceProfile,
 ): SetupProfile => {
-    const payload = parseSpaceProfilePayload(spaceProfile.profile);
+    const payload = spaceProfile.profile;
     const fullName =
-        spaceProfileTextField(payload.fullName) ||
-        spaceProfileTextField(payload.displayName) ||
-        spaceProfile.spaceSlug;
+        payload?.fullName || payload?.displayName || spaceProfile.spaceSlug;
 
     return {
         avatarKeyVersion: spaceProfile.avatar?.keyVersion,

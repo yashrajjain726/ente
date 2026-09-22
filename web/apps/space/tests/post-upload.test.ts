@@ -1,5 +1,6 @@
 import { encryptBox, openSpaceAccountContext } from "ente-space-wasm";
 import { afterEach, expect, test, vi } from "vitest";
+import { CachedSpacePost } from "../src/services/post-cache";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -44,13 +45,36 @@ const uploadFixture = async (failSecondUpload = false) => {
             },
         ],
     });
+    const profile = await encryptBox(
+        btoa(JSON.stringify({ fullName: " Test User " })),
+        spaceKey,
+    );
+    const author = {
+        spaceId: "test-space",
+        spaceSlug: "test",
+        keyVersion: 1,
+        encryptedProfile: Buffer.concat([
+            Buffer.from(profile.nonce, "base64"),
+            Buffer.from(profile.encryptedData, "base64"),
+        ]).toString("base64"),
+    };
     const calls: string[] = [];
     const uploadedAssets = new Map<string, ArrayBuffer>();
     let presigned = 0;
     let created: UploadedPost | undefined;
+    const record = () => ({
+        ...created,
+        postId: 501,
+        spaceId: "test-space",
+        spaceSlug: "test",
+        author,
+        createdAt: "2026-09-17T00:00:00Z",
+        viewerLiked: false,
+    });
     const respond = async (request: Request) => {
         const path = new URL(request.url).pathname;
         calls.push(`${request.method} ${path}`);
+        if (path.endsWith("/friends/shares")) return Response.json([]);
         if (path.endsWith("/uploads/presign")) {
             const index = presigned++;
             return Response.json({
@@ -89,15 +113,13 @@ const uploadFixture = async (failSecondUpload = false) => {
             return Response.json({ postId: 501 });
         }
         if (request.method == "GET" && path.endsWith("/posts/501")) {
-            return Response.json({
-                ...created,
-                postId: 501,
-                spaceId: "test-space",
-                spaceSlug: "test",
-                author: { spaceId: "test-space", spaceSlug: "test" },
-                createdAt: "2026-09-17T00:00:00Z",
-                viewerLiked: false,
-            });
+            return Response.json(record());
+        }
+        if (
+            request.method == "GET" &&
+            (path.endsWith("/posts") || path.endsWith("/feed"))
+        ) {
+            return Response.json({ items: [record()], nextCursor: "older" });
         }
         throw new Error(`Unexpected request: ${request.method} ${path}`);
     };
@@ -106,7 +128,7 @@ const uploadFixture = async (failSecondUpload = false) => {
         Object.defineProperty(response, "url", { value: request.url });
         return response;
     });
-    return { ctx, calls, created: () => created };
+    return { ctx, calls, author, created: () => created };
 };
 
 test.each([1, 3, 10])(
@@ -120,13 +142,13 @@ test.each([1, 3, 10])(
                 "One shared caption",
             );
             expect(result.caption).toBe("One shared caption");
-            expect(result.objects.map((object) => object.objectKey)).toEqual(
+            expect(result.photos.map((photo) => photo.asset.objectKey)).toEqual(
                 Array.from({ length: count }, (_, i) => `photo-${i}`),
             );
-            expect(result.objects.map((object) => object.width)).toEqual(
+            expect(result.photos.map((photo) => photo.width)).toEqual(
                 Array.from({ length: count }, (_, i) => 1200 + i),
             );
-            expect(result.objects.map((object) => object.thumbHash)).toEqual(
+            expect(result.photos.map((photo) => photo.thumbHash)).toEqual(
                 Array.from({ length: count }, (_, i) => `hash-${i}`),
             );
             expect(created()?.objects.map((object) => object.position)).toEqual(
@@ -168,13 +190,10 @@ test("copies typed-array photo bytes without JavaScript iteration", async () => 
             "Caption",
         );
         expect(created()?.objects).toHaveLength(1);
-        const downloaded = await ctx.downloadPostAssetWithKey(
-            post.spaceId,
-            post.encryptedPostKey,
-            post.keyVersion,
-            post.spaceId,
-            post.objects[0]!.objectKey,
-        );
+        const cached = CachedSpacePost.shape.imageAsset
+            .unwrap()
+            .parse(JSON.parse(JSON.stringify(post.photos[0]!.asset)));
+        const downloaded = await ctx.downloadPostAsset(cached, post.spaceId);
         expect(downloaded).toEqual(photo(0).bytes);
     } finally {
         ctx.free();
@@ -208,6 +227,39 @@ test.each([0, 11])("rejects %i photos before uploading", async (count) => {
             ),
         ).rejects.toThrow("Choose between 1 and 10 photos");
         expect(calls).toHaveLength(0);
+    } finally {
+        ctx.free();
+    }
+});
+
+test("pages expose typed profiles and mark corrupt posts unavailable", async () => {
+    const { ctx, created, author } = await uploadFixture();
+    try {
+        const post = await ctx.createPhotoPost(
+            "test-space",
+            [photo(0)],
+            "Caption",
+        );
+        expect(post.author.profile).toEqual({ fullName: "Test User" });
+        expect(post.isUnavailable).toBe(false);
+        const metadataCipher = created()!.objects[0]!.metadataCipher;
+        created()!.objects[0]!.metadataCipher = "not-base64";
+        for (const page of [
+            await ctx.listPosts("test-space"),
+            await ctx.listFeed("test-space"),
+        ]) {
+            expect(page.nextCursor).toBe("older");
+            expect(page.items[0]!.isUnavailable).toBe(true);
+            expect(page.items[0]!.caption).toBeUndefined();
+            expect(page.items[0]!.photos).toEqual([]);
+        }
+        await expect(ctx.getPost("test-space", 501n)).rejects.toThrow();
+        created()!.objects[0]!.metadataCipher = metadataCipher;
+        author.encryptedProfile = "not-base64";
+        const [withoutProfile] = (await ctx.listPosts("test-space")).items;
+        expect(withoutProfile!.photos).toHaveLength(1);
+        expect(withoutProfile!.isUnavailable).toBe(false);
+        expect(withoutProfile!.author.profile).toBeUndefined();
     } finally {
         ctx.free();
     }

@@ -8,14 +8,15 @@ use ente_core::{
 
 use super::{
     AccountSpaceCtx, build_api, build_space_key_history_map, cache_lock, decrypt_space_profile,
+    posts::{decrypt_post, open_post_content, opened_post},
     space_profile_without_payload,
 };
 use crate::{
     crypto::{decrypt_asset_payload, decrypt_secretbox_payload, encrypt_secretbox_payload},
     error::{Error, Result},
-    models::{CreatedSpaceLink, DecryptedPost, DecryptedSpaceProfile, OpenSpaceLinkCtxInput},
+    models::{CreatedSpaceLink, DecryptedSpaceProfile, OpenSpaceLinkCtxInput, PostAsset, PostPage},
     transport::{
-        AssetDownloadResponse, PostPage, PostResponse, SpaceKeyVersionResponse,
+        AssetDownloadResponse, PostPageResponse, SpaceKeyVersionResponse,
         SpaceLinkBootstrapResponse, SpaceLinkProfileResponse, SpaceLinkStatusResponse,
         SpaceLinkWriteRequest, WebPushSubscriptionKeys, WebPushSubscriptionRequest,
         WebPushTargetResponse, WebPushUnsubscriptionRequest,
@@ -247,7 +248,7 @@ impl SpaceLinkCtx {
     }
 
     pub async fn list_posts(&self) -> Result<PostPage> {
-        let page: PostPage = self
+        let page: PostPageResponse = self
             .api
             .get(&format!("{}/posts", self.prefix()))
             .header(AUTH_HEADER, &self.auth_key)
@@ -267,7 +268,21 @@ impl SpaceLinkCtx {
                 "space link changed while posts were being loaded".into(),
             ));
         }
-        Ok(page)
+        let items = page
+            .items
+            .into_iter()
+            .map(|mut post| {
+                let decrypted = self
+                    .space_key(post.key_version, "post")
+                    .and_then(|space_key| decrypt_post(&space_key, &post));
+                let content = open_post_content(&mut post, decrypted)?;
+                Ok(opened_post(post, content, Ok(None)))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(PostPage {
+            items,
+            next_cursor: page.next_cursor,
+        })
     }
 
     pub async fn subscribe_web_push(
@@ -303,33 +318,11 @@ impl SpaceLinkCtx {
         Ok(())
     }
 
-    pub fn decrypt_post(&self, post: &PostResponse) -> Result<DecryptedPost> {
-        let space_key = self.space_key(post.key_version, "post")?;
+    pub async fn download_post_asset(&self, asset: &PostAsset) -> Result<Vec<u8>> {
+        let space_key = self.space_key(asset.key_version, "post")?;
         let post_key =
-            decrypt_secretbox_payload(&space_key, &b64::decode(&post.encrypted_post_key)?)?;
-        let caption_plaintext = if post.caption_cipher.is_empty() {
-            None
-        } else {
-            Some(decrypt_secretbox_payload(
-                &post_key,
-                &b64::decode(&post.caption_cipher)?,
-            )?)
-        };
-        Ok(DecryptedPost {
-            post_key,
-            caption_plaintext,
-        })
-    }
-
-    pub async fn download_post_asset(
-        &self,
-        encrypted_post_key: &str,
-        key_version: i32,
-        object_key: &str,
-    ) -> Result<Vec<u8>> {
-        let space_key = self.space_key(key_version, "post")?;
-        let post_key = decrypt_secretbox_payload(&space_key, &b64::decode(encrypted_post_key)?)?;
-        self.download_asset(vec![("objectKey", object_key.to_owned())], &post_key)
+            decrypt_secretbox_payload(&space_key, &b64::decode(&asset.encrypted_post_key)?)?;
+        self.download_asset(vec![("objectKey", asset.object_key.clone())], &post_key)
             .await
     }
 
@@ -377,7 +370,7 @@ impl SpaceLinkCtx {
         format!("/space/public/by-slug/{}/link", self.space_slug)
     }
 
-    fn has_keys_for_posts(&self, page: &PostPage) -> Result<bool> {
+    fn has_keys_for_posts(&self, page: &PostPageResponse) -> Result<bool> {
         let key_history = cache_lock(&self.key_history, "space link key history")?;
         Ok(page
             .items
@@ -662,12 +655,48 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(ctx.profile().profile, profile);
+        assert_eq!(
+            ctx.profile().profile,
+            Some(crate::SpaceProfile::from_bytes(profile).unwrap())
+        );
         assert_eq!(ctx.profile().friends, 2);
         assert_eq!(ctx.posts(), 3);
         bootstrap.assert_async().await;
         profile_request.assert_async().await;
         versions.assert_async().await;
+        let post_key = vec![5; Key::BYTES];
+        let valid = serde_json::json!({
+            "postId": 1, "spaceId": "space-alice", "spaceSlug": "alice",
+            "author": { "spaceSlug": "alice" }, "keyVersion": 1,
+            "encryptedPostKey": b64::encode(&encrypt_secretbox_payload(&space_key, &post_key).unwrap()),
+            "captionCipher": b64::encode(&encrypt_secretbox_payload(&post_key, b"hello").unwrap()),
+            "objects": [{ "objectKey": "photo", "metadataCipher": b64::encode(&encrypt_secretbox_payload(&post_key, br#"{"width":100,"mediaType":"image/webp"}"#).unwrap()) }],
+            "createdAt": "2026-07-26T00:00:00Z", "viewerLiked": false,
+        });
+        let mut corrupt = valid.clone();
+        corrupt["postId"] = 2.into();
+        corrupt["encryptedPostKey"] = "not-base64".into();
+        let posts = server
+            .mock("GET", format!("{prefix}/posts").as_str())
+            .match_header("x-space-link-auth", auth.as_str())
+            .with_body(
+                serde_json::json!({ "items": [valid, corrupt], "nextCursor": "next" }).to_string(),
+            )
+            .create_async()
+            .await;
+
+        let page = ctx.list_posts().await.unwrap();
+        let content = page.items[0].content.as_ref().unwrap();
+        assert_eq!(content.caption.as_deref(), Some("hello"));
+        assert_eq!(content.photos[0].asset.object_key, "photo");
+        assert_eq!(
+            content.photos[0].metadata.as_ref().unwrap().width,
+            Some(100)
+        );
+        assert!(page.items[0].author.profile.as_ref().unwrap().is_none());
+        assert!(matches!(page.items[1].content, Err(Error::Base64Decode(_))));
+        assert_eq!(page.next_cursor, "next");
+        posts.assert_async().await;
     }
 
     #[tokio::test]
@@ -708,7 +737,7 @@ mod tests {
                 space_slug: "alice".to_owned(),
                 version: 1,
                 friends: 0,
-                profile: Vec::new(),
+                profile: None,
                 avatar: None,
                 cover: None,
                 updated_at: None,
