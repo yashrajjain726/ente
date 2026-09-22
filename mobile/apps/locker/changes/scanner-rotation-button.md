@@ -1,0 +1,1 @@
+- Fixed the scanner's rotation icon and removed the extra pause between rotations.

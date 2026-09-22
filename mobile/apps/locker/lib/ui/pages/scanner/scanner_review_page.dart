@@ -602,11 +602,15 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
                       ),
                       const SizedBox(width: Spacing.lg),
                       IconButtonComponent(
-                        icon: HugeIcon(
-                          icon: HugeIcons.strokeRoundedRotateClockwise,
-                          color: colors.textBase,
+                        icon: Transform.flip(
+                          flipX: true,
+                          child: HugeIcon(
+                            icon: HugeIcons.strokeRoundedRotateClockwise,
+                            color: colors.textBase,
+                          ),
                         ),
                         onTap: pageCount == 0 ? null : _rotate,
+                        shouldSurfaceExecutionStates: false,
                         tooltip: l10n.rotate,
                       ),
                       const SizedBox(width: Spacing.lg),
