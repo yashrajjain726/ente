@@ -11,6 +11,6 @@ fi
 docker pull rg.fr-par.scw.cloud/ente/museum-prod
 
 systemctl restart museum
-curl -fk --retry 5 --retry-connrefused --retry-delay 1 https://localhost/ping
+curl -fk --retry 5 --retry-all-errors --retry-delay 1 https://localhost/ping
 systemctl status museum --no-pager
 tail -n 20 /root/var/logs/museum.log
