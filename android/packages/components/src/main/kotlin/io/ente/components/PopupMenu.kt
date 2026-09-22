@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -60,6 +61,7 @@ public fun MenuItem(
     Row(
         modifier
             .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.5f)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { selected?.let { this.selected = it } }
             .heightIn(min = 52.dp)
@@ -73,7 +75,7 @@ public fun MenuItem(
                 title,
                 Modifier.weight(1f),
                 style = EnteTypography.mini,
-                color = if (enabled) palette.text else palette.disabledText,
+                color = palette.text,
             )
             trailing?.invoke()
         }
