@@ -306,7 +306,7 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
           return await _nameAlbum(context, name);
         },
         showOnlyLoadingState: true,
-        textCapitalization: TextCapitalization.words,
+        textCapitalization: TextCapitalization.sentences,
         popnavAfterSubmission: true,
       );
       if (result is Exception) {

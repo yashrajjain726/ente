@@ -389,7 +389,7 @@ class _CreateAlbumBottomSheetState extends State<_CreateAlbumBottomSheet> {
         hintText: strings.enterAlbumName,
         autofocus: true,
         isClearable: true,
-        textCapitalization: TextCapitalization.words,
+        textCapitalization: TextCapitalization.sentences,
         onSubmit: (_) => _createAlbum(),
         onChanged: (_) {
           final hasAlbumName = _controller.text.trim().isNotEmpty;

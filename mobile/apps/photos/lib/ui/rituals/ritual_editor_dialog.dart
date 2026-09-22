@@ -710,7 +710,7 @@ class _AlbumPickerSheetState extends State<_AlbumPickerSheet> {
           created = await service.createAlbum(trimmedName);
         },
         showOnlyLoadingState: true,
-        textCapitalization: TextCapitalization.words,
+        textCapitalization: TextCapitalization.sentences,
         popnavAfterSubmission: true,
       );
       if (!context.mounted) return;
