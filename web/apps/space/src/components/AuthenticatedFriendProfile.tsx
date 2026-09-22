@@ -155,7 +155,10 @@ export const AuthenticatedFriendProfile: React.FC<
 
     return (
         <>
-            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
+            <SpacePageMeta
+                themeColor={spaceAppBackgroundColor}
+                title={`${friendDisplayName}'s profile`}
+            />
             <ProfileScreen
                 headerVariant="friend"
                 isCoverLoading={isProfileLoading}

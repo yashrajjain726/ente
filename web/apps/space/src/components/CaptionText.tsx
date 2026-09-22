@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import { visuallyHidden } from "@mui/utils";
 import React from "react";
 
 const captionBubbleSx = {
@@ -79,8 +80,14 @@ export const SpaceCaptionText: React.FC<{
     return (
         <Box component="span" sx={{ display: "grid" }}>
             {lineClamp ? (
+                <Box component="span" sx={visuallyHidden}>
+                    {caption}
+                </Box>
+            ) : null}
+            {lineClamp ? (
                 <Box
                     component="span"
+                    aria-hidden
                     sx={{ ...layerSx, height: 0, overflow: "hidden" }}
                 >
                     <Box component="span" ref={measureRef} sx={layerSx}>

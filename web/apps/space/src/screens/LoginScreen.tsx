@@ -89,6 +89,7 @@ const TextInput: React.FC<TextInputProps> = ({
 }) => {
     const inputID = useId();
     const [showPassword, setShowPassword] = useState(false);
+    const [visibilityStatus, setVisibilityStatus] = useState("");
     const internalInputRef = useRef<HTMLInputElement | null>(null);
     const isPassword = type == "password";
     const setInputRef = (element: HTMLInputElement | null) => {
@@ -104,7 +105,10 @@ const TextInput: React.FC<TextInputProps> = ({
         const inputElement = internalInputRef.current;
         const shouldRestoreFocus = document.activeElement == inputElement;
 
-        setShowPassword((value) => !value);
+        setShowPassword(!showPassword);
+        setVisibilityStatus(
+            showPassword ? "Password is hidden" : "Password is visible",
+        );
         if (shouldRestoreFocus) {
             window.requestAnimationFrame(() =>
                 inputElement?.focus({ preventScroll: true }),
@@ -182,8 +186,10 @@ const TextInput: React.FC<TextInputProps> = ({
                     <Box
                         component="button"
                         type="button"
-                        aria-label="Show password"
-                        aria-pressed={showPassword}
+                        aria-label={
+                            showPassword ? "Hide password" : "Show password"
+                        }
+                        aria-controls={inputID}
                         onClick={togglePasswordVisibility}
                         onPointerDown={(event) => event.preventDefault()}
                         sx={{
@@ -210,6 +216,9 @@ const TextInput: React.FC<TextInputProps> = ({
                     </Box>
                 )}
             </Box>
+            {isPassword && (
+                <SpaceLiveStatus>{visibilityStatus}</SpaceLiveStatus>
+            )}
         </Box>
     );
 };

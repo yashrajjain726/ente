@@ -31,6 +31,7 @@ import { SpacePostPhotoInput } from "components/PostPhotoInput";
 import { SpacePostPhotosBadge } from "components/PostPhotosBadge";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
 import { SpaceShareIcon } from "components/ShareInviteButton";
+import { SpaceSkipLink } from "components/SkipLink";
 import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React, { useState } from "react";
@@ -1094,6 +1095,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 position: "relative",
             }}
         >
+            {!isPublicProfile && <SpaceSkipLink />}
             <Box
                 sx={{
                     bgcolor: "transparent",
@@ -1200,6 +1202,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 )}
                 {renderHeader()}
                 <Box
+                    id={isPublicProfile ? undefined : "space-main-content"}
+                    tabIndex={isPublicProfile ? undefined : -1}
                     sx={{
                         alignItems: "center",
                         display: "flex",
@@ -1719,6 +1723,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         lineHeight: "20px",
                                         m: 0,
                                         maxWidth: 250,
+                                        textWrap: "balance",
                                     }}
                                 >
                                     {`${firstName} hasn't posted anything yet.`}

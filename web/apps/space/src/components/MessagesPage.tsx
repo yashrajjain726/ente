@@ -196,6 +196,8 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         selectedFriendFromFriends ??
         selectedLoadedFriendProfile ??
         selectedFriendPlaceholder;
+    const selectedFriendName =
+        selectedFriend?.fullName.trim() || selectedFriend?.username;
     const selectedFriendSpaceId = selectedFriend
         ? friendSpaceId(selectedFriend)
         : undefined;
@@ -667,7 +669,14 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
 
     return (
         <>
-            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
+            <SpacePageMeta
+                themeColor={spaceAppBackgroundColor}
+                title={
+                    selectedFriendName
+                        ? `Messages with ${selectedFriendName}`
+                        : "Messages"
+                }
+            />
             <MessagesScreen
                 conversations={conversations}
                 friendsCount={conversationFriends.length}

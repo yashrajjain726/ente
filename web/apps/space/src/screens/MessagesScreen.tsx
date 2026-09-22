@@ -21,6 +21,7 @@ import { SpacePostPhotoInput } from "components/PostPhotoInput";
 import { SpacePostPhotosBadge } from "components/PostPhotosBadge";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
 import { SpaceShareInviteButton } from "components/ShareInviteButton";
+import { SpaceSkipLink } from "components/SkipLink";
 import { formatTimeAgo } from "ente-base/date";
 import log from "ente-base/log";
 import React from "react";
@@ -1744,6 +1745,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         "idle",
     );
     const [actionStatus, setActionStatus] = React.useState("");
+    const [liveThreadID, setLiveThreadID] = React.useState<string>();
     const [isInviteSharing, setIsInviteSharing] = React.useState(false);
     const [activityPostsByKey, setActivityPostsByKey] = React.useState<
         Record<string, SpaceMessageActivityPost>
@@ -1771,6 +1773,11 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const selectedName = selectedFriend
         ? selectedFriend.fullName.trim() || selectedFriend.username
         : "";
+    const selectedThreadID = selectedFriend?.spaceId ?? selectedFriend?.id;
+    const isThreadBusy = isThreadLoading || isThreadRecipientLoading;
+    React.useEffect(() => {
+        setLiveThreadID(isThreadBusy ? undefined : selectedThreadID);
+    }, [isThreadBusy, selectedThreadID]);
     const showInviteEmptyState = friendsCount == 0 && Boolean(profileLink);
     const emptyConversationsCopy =
         friendsCount == 0
@@ -2209,6 +2216,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     placeItems: { xs: "stretch", sm: "start center" },
                 }}
             >
+                <SpaceSkipLink />
                 <Box
                     sx={{
                         bgcolor: "transparent",
@@ -2411,11 +2419,17 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     {isThreadOpen && selectedFriend ? (
                         <>
                             <Box
+                                id="space-main-content"
+                                tabIndex={-1}
                                 ref={threadScrollRef}
                                 role="log"
                                 aria-label={`Messages with ${selectedName}`}
-                                aria-busy={
-                                    isThreadLoading || isThreadRecipientLoading
+                                aria-busy={isThreadBusy}
+                                aria-live={
+                                    !isThreadBusy &&
+                                    liveThreadID == selectedThreadID
+                                        ? "polite"
+                                        : "off"
                                 }
                                 aria-relevant="additions text"
                                 onScroll={handleThreadScroll}
@@ -2906,7 +2920,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                             )}
                         </>
                     ) : (
-                        <>
+                        <Box id="space-main-content" tabIndex={-1}>
                             {isConversationsLoading ? (
                                 <Box
                                     sx={{
@@ -3004,7 +3018,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     ))}
                                 </Box>
                             )}
-                        </>
+                        </Box>
                     )}
                 </Box>
             </Box>

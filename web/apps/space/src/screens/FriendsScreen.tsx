@@ -9,8 +9,8 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem, Skeleton } from "@mui/material";
 import {
-    SpaceActionFeedbackIcon,
     spaceActionDoneDurationMs,
+    SpaceActionFeedbackIcon,
     type SpaceActionPhase,
 } from "components/ActionFeedback";
 import { SpaceAddFriendDialog } from "components/AddFriendDialog";
@@ -18,6 +18,7 @@ import { SpaceAvatarImage } from "components/AvatarImage";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
 import { SpaceShareInviteButton } from "components/ShareInviteButton";
+import { SpaceSkipLink } from "components/SkipLink";
 import type { FriendProfile } from "data/friends";
 import log from "ente-base/log";
 import React, { useState } from "react";
@@ -731,6 +732,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 placeItems: { xs: "stretch", sm: "start center" },
             }}
         >
+            <SpaceSkipLink />
             <Box
                 sx={{
                     bgcolor: "transparent",
@@ -841,91 +843,96 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     username={username}
                 />
 
-                {isLoading ? (
-                    <Box
-                        sx={{
-                            display: "grid",
-                            inset: 0,
-                            placeItems: "center",
-                            position: "absolute",
-                            pointerEvents: "none",
-                        }}
-                    >
-                        <SpaceLoadingSpinner ariaLabel="Loading friends" />
-                    </Box>
-                ) : friendRequests.length > 0 || friends.length > 0 ? (
-                    <Box
-                        component="ul"
-                        sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "4px",
-                            m: 0,
-                            mt: "8px",
-                            p: 0,
-                            width: "100%",
-                        }}
-                    >
-                        {friendRequests.map((request) => (
-                            <FriendRequestRow
-                                key={`request-${request.requestId}`}
-                                request={request}
-                                onAccept={onAcceptFriendRequest}
-                                onDelete={onDeleteFriendRequest}
-                            />
-                        ))}
-                        {friends.map((friend) => (
-                            <FriendRow
-                                key={friend.id}
-                                avatarUrl={loadedAvatarURLFor(friend)}
-                                friend={friend}
-                                onLoadAvatar={() => loadFriendAvatar(friend)}
-                                onMessage={onMessage}
-                                onOpenFriend={onOpenFriend}
-                                onUnfriend={() => {
-                                    setUnfriendErrorMessage(null);
-                                    setFriendToUnfriend(friend);
-                                }}
-                            />
-                        ))}
-                    </Box>
-                ) : (
-                    <Box
-                        sx={{
-                            alignItems: "center",
-                            color: textSoft,
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "22px",
-                            inset: 0,
-                            justifyContent: "center",
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 14,
-                            fontWeight: 500,
-                            lineHeight: "20px",
-                            pointerEvents: "none",
-                            position: "absolute",
-                            px: "24px",
-                            textAlign: "center",
-                        }}
-                    >
-                        <Box component="p" sx={{ m: 0, maxWidth: 260 }}>
-                            Invite your friends and family. Share everyday
-                            photos and keep up with each other.
+                <Box id="space-main-content" tabIndex={-1}>
+                    {isLoading ? (
+                        <Box
+                            sx={{
+                                display: "grid",
+                                inset: 0,
+                                placeItems: "center",
+                                position: "absolute",
+                                pointerEvents: "none",
+                            }}
+                        >
+                            <SpaceLoadingSpinner ariaLabel="Loading friends" />
                         </Box>
-                        <SpaceShareInviteButton
-                            profileLink={profileLink}
-                            sharing={isInviteSharing}
-                            onShareError={(error) =>
-                                log.error(
-                                    "Failed to share Space invite link",
-                                    error,
-                                )
-                            }
-                            onSharingChange={setIsInviteSharing}
-                        />
-                    </Box>
-                )}
+                    ) : friendRequests.length > 0 || friends.length > 0 ? (
+                        <Box
+                            component="ul"
+                            sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "4px",
+                                m: 0,
+                                mt: "8px",
+                                p: 0,
+                                width: "100%",
+                            }}
+                        >
+                            {friendRequests.map((request) => (
+                                <FriendRequestRow
+                                    key={`request-${request.requestId}`}
+                                    request={request}
+                                    onAccept={onAcceptFriendRequest}
+                                    onDelete={onDeleteFriendRequest}
+                                />
+                            ))}
+                            {friends.map((friend) => (
+                                <FriendRow
+                                    key={friend.id}
+                                    avatarUrl={loadedAvatarURLFor(friend)}
+                                    friend={friend}
+                                    onLoadAvatar={() =>
+                                        loadFriendAvatar(friend)
+                                    }
+                                    onMessage={onMessage}
+                                    onOpenFriend={onOpenFriend}
+                                    onUnfriend={() => {
+                                        setUnfriendErrorMessage(null);
+                                        setFriendToUnfriend(friend);
+                                    }}
+                                />
+                            ))}
+                        </Box>
+                    ) : (
+                        <Box
+                            sx={{
+                                alignItems: "center",
+                                color: textSoft,
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "22px",
+                                inset: 0,
+                                justifyContent: "center",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 14,
+                                fontWeight: 500,
+                                lineHeight: "20px",
+                                pointerEvents: "none",
+                                position: "absolute",
+                                px: "24px",
+                                textAlign: "center",
+                            }}
+                        >
+                            <Box component="p" sx={{ m: 0, maxWidth: 260 }}>
+                                Invite your friends and family. Share everyday
+                                photos and keep up with each other.
+                            </Box>
+                            <SpaceShareInviteButton
+                                profileLink={profileLink}
+                                sharing={isInviteSharing}
+                                onShareError={(error) =>
+                                    log.error(
+                                        "Failed to share Space invite link",
+                                        error,
+                                    )
+                                }
+                                onSharingChange={setIsInviteSharing}
+                            />
+                        </Box>
+                    )}
+                </Box>
             </Box>
             <ConfirmationActionSheet
                 open={Boolean(friendToUnfriend)}
