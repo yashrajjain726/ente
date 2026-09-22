@@ -80,19 +80,16 @@ const profileAvatarTopOffset = 54;
 const profileAvatarSize = 132;
 const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
-const photoMasonryGap = `${profilePhotoGap}px`;
-const photoMasonryPlaceholderBackground = spaceSurface;
-const photoMasonryRadius = `${spaceProfilePostRadius}px`;
+const photoGridGap = `${profilePhotoGap}px`;
+const photoGridPlaceholderBackground = spaceSurface;
+const photoGridRadius = `${spaceProfilePostRadius}px`;
 const profileCoverRadius = "12px";
-const photoMasonryLoadRootMargin = "800px 0px";
-const publicPhotoMasonryLoadRootMargin = "400px 0px";
+const photoGridLoadRootMargin = "800px 0px";
+const publicPhotoGridLoadRootMargin = "400px 0px";
 interface ProfilePhotoDimensions {
     height: number;
     width: number;
 }
-
-const photoAspectRatio = ({ height, width }: ProfilePhotoDimensions): number =>
-    height > 0 && width > 0 ? width / height : 1;
 
 export interface ProfilePostItem {
     avatarUrl?: string | null;
@@ -119,63 +116,11 @@ interface SelectedProfilePost {
     photoIndex: number;
 }
 
-interface PostMasonryTile {
+interface ProfilePhotoTile {
     aspectRatio: number;
     index: number;
     item: ProfilePostItem;
 }
-
-const buildPostMasonrySections = (
-    items: ProfilePostItem[],
-    loadedDimensionsByID: Record<string, ProfilePhotoDimensions>,
-    width: number,
-) => {
-    const now = new Date();
-    const dayMs = 24 * 60 * 60 * 1000;
-    const sections = [
-        {
-            title: "Today",
-            sinceMs: new Date(
-                now.getFullYear(),
-                now.getMonth(),
-                now.getDate(),
-            ).getTime(),
-        },
-        {
-            title: "Yesterday",
-            sinceMs: new Date(
-                now.getFullYear(),
-                now.getMonth(),
-                now.getDate() - 1,
-            ).getTime(),
-        },
-        { title: "Last 7 days", sinceMs: now.getTime() - 7 * dayMs },
-        { title: "Last 30 days", sinceMs: now.getTime() - 30 * dayMs },
-        { title: "Older", sinceMs: -Infinity },
-    ].map((section) => ({ ...section, tiles: new Array<PostMasonryTile>() }));
-
-    items.forEach((item, index) => {
-        const dimensions = loadedDimensionsByID[item.id] ?? {
-            height: item.height ?? 1,
-            width: item.width ?? 1,
-        };
-        const section = sections.find(
-            ({ sinceMs }) => item.timestampMs >= sinceMs,
-        )!;
-        section.tiles.push({
-            aspectRatio: photoAspectRatio(dimensions),
-            index,
-            item,
-        });
-    });
-
-    return sections
-        .filter(({ tiles }) => tiles.length > 0)
-        .map(({ title, tiles }) => ({
-            title,
-            rows: profilePhotoRows(tiles, width),
-        }));
-};
 
 const profilePostImageCacheKey = (item: ProfilePostItem) =>
     [item.id, item.imageAsset?.objectKey ?? item.imageUrl ?? ""].join(":");
@@ -197,7 +142,7 @@ const ProfileStatsSkeleton: React.FC = () => (
         <Skeleton
             variant="rectangular"
             sx={{
-                bgcolor: photoMasonryPlaceholderBackground,
+                bgcolor: photoGridPlaceholderBackground,
                 borderRadius: "999px",
                 height: 18,
                 transform: "none",
@@ -217,7 +162,7 @@ const ProfileStatsSkeleton: React.FC = () => (
         <Skeleton
             variant="rectangular"
             sx={{
-                bgcolor: photoMasonryPlaceholderBackground,
+                bgcolor: photoGridPlaceholderBackground,
                 borderRadius: "999px",
                 height: 18,
                 transform: "none",
@@ -384,11 +329,12 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
             }}
             sx={{
                 appearance: "none",
-                bgcolor: photoMasonryPlaceholderBackground,
+                bgcolor: photoGridPlaceholderBackground,
                 border: 0,
+                borderRadius: photoGridRadius,
                 cursor: imageUrl && !isUnavailable ? "pointer" : "default",
                 display: "block",
-                flex: `${flexGrow} 1 0`,
+                flex: `${flexGrow} 1 0px`,
                 height: "100%",
                 minWidth: 0,
                 opacity: 1,
@@ -440,7 +386,7 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
                         display: "block",
                         height: "100%",
                         inset: 0,
-                        objectFit: "cover",
+                        objectFit: "contain",
                         objectPosition: "center",
                         opacity:
                             isCurrentImageReady || !thumbHashDataURL ? 1 : 0,
@@ -650,13 +596,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             ? "hidden"
             : "like-only";
     const postImageLoadRootMargin = isAnonymousPublicProfile
-        ? publicPhotoMasonryLoadRootMargin
-        : photoMasonryLoadRootMargin;
-    const masonrySections = buildPostMasonrySections(
-        visiblePostItems,
-        loadedPhotoDimensionsByID,
-        postGridWidth,
-    );
+        ? publicPhotoGridLoadRootMargin
+        : photoGridLoadRootMargin;
     const closeFriendActions = () => setFriendActionsAnchor(null);
 
     const requestUnfriend = () => {
@@ -793,6 +734,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         [loadedPhotoDimensionsByID],
     );
 
+    const photoRows = profilePhotoRows(
+        visiblePostItems.map((item, index) => {
+            const { width, height } = dimensionsForPost(item);
+            return {
+                aspectRatio: width > 0 && height > 0 ? width / height : 1,
+                index,
+                item,
+            };
+        }),
+        postGridWidth,
+    );
+
     const profileViewerPhotos = viewerPostItems.flatMap((item) =>
         viewerPhotosFromPost({
             ...item,
@@ -844,16 +797,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     };
 
     const renderPostTile = (
-        { aspectRatio, index, item }: PostMasonryTile,
+        { aspectRatio, index, item }: ProfilePhotoTile,
         rowAspectRatio: number,
     ) => {
         const imageUrl = loadedPostImageURLFor(item);
         const isUnavailable = !viewerPostIndexByID.has(item.id);
         return (
             <ProfilePostTile
-                key={`${item.id}-${index}`}
-                flexGrow={aspectRatio / rowAspectRatio}
+                key={item.id}
                 displayName={displayName}
+                flexGrow={aspectRatio / rowAspectRatio}
                 imageUrl={imageUrl}
                 index={index}
                 isUnavailable={isUnavailable}
@@ -1328,7 +1281,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         variant="rounded"
                                         sx={{
                                             bgcolor:
-                                                photoMasonryPlaceholderBackground,
+                                                photoGridPlaceholderBackground,
                                             height: 26,
                                             transform: "none",
                                             width: 112,
@@ -1634,61 +1587,26 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             sx={{
                                 display: "flex",
                                 flexDirection: "column",
-                                gap: "24px",
+                                gap: photoGridGap,
                                 mt: "6px",
                                 mx: "16px",
                                 width: "calc(100% - 32px)",
                             }}
                         >
-                            {masonrySections.map(({ title, rows }) => (
-                                <Box component="section" key={title}>
-                                    <Box
-                                        component="h2"
-                                        sx={{
-                                            alignItems: "baseline",
-                                            color: textSoft,
-                                            display: "flex",
-                                            fontFamily:
-                                                '"Inter Variable", Inter, sans-serif',
-                                            fontSize: 13,
-                                            fontWeight: 700,
-                                            gap: "4px",
-                                            lineHeight: "18px",
-                                            m: 0,
-                                            pb: "8px",
-                                        }}
-                                    >
-                                        {title}
-                                    </Box>
-                                    <Box
-                                        sx={{
-                                            borderRadius: photoMasonryRadius,
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            gap: photoMasonryGap,
-                                            overflow: "hidden",
-                                        }}
-                                    >
-                                        {rows.map((row) => (
-                                            <Box
-                                                key={row.tiles[0]!.item.id}
-                                                sx={{
-                                                    display: "flex",
-                                                    flexShrink: 0,
-                                                    gap: photoMasonryGap,
-                                                    height: row.height,
-                                                    width: "100%",
-                                                }}
-                                            >
-                                                {row.tiles.map((tile) =>
-                                                    renderPostTile(
-                                                        tile,
-                                                        row.aspectRatio,
-                                                    ),
-                                                )}
-                                            </Box>
-                                        ))}
-                                    </Box>
+                            {photoRows.map((row) => (
+                                <Box
+                                    key={row.tiles[0]!.item.id}
+                                    sx={{
+                                        display: "flex",
+                                        flexShrink: 0,
+                                        gap: photoGridGap,
+                                        height: row.height,
+                                        width: "100%",
+                                    }}
+                                >
+                                    {row.tiles.map((tile) =>
+                                        renderPostTile(tile, row.aspectRatio),
+                                    )}
                                 </Box>
                             ))}
                         </Box>

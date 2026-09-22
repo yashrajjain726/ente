@@ -8,78 +8,94 @@ import {
 const photos = (ratios: number[]) =>
     ratios.map((aspectRatio, id) => ({ id, aspectRatio }));
 
-test("a portrait and landscape share a row at their allocated widths", () => {
-    const tiles = photos([3 / 4, 3 / 2]);
-    expect(profilePhotoRows(tiles, 363)).toEqual([
-        { aspectRatio: 2.25, height: 160, tiles },
-    ]);
-});
+test.each([1, 2, 3, 4])(
+    "a profile with %i photos shows each at full width and its original height",
+    (count) => {
+        const tiles = photos([4 / 3, 3 / 2, 1, 9 / 16].slice(0, count));
+        const rows = profilePhotoRows(tiles, 352);
+        expect(rows).toEqual(
+            tiles.map((tile) => ({
+                aspectRatio: tile.aspectRatio,
+                height: 352 / tile.aspectRatio,
+                tiles: [tile],
+            })),
+        );
+    },
+);
 
-test("short landscape rows split without changing photo dimensions", () => {
-    const tiles = photos([4 / 3, 5 / 4, 7 / 4]);
-    const rows = profilePhotoRows(tiles, 328);
-    expect(rows.map(({ tiles }) => tiles.length)).toEqual([2, 1]);
-    expect(rows.flatMap(({ tiles }) => tiles)).toEqual(tiles);
-});
-
-test("portrait photos are limited to two per row", () => {
-    expect(
-        profilePhotoRows(photos([2 / 3, 3 / 4, 2 / 3]), 328).map(
-            ({ tiles }) => tiles.length,
-        ),
-    ).toEqual([2, 1]);
-});
-
-test("a landscape stands alone so the final portrait can share a row", () => {
-    const tiles = photos([16 / 9, 16 / 9, 9 / 16]);
-    const rows = profilePhotoRows(tiles, 568);
+test("a profile with exactly five photos uses the adaptive grid throughout", () => {
+    const tiles = photos([3 / 2, 3 / 2, 3 / 2, 3 / 2, 3 / 2]);
+    const rows = profilePhotoRows(tiles, 352);
     expect(rows.map(({ tiles }) => tiles.map(({ id }) => id))).toEqual([
-        [0],
-        [1, 2],
+        [0, 1],
+        [2, 3],
+        [4],
     ]);
-    expect(rows[1]!.height).toBeCloseTo(565 / (16 / 9 + 9 / 16));
 });
 
-test("row grouping can shift earlier pairs to avoid a final portrait on its own", () => {
+test("three portraits share a compact row", () => {
+    expect(
+        profilePhotoRows(
+            photos([2 / 3, 3 / 4, 2 / 3, 2 / 3, 3 / 4, 2 / 3]),
+            328,
+        ).map(({ tiles }) => tiles.length),
+    ).toEqual([3, 3]);
+});
+
+test("a landscape can share a row with two portraits to avoid a lone portrait", () => {
     const tiles = photos([3 / 4, 3 / 4, 16 / 9, 3 / 4, 9 / 16]);
     expect(
         profilePhotoRows(tiles, 363).map(({ tiles }) =>
             tiles.map(({ id }) => id),
         ),
-    ).toEqual([[0, 1], [2], [3, 4]]);
+    ).toEqual([
+        [0, 1],
+        [2, 3, 4],
+    ]);
 });
 
-test("an unavoidable standalone portrait is capped at a 4:5 preview", () => {
+test("a standalone portrait keeps its original proportions", () => {
     const tiles = photos([9 / 16]);
     expect(profilePhotoRows(tiles, 328)).toEqual([
-        { aspectRatio: 9 / 16, height: 410, tiles },
+        { aspectRatio: 9 / 16, height: 328 / (9 / 16), tiles },
     ]);
 });
 
-test("paired portraits keep their original proportions", () => {
-    const tiles = photos([9 / 16, 9 / 16]);
-    expect(profilePhotoRows(tiles, 363)).toEqual([
-        { aspectRatio: 18 / 16, height: 320, tiles },
-    ]);
+test("similar landscapes are not forced into full-width rows", () => {
+    const tiles = photos(new Array<number>(10).fill(3 / 2));
+    const rows = profilePhotoRows(tiles, 358);
+    expect(rows.map(({ tiles }) => tiles.length)).toEqual([2, 2, 2, 2, 2]);
+    expect(rows.flatMap(({ tiles }) => tiles)).toEqual(tiles);
+});
+
+test("wider photos stand alone when that fits better than a short paired row", () => {
+    const tiles = photos([3 / 2, 3 / 2, 5 / 3, 5 / 3, 3 / 2, 3 / 2]);
+    const rows = profilePhotoRows(tiles, 358);
+    expect(rows.map(({ tiles }) => tiles.length)).toEqual([2, 1, 1, 2]);
+    expect(rows.flatMap(({ tiles }) => tiles)).toEqual(tiles);
 });
 
 test("row grouping adapts to the available width and accounts for gaps", () => {
-    const tiles = photos([1.5, 1.5, 1.5]);
+    const tiles = photos([1.5, 1.5, 1.5, 1.5, 1.5, 1.5]);
     expect(
-        profilePhotoRows(tiles, 302).map(({ tiles }) => tiles.length),
-    ).toEqual([1, 1, 1]);
+        profilePhotoRows(tiles, 299 + profilePhotoGap).map(
+            ({ tiles }) => tiles.length,
+        ),
+    ).toEqual([1, 1, 1, 1, 1, 1]);
     expect(
-        profilePhotoRows(tiles, 303).map(({ tiles }) => tiles.length),
-    ).toEqual([2, 1]);
+        profilePhotoRows(tiles, 300 + profilePhotoGap).map(
+            ({ tiles }) => tiles.length,
+        ),
+    ).toEqual([2, 2, 2]);
     expect(
         profilePhotoRows(tiles, 456).map(({ tiles }) => tiles.length),
-    ).toEqual([2, 1]);
+    ).toEqual([2, 2, 2]);
 });
 
 test("a panorama keeps its aspect ratio even when it cannot reach the minimum", () => {
-    const tiles = photos([8, 1, 1]);
+    const tiles = photos([8, 1, 1, 1, 1]);
     const rows = profilePhotoRows(tiles, 328);
-    expect(rows.map(({ tiles }) => tiles.length)).toEqual([1, 2]);
+    expect(rows.map(({ tiles }) => tiles.length)).toEqual([1, 2, 2]);
     expect(rows[0]!.aspectRatio).toBe(8);
 });
 
@@ -90,7 +106,7 @@ test.each([288, 328, 358, 568])(
         const rows = profilePhotoRows(tiles, width);
         expect(rows.flatMap(({ tiles }) => tiles)).toEqual(tiles);
         for (const row of rows) {
-            expect(row.tiles.length).toBeLessThanOrEqual(2);
+            expect(row.tiles.length).toBeLessThanOrEqual(3);
             const gaps = (row.tiles.length - 1) * profilePhotoGap;
             expect(
                 row.tiles.reduce(
