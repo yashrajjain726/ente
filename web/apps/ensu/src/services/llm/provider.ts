@@ -234,20 +234,6 @@ export class LlmProvider {
             this.backend.kind === "tauri"
                 ? requestedContextSize
                 : Math.min(requestedContextSize, DEFAULT_WEB_CONTEXT_SIZE);
-        const configuredMaxTokens = settings.maxTokens ?? model.maxTokens;
-        if (this.backend.kind !== "tauri") {
-            const maxTokens = Math.min(
-                configuredMaxTokens ??
-                    Math.min(8_192, Math.max(1, Math.floor(contextSize / 2))),
-                Math.max(1, contextSize - 256),
-            );
-            return {
-                model,
-                contextSize,
-                maxTokens,
-                inputBudget: contextSize - maxTokens - 256,
-            };
-        }
         resolveGenerationBudget(contextSize, 1);
         const loadedContextSize =
             useLoadedContext &&
@@ -258,10 +244,7 @@ export class LlmProvider {
                 : undefined;
         return {
             model,
-            ...resolveGenerationBudget(
-                loadedContextSize ?? contextSize,
-                configuredMaxTokens,
-            ),
+            ...resolveGenerationBudget(loadedContextSize ?? contextSize),
         };
     }
 

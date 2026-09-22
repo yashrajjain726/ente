@@ -16,13 +16,11 @@ export interface ModelInfo {
     sizeBytes?: number;
     mmprojSizeBytes?: number;
     contextLength?: number;
-    maxTokens?: number;
 }
 
 export interface ModelSettings {
     modelId?: string;
     contextLength?: number;
-    maxTokens?: number;
 }
 
 export interface DownloadProgress {

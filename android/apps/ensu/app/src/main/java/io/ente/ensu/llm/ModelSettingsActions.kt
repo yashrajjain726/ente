@@ -372,12 +372,10 @@ internal class ModelSettingsActions(
                 preferredModelId = settings.modelId.takeIf { it.isNotEmpty() },
             )
         val contextLength = settings.contextLength.toIntOrNull()
-        val maxTokens = settings.maxTokens.toIntOrNull()?.takeIf { it > 0 }
 
         return LlmModelSelection(
             id = modelId,
             contextLength = contextLength,
-            maxTokens = maxTokens,
         )
     }
 

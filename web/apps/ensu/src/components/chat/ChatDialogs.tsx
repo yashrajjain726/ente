@@ -1,6 +1,7 @@
 import type { KnowledgePack } from "@/services/knowledge";
 import {
     DEFAULT_TAURI_CONTEXT_SIZE,
+    DEFAULT_WEB_CONTEXT_SIZE,
     resolveGenerationBudget,
 } from "@/services/llm/budget";
 import type { NotesCollectionView } from "@/services/notes-lifecycle";
@@ -98,7 +99,6 @@ const compactInlineLinkSx = {
 export interface ModelSettingsDraft {
     modelId: string;
     contextLength: string;
-    maxTokens: string;
 }
 
 export interface ChatDialogsProps {
@@ -138,7 +138,6 @@ export interface ChatDialogsProps {
     isTauriRuntime: boolean;
     suggestedModels: SuggestedModel[];
     contextLength: string;
-    maxTokens: string;
     isSavingModel: boolean;
     handleSaveModel: (draft: ModelSettingsDraft) => void;
     handleUseDefaultModel: () => void;
@@ -210,7 +209,6 @@ export const ChatDialogs = memo(
         isTauriRuntime,
         suggestedModels,
         contextLength,
-        maxTokens,
         isSavingModel,
         handleSaveModel,
         handleUseDefaultModel,
@@ -264,15 +262,11 @@ export const ChatDialogs = memo(
         };
 
         const [draftContextLength, setDraftContextLength] = React.useState("");
-        const [draftMaxTokens, setDraftMaxTokens] = React.useState("");
         const isModelPreparationActive =
             modelGateStatus === "checking" ||
             modelGateStatus === "preloading" ||
             modelGateStatus === "downloading";
         const [draftContextError, setDraftContextError] = React.useState<
-            string | null
-        >(null);
-        const [draftMaxTokensError, setDraftMaxTokensError] = React.useState<
             string | null
         >(null);
         const [showAdvancedLimits, setShowAdvancedLimits] =
@@ -311,17 +305,9 @@ export const ChatDialogs = memo(
                     : "default",
             );
             setDraftContextLength(contextLength);
-            setDraftMaxTokens(maxTokens);
             setDraftContextError(null);
-            setDraftMaxTokensError(null);
-            setShowAdvancedLimits(!!contextLength || !!maxTokens);
-        }, [
-            contextLength,
-            maxTokens,
-            modelOptions,
-            selectedModelId,
-            showModelSettings,
-        ]);
+            setShowAdvancedLimits(!!contextLength);
+        }, [contextLength, modelOptions, selectedModelId, showModelSettings]);
 
         React.useEffect(() => {
             const didOpen =
@@ -336,48 +322,27 @@ export const ChatDialogs = memo(
                 draftContextLength && !/^\d+$/.test(draftContextLength)
                     ? "Enter a number"
                     : undefined;
-            let maxTokensErrorValue =
-                draftMaxTokens && !/^\d+$/.test(draftMaxTokens)
-                    ? "Enter a number"
-                    : undefined;
 
             const contextValue = draftContextLength
                 ? Number(draftContextLength)
                 : undefined;
-            const maxTokensValue = draftMaxTokens
-                ? Number(draftMaxTokens)
-                : undefined;
-
-            if (isTauriRuntime) {
-                const contextSize = contextValue ?? DEFAULT_TAURI_CONTEXT_SIZE;
-                if (!contextErrorValue) {
-                    try {
-                        resolveGenerationBudget(contextSize, 1);
-                    } catch (error) {
-                        contextErrorValue = (error as Error).message;
-                    }
+            if (!contextErrorValue) {
+                const contextSize = isTauriRuntime
+                    ? (contextValue ?? DEFAULT_TAURI_CONTEXT_SIZE)
+                    : Math.min(
+                          contextValue ?? DEFAULT_WEB_CONTEXT_SIZE,
+                          DEFAULT_WEB_CONTEXT_SIZE,
+                      );
+                try {
+                    resolveGenerationBudget(contextSize);
+                } catch (error) {
+                    contextErrorValue = (error as Error).message;
                 }
-                if (!contextErrorValue && !maxTokensErrorValue) {
-                    try {
-                        resolveGenerationBudget(contextSize, maxTokensValue);
-                    } catch (error) {
-                        maxTokensErrorValue = (error as Error).message;
-                    }
-                }
-            } else if (
-                !maxTokensErrorValue &&
-                contextValue &&
-                maxTokensValue &&
-                maxTokensValue > contextValue
-            ) {
-                maxTokensErrorValue = "Must be <= context length";
             }
 
             setDraftContextError(contextErrorValue ?? null);
-            setDraftMaxTokensError(maxTokensErrorValue ?? null);
-
-            return !(contextErrorValue || maxTokensErrorValue);
-        }, [draftContextLength, draftMaxTokens, isTauriRuntime]);
+            return !contextErrorValue;
+        }, [draftContextLength, isTauriRuntime]);
 
         return (
             <>
@@ -1512,7 +1477,7 @@ export const ChatDialogs = memo(
                                             variant="mini"
                                             sx={{ color: "text.muted" }}
                                         >
-                                            Context length and max output
+                                            Context length
                                         </Typography>
                                     )}
                                     {showAdvancedLimits && (
@@ -1535,34 +1500,15 @@ export const ChatDialogs = memo(
                                                     draftContextError ?? " "
                                                 }
                                             />
-                                            <TextField
-                                                fullWidth
-                                                label="Max output"
-                                                placeholder={
-                                                    isTauriRuntime
-                                                        ? "Auto"
-                                                        : "2048"
-                                                }
-                                                value={draftMaxTokens}
-                                                onChange={(event) =>
-                                                    setDraftMaxTokens(
-                                                        event.target.value,
-                                                    )
-                                                }
-                                                error={!!draftMaxTokensError}
-                                                helperText={
-                                                    draftMaxTokensError ?? " "
-                                                }
-                                            />
                                         </Stack>
                                     )}
                                     <Typography
                                         variant="mini"
                                         sx={{ color: "text.muted" }}
                                     >
-                                        {isTauriRuntime
-                                            ? "Leave blank for Auto. Output adjusts to the available context."
-                                            : "Leave blank to use model defaults."}
+                                        Leave blank to use model defaults.
+                                        Response length adjusts automatically to
+                                        the context length.
                                     </Typography>
                                 </Stack>
                             </Stack>
@@ -1584,7 +1530,6 @@ export const ChatDialogs = memo(
                                                     ? ""
                                                     : draftModelId,
                                             contextLength: draftContextLength,
-                                            maxTokens: draftMaxTokens,
                                         });
                                     }}
                                 >

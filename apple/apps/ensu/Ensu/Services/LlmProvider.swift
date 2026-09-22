@@ -1,10 +1,13 @@
 import Foundation
 import os
 
+func automaticMaxOutputTokens(contextLength: Int) -> Int {
+    min(2048, max(1, contextLength / 4))
+}
+
 struct LlmModelSelection: Equatable {
     let id: String
     let contextLength: Int?
-    let maxTokens: Int?
 }
 
 struct DownloadProgress: Equatable {

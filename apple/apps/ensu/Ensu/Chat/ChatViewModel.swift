@@ -29,7 +29,6 @@ final class ChatViewModel: ObservableObject {
     }()
     private static let systemPromptDatePlaceholder = ConfigDefaults.shared
         .systemPromptDatePlaceholder
-    private static let defaultGenerationMaxTokens = 8_192
     private static let overflowSafetyTokens = 256
     private static let imageTokenEstimate = 768
     private nonisolated static let sessionTitleMaxLength = 40
@@ -1319,7 +1318,7 @@ final class ChatViewModel: ObservableObject {
                                 current: prompt.text,
                                 expectedUserText: userNode.text,
                                 historyQuery: userNode.text,
-                                maxTokens: selection.maxTokens.map { UInt32(clamping: $0) },
+                                maxTokens: nil,
                                 searched: knowledgeHits
                             ),
                             temperature: self.resolveTemperature(),
@@ -2323,15 +2322,14 @@ final class ChatViewModel: ObservableObject {
     private func resolveGenerationLimits(_ selection: LlmModelSelection) async -> GenerationLimits {
         let contextLength =
             await provider.loadedContextLength(selection) ?? selection.contextLength ?? 12000
-        let maxOutput = resolveMaxOutputTokens(
-            configuredMaxTokens: selection.maxTokens, contextLength: contextLength)
+        let maxOutput = resolveMaxOutputTokens(contextLength: contextLength)
         return GenerationLimits(contextLength: contextLength, maxOutput: maxOutput)
     }
 
-    private func resolveMaxOutputTokens(configuredMaxTokens: Int?, contextLength: Int) -> Int {
+    private func resolveMaxOutputTokens(contextLength: Int) -> Int {
         let maxAllowed = max(1, contextLength - Self.overflowSafetyTokens)
-        let implicitMax = min(Self.defaultGenerationMaxTokens, max(1, contextLength / 2))
-        return min(maxAllowed, configuredMaxTokens ?? implicitMax)
+        let implicitMax = automaticMaxOutputTokens(contextLength: contextLength)
+        return min(maxAllowed, implicitMax)
     }
 
     private func historyText(_ node: MessageNode) -> String {

@@ -85,14 +85,17 @@ impl Preparation {
             });
         let state = state.filter(|_| covered.is_some());
         let covered = covered.unwrap_or(0);
-        let summary_output = SUMMARY_OUTPUT_TOKENS.min(context / 4);
+        let answer_input_budget = input_budget(context, output)?;
+        let summary_output = SUMMARY_OUTPUT_TOKENS
+            .min(context / 4)
+            .min(context - SAFETY_TOKENS - 1);
         Ok(Self {
             session,
             history,
             system,
             history_query: Some(current.clone()),
             current,
-            input_budget: input_budget(context, output)?,
+            input_budget: answer_input_budget,
             summary_input_budget: input_budget(context, summary_output)?,
             summary_output,
             state,

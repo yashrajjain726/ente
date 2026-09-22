@@ -575,7 +575,6 @@ const Page: React.FC = () => {
     >(null);
     const [selectedModelId, setSelectedModelId] = useState("");
     const [contextLength, setContextLength] = useState("");
-    const [maxTokens, setMaxTokens] = useState("");
     const [systemPrompt, setSystemPrompt] = useState(
         DEFAULT_CHAT_SYSTEM_PROMPT_BODY,
     );
@@ -1048,7 +1047,6 @@ const Page: React.FC = () => {
         const applySettings = (parsed: {
             modelId?: string;
             contextLength?: string;
-            maxTokens?: string;
         }) => {
             const rawContextLength = parsed.contextLength ?? "";
             const clampedContextLength =
@@ -1060,7 +1058,6 @@ const Page: React.FC = () => {
             const settings = {
                 modelId: parsed.modelId ?? "",
                 contextLength: clampedContextLength,
-                maxTokens: parsed.maxTokens ?? "",
             };
             window.localStorage.setItem(
                 MODEL_SETTINGS_STORAGE_KEY,
@@ -1069,7 +1066,6 @@ const Page: React.FC = () => {
             if (cancelled) return;
             setSelectedModelId(settings.modelId);
             setContextLength(settings.contextLength);
-            setMaxTokens(settings.maxTokens);
         };
 
         // Older builds persisted a model URL selection; llm_migrate_models
@@ -1097,7 +1093,6 @@ const Page: React.FC = () => {
                       modelUrl?: string;
                       mmprojUrl?: string;
                       contextLength?: string;
-                      maxTokens?: string;
                   })
                 : {};
             let modelId = parsed.modelId ?? "";
@@ -1122,11 +1117,7 @@ const Page: React.FC = () => {
                     modelId = converted ?? "";
                 }
             }
-            applySettings({
-                modelId,
-                contextLength: parsed.contextLength,
-                maxTokens: parsed.maxTokens,
-            });
+            applySettings({ modelId, contextLength: parsed.contextLength });
         };
 
         void loadSettings()
@@ -1869,12 +1860,8 @@ const Page: React.FC = () => {
         return {
             modelId: selectedModelId || undefined,
             contextLength: contextLength ? Number(contextLength) : undefined,
-            maxTokens:
-                maxTokens && (isTauriRuntime || Number(maxTokens) > 0)
-                    ? Number(maxTokens)
-                    : undefined,
         };
-    }, [selectedModelId, contextLength, maxTokens, isTauriRuntime]);
+    }, [selectedModelId, contextLength]);
 
     const modelSettingsKey = useMemo(
         () => JSON.stringify(getModelSettings()),
@@ -1883,7 +1870,7 @@ const Page: React.FC = () => {
 
     const formatErrorMessage = useCallback((error: unknown) => {
         if (isNamedError(error, "prompt_too_long")) {
-            return "Prompt exceeds the model context window. Reduce history, lower max tokens, or increase context length.";
+            return "Prompt exceeds the model context window. Reduce history or increase context length.";
         }
         return tauriCommandError(error).message ?? "Unknown model error";
     }, []);
@@ -3069,7 +3056,7 @@ const Page: React.FC = () => {
                     normalPromptTokenEstimate > inputBudget
                 ) {
                     throw new Error(
-                        "Prompt exceeds the model context window. Reduce history, lower max tokens, or increase context length.",
+                        "Prompt exceeds the model context window. Reduce history or increase context length.",
                     );
                 }
 
@@ -3187,7 +3174,7 @@ const Page: React.FC = () => {
                     );
                     if (countTokens(normalMessages) > inputBudget) {
                         throw new Error(
-                            "Prompt exceeds the loaded model context window. Reduce history, lower max output, or increase context length.",
+                            "Prompt exceeds the loaded model context window. Reduce history or increase context length.",
                         );
                     }
                 }
@@ -3799,11 +3786,7 @@ const Page: React.FC = () => {
         modelGateStatus === "downloading";
 
     const handleSaveModel = useCallback(
-        (draft: {
-            modelId: string;
-            contextLength: string;
-            maxTokens: string;
-        }) => {
+        (draft: { modelId: string; contextLength: string }) => {
             if (isModelPreparationActive) return;
             setIsSavingModel(true);
             if (typeof window !== "undefined") {
@@ -3814,7 +3797,6 @@ const Page: React.FC = () => {
             }
             setSelectedModelId(draft.modelId);
             setContextLength(draft.contextLength);
-            setMaxTokens(draft.maxTokens);
             modelGateRequestRef.current += 1;
             setLoadedModelName(null);
             setModelDownloadSizeBytes(null);
@@ -3830,16 +3812,11 @@ const Page: React.FC = () => {
         if (typeof window !== "undefined") {
             window.localStorage.setItem(
                 MODEL_SETTINGS_STORAGE_KEY,
-                JSON.stringify({
-                    modelId: "",
-                    contextLength: "",
-                    maxTokens: "",
-                }),
+                JSON.stringify({ modelId: "", contextLength: "" }),
             );
         }
         setSelectedModelId("");
         setContextLength("");
-        setMaxTokens("");
         modelGateRequestRef.current += 1;
         setLoadedModelName(null);
         setModelDownloadSizeBytes(null);
@@ -4823,7 +4800,6 @@ const Page: React.FC = () => {
                 isTauriRuntime={isTauriRuntime}
                 suggestedModels={suggestedModels}
                 contextLength={contextLength}
-                maxTokens={maxTokens}
                 isSavingModel={isSavingModel}
                 handleSaveModel={handleSaveModel}
                 handleUseDefaultModel={handleUseDefaultModel}

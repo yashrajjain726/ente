@@ -19,14 +19,12 @@ export function resolveGenerationBudget(
     const maxTokens =
         configuredMaxTokens ?? Math.min(2048, Math.floor(contextSize / 4));
     if (!Number.isSafeInteger(maxTokens) || maxTokens <= 0) {
-        throw new Error(
-            "Max output must be a positive whole number, or blank for Auto.",
-        );
+        throw new Error("The response budget must be a positive whole number.");
     }
     const inputBudget = contextSize - maxTokens - OVERFLOW_SAFETY_TOKENS;
     if (inputBudget <= 0) {
         throw new Error(
-            `Max output leaves no room for a prompt in the ${contextSize}-token context. Lower max output, choose Auto, or increase context length.`,
+            `The ${contextSize}-token context cannot fit the conversation and response. Increase context length.`,
         );
     }
     return { contextSize, maxTokens, inputBudget };

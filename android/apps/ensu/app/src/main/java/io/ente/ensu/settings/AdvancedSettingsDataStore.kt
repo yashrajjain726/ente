@@ -36,7 +36,6 @@ class AdvancedSettingsDataStore(private val context: Context) {
                     ModelSettingsState(
                         modelId = prefs[Keys.modelId].orEmpty(),
                         contextLength = prefs[Keys.contextLength].orEmpty(),
-                        maxTokens = prefs[Keys.maxTokens].orEmpty(),
                         temperature = prefs[Keys.temperature].orEmpty(),
                     ),
             )
@@ -59,6 +58,7 @@ class AdvancedSettingsDataStore(private val context: Context) {
             prefs.remove(useCustomModel)
             prefs.remove(modelUrl)
             prefs.remove(mmprojUrl)
+            prefs.remove(Keys.legacyMaxTokens)
         }
     }
 
@@ -82,7 +82,7 @@ class AdvancedSettingsDataStore(private val context: Context) {
         context.advancedSettingsPreferences.edit { prefs ->
             prefs[Keys.modelId] = settings.modelId
             prefs[Keys.contextLength] = settings.contextLength
-            prefs[Keys.maxTokens] = settings.maxTokens
+            prefs.remove(Keys.legacyMaxTokens)
             prefs[Keys.temperature] = settings.temperature
         }
     }
@@ -95,7 +95,7 @@ class AdvancedSettingsDataStore(private val context: Context) {
         context.advancedSettingsPreferences.edit { prefs ->
             prefs[Keys.modelId] = ""
             prefs[Keys.contextLength] = ""
-            prefs[Keys.maxTokens] = ""
+            prefs.remove(Keys.legacyMaxTokens)
             prefs[Keys.temperature] = ""
         }
     }
@@ -110,7 +110,7 @@ class AdvancedSettingsDataStore(private val context: Context) {
             val systemPrompt = stringPreferencesKey("system_prompt")
             val modelId = stringPreferencesKey("model_id")
             val contextLength = stringPreferencesKey("context_length")
-            val maxTokens = stringPreferencesKey("max_tokens")
+            val legacyMaxTokens = stringPreferencesKey("max_tokens")
             val temperature = stringPreferencesKey("temperature")
         }
     }

@@ -22,6 +22,7 @@ import io.ente.ensu.llm.LlmMessageRole
 import io.ente.ensu.llm.LlmModelSelection
 import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.llm.ModelSettingsActions
+import io.ente.ensu.llm.automaticMaxOutputTokens
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.notes.NotesStore
@@ -850,9 +851,6 @@ internal class ChatStoreActions(
         try {
             llmProvider.withConversationContext(selection) { context ->
                 if (!isActive() || stopRequested) return@withConversationContext
-                require(selection.maxTokens == null || selection.maxTokens > 0) {
-                    "Max output must be a positive whole number, or Auto"
-                }
                 val preparation =
                     chatRepository.prepareConversation(
                         context,
@@ -863,7 +861,7 @@ internal class ChatStoreActions(
                             current = current,
                             expectedUserText = userMessage.text,
                             historyQuery = userMessage.text,
-                            maxTokens = selection.maxTokens?.toUInt(),
+                            maxTokens = null,
                             searched = searched,
                         ),
                     )
@@ -1584,14 +1582,14 @@ internal class ChatStoreActions(
             llmProvider.loadedContextLength(selection)
                 ?: selection.contextLength
                 ?: DEFAULT_CONTEXT_LENGTH
-        val maxOutput = resolveMaxOutputTokens(selection.maxTokens, contextLength)
+        val maxOutput = resolveMaxOutputTokens(contextLength)
         return GenerationLimits(contextLength = contextLength, maxOutput = maxOutput)
     }
 
-    private fun resolveMaxOutputTokens(configuredMaxTokens: Int?, contextLength: Int): Int {
+    private fun resolveMaxOutputTokens(contextLength: Int): Int {
         val maxAllowed = max(1, contextLength - OVERFLOW_SAFETY_TOKENS)
-        val implicitMax = min(DEFAULT_GENERATION_MAX_TOKENS, max(1, contextLength / 2))
-        return (configuredMaxTokens ?: implicitMax).coerceIn(1, maxAllowed)
+        val implicitMax = automaticMaxOutputTokens(contextLength)
+        return min(implicitMax, maxAllowed)
     }
 
     private fun showOverflowDialog(selection: HistorySelection, limits: GenerationLimits) {
@@ -1727,7 +1725,6 @@ internal class ChatStoreActions(
 
     companion object {
         private const val DEFAULT_CONTEXT_LENGTH = 12_000
-        private const val DEFAULT_GENERATION_MAX_TOKENS = 8_192
         private const val MEDIA_MARKER = "<__media__>"
         private const val OVERFLOW_SAFETY_TOKENS = 256
         private const val IMAGE_TOKEN_ESTIMATE = 768

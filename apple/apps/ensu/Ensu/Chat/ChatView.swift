@@ -47,7 +47,6 @@ struct ChatView: View {
         [
             modelSettings.modelId,
             modelSettings.contextLength,
-            modelSettings.maxTokens,
             modelSettings.temperature,
             modelSettings.systemPromptBody,
         ]
