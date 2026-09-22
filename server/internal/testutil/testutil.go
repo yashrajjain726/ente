@@ -121,6 +121,7 @@ func ResetTables(t *testing.T, db *sql.DB) {
 			events,
 			task_lock,
 			storage_bonus,
+			referral_tracking,
 			referral_codes,
 			subscriptions,
 			usage,
