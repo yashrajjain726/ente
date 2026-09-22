@@ -3,11 +3,13 @@ package storagebonus
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/ente/storagebonus"
 	"github.com/ente/stacktrace"
+	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 )
 
@@ -27,6 +29,10 @@ func (r *Repository) TrackReferralAndInviteeBonus(ctx context.Context, invitee, 
 	}(tx)
 	_, err = tx.ExecContext(ctx, "INSERT INTO referral_tracking (invitee_id, invitor_id, plan_type) VALUES ($1, $2, $3)", invitee, codeOwnerId, planType)
 	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" && pqErr.Constraint == "referral_tracking_invitee_id_idx" {
+			return stacktrace.Propagate(storagebonus.CodeAlreadyAppliedErr, "invitee %d has already applied a referral code", invitee)
+		}
 		return stacktrace.Propagate(err, "failed to insert storagebonus tracking entry for invitee %d, invitor %d and planType %s", invitee, codeOwnerId, planType)
 	}
 	bonusType := storagebonus.SignUp
