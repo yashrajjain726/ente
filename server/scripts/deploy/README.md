@@ -47,7 +47,7 @@ sudo tee /root/museum/credentials/tls.cert
 sudo tee /root/museum/credentials/tls.key
 ```
 
-Copy the service definition and restart script to the new instance. The restart script can remain in the ente user's home directory. Move the service definition to its proper place.
+Copy the service definition and restart script to the new instance, then install them in their system locations.
 
 ```sh
 # If using nginx
@@ -57,7 +57,10 @@ scp scripts/deploy/museum.service <instance>:
 
 scp scripts/deploy/update-and-restart-museum.sh <instance>:
 
-sudo mv museum.service /etc/systemd/system
+sudo install -o root -g root -m 0644 museum.service \
+    /etc/systemd/system/museum.service && rm museum.service
+sudo install -o root -g root -m 0755 update-and-restart-museum.sh \
+    /usr/local/sbin/update-and-restart-museum.sh && rm update-and-restart-museum.sh
 sudo systemctl daemon-reload
 ```
 
@@ -75,7 +78,7 @@ sudo systemctl reload nginx
 SSH into the instance and run:
 
 ```sh
-./update-and-restart-museum.sh
+sudo /usr/local/sbin/update-and-restart-museum.sh
 ```
 
 ## Rollback
@@ -91,7 +94,7 @@ sudo systemctl restart museum
 >
 > This doesn't work if there are migrations!
 
-To reset the local `latest` back to the registry image, run `./update-and-restart-museum.sh` again, or
+To reset the local `latest` back to the registry image, run `sudo /usr/local/sbin/update-and-restart-museum.sh` again, or
 
 ```sh
 sudo docker pull rg.fr-par.scw.cloud/ente/museum-prod:latest
