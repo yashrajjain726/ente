@@ -207,7 +207,7 @@ extension SectionTypeExtensions on SectionType {
             hintText: context.strings.enterAlbumName,
             alwaysShowSuccessState: false,
             initialValue: "",
-            textCapitalization: TextCapitalization.words,
+            textCapitalization: TextCapitalization.sentences,
             onSubmit: (String text) async {
               if (text.trim() == "") {
                 return;
