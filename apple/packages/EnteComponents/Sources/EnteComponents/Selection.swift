@@ -106,6 +106,7 @@ public struct EnteToggleStyle: ToggleStyle {
                     .overlay {
                         Circle()
                             .fill(configuration.isOn ? palette.reverseText : palette.primary)
+                            .frame(width: 25, height: 25)
                             .padding(3)
                             .frame(
                                 maxWidth: .infinity,
