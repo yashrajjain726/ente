@@ -1202,7 +1202,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 )}
                 {renderHeader()}
                 <Box
+                    component={isPublicProfile ? "div" : "section"}
                     id={isPublicProfile ? undefined : "space-main-content"}
+                    aria-label={
+                        isPublicProfile ? undefined : `${displayName}'s profile`
+                    }
                     tabIndex={isPublicProfile ? undefined : -1}
                     sx={{
                         alignItems: "center",

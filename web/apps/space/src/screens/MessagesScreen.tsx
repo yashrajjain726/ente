@@ -2920,7 +2920,12 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                             )}
                         </>
                     ) : (
-                        <Box id="space-main-content" tabIndex={-1}>
+                        <Box
+                            component="section"
+                            id="space-main-content"
+                            aria-label="Messages"
+                            tabIndex={-1}
+                        >
                             {isConversationsLoading ? (
                                 <Box
                                     sx={{

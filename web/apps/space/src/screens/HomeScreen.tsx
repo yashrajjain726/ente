@@ -2185,7 +2185,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     />
                 </SpaceHomeHeader>
                 <Box
+                    component="section"
                     id="space-main-content"
+                    aria-label="Feed"
                     tabIndex={-1}
                     sx={{
                         boxSizing: "border-box",

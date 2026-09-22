@@ -491,6 +491,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <Box
                     component="section"
                     id="space-main-content"
+                    aria-label="Settings"
                     tabIndex={-1}
                     sx={{
                         display: "flex",
@@ -723,6 +724,7 @@ export const ChangeNameSettingsScreen: React.FC<
                 <Box
                     component="form"
                     id="space-main-content"
+                    aria-label="Change name"
                     tabIndex={-1}
                     onSubmit={handleSubmit}
                     sx={{

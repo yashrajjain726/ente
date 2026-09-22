@@ -843,7 +843,12 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     username={username}
                 />
 
-                <Box id="space-main-content" tabIndex={-1}>
+                <Box
+                    component="section"
+                    id="space-main-content"
+                    aria-label="Friends"
+                    tabIndex={-1}
+                >
                     {isLoading ? (
                         <Box
                             sx={{
