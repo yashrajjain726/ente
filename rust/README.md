@@ -21,19 +21,7 @@ Other useful commands:
 cargo codegen native  # Regenerate bindings used by native apps
 cargo codegen frb     # Regenerate bindings used by Flutter apps
 cargo codegen napi    # Regenerate bindings used by Desktop (Electron) apps
-```
 
-## Integration tests
-
-Integration tests use [ente-test-support](crates/test-support) to start a local
-Museum backed by temporary Postgres and object storage. They require `go` on
-`PATH` to build and run Museum. The Postgres binary
-([postgresql_embedded](https://crates.io/crates/postgresql_embedded)) is downloaded
-and cached on first use.
-
-These tests are gated behind the `museum` feature, so a plain `cargo test` skips
-them. To run them:
-
-```sh
+# Run integration tests against a local Museum
 cargo test --features museum,ente-ml/ml-assets
 ```
