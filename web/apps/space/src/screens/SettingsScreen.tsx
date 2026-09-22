@@ -16,6 +16,7 @@ import { SpaceButtonSpinner } from "components/ButtonSpinner";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import { SpaceNotificationPermissionInstructions } from "components/NotificationPermissionInstructions";
 import { SpacePWAInstallInstructions } from "components/PWAInstallPrompt";
+import { SpaceSkipLink } from "components/SkipLink";
 import log from "ente-base/log";
 import {
     isSpaceIOS,
@@ -417,6 +418,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 placeItems: { xs: "stretch", sm: "start center" },
             }}
         >
+            <SpaceSkipLink />
             <Box
                 sx={{
                     bgcolor: "transparent",
@@ -488,6 +490,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
                 <Box
                     component="section"
+                    id="space-main-content"
+                    aria-label="Settings"
+                    tabIndex={-1}
                     sx={{
                         display: "flex",
                         flexDirection: "column",
@@ -646,6 +651,7 @@ export const ChangeNameSettingsScreen: React.FC<
                 placeItems: { xs: "stretch", sm: "start center" },
             }}
         >
+            <SpaceSkipLink />
             <Box
                 sx={{
                     bgcolor: "transparent",
@@ -717,6 +723,9 @@ export const ChangeNameSettingsScreen: React.FC<
 
                 <Box
                     component="form"
+                    id="space-main-content"
+                    aria-label="Change name"
+                    tabIndex={-1}
                     onSubmit={handleSubmit}
                     sx={{
                         boxSizing: "border-box",

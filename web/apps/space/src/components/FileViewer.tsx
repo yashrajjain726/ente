@@ -848,13 +848,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         ) {
             event.preventDefault();
             requestAddFriendForPostAction("reply");
-            return;
         }
-
-        if (event.key != "Enter" || event.shiftKey) return;
-
-        event.preventDefault();
-        sendReply();
     };
 
     const handleInputActionPointerDown = (event: React.PointerEvent) => {

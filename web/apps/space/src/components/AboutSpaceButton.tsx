@@ -116,7 +116,6 @@ export const SpaceAboutButton: React.FC<
                                 ml: "-12px",
                                 p: 0,
                                 width: 44,
-                                "&:hover": { bgcolor: "rgba(0, 0, 0, 0.06)" },
                                 "&:focus-visible": {
                                     outline: "2px solid black",
                                     outlineOffset: 3,

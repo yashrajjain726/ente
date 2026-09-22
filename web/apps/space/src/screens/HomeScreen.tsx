@@ -28,6 +28,7 @@ import { SpacePostPhotosDots } from "components/PostPhotosDots";
 import { SpacePWAInstallPrompt } from "components/PWAInstallPrompt";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
 import { SpaceShareInviteButton } from "components/ShareInviteButton";
+import { SpaceSkipLink } from "components/SkipLink";
 import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React, { useState } from "react";
@@ -2153,6 +2154,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 position: "relative",
             }}
         >
+            <SpaceSkipLink />
             {hasFeedItems && (
                 <Box component="h1" sx={visuallyHidden}>
                     Home
@@ -2183,6 +2185,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     />
                 </SpaceHomeHeader>
                 <Box
+                    component="section"
+                    id="space-main-content"
+                    aria-label="Feed"
+                    tabIndex={-1}
                     sx={{
                         boxSizing: "border-box",
                         display: "flex",

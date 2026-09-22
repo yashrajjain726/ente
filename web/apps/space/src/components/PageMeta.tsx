@@ -16,11 +16,13 @@ const previewImages = {
 interface SpacePageMetaProps {
     preview?: keyof typeof previewImages;
     themeColor: string;
+    title?: string;
 }
 
 export const SpacePageMeta: React.FC<SpacePageMetaProps> = ({
     preview,
     themeColor,
+    title,
 }) => {
     const previewImage = preview && previewImages[preview];
     const previewTitle =
@@ -32,6 +34,7 @@ export const SpacePageMeta: React.FC<SpacePageMetaProps> = ({
 
     return (
         <Head>
+            {title && <title>{`${title} · Ente Space`}</title>}
             <meta name="theme-color" content={themeColor} />
             <meta name="robots" content="noindex,nofollow" />
             <meta
