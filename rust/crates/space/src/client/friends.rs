@@ -1,7 +1,7 @@
 use super::{AccountSpaceCtx, retain_content_error};
 use crate::crypto::seal_with_public_key;
 use crate::error::{Error, Result};
-use crate::models::{SpaceActor, SpaceFriend};
+use crate::models::{SpaceActor, SpaceFriend, SpaceFriendRequest, SpaceSentFriendRequest};
 use crate::transport::{
     AddFriendPayload, ConfirmFriendRequestPayload, FriendRelationshipResponse,
     FriendStatusResponse, FriendTargetPayload, RefreshFriendSharesRequest, ShareUpdatePayload,
@@ -75,34 +75,33 @@ impl AccountSpaceCtx {
             .await
     }
 
-    pub async fn list_friend_requests(
-        &self,
-        space_id: &str,
-    ) -> Result<Vec<SpaceFriendRequestResponse>> {
+    pub async fn list_friend_requests(&self, space_id: &str) -> Result<Vec<SpaceFriendRequest>> {
         let path = format!("/spaces/{space_id}/friends/requests");
-        Ok(self
+        let requests: Vec<SpaceFriendRequestResponse> = self
             .api()
             .get(&path)
             .send()
             .await?
             .error_for_status()?
             .json()
-            .await?)
+            .await?;
+        Ok(requests.into_iter().map(Into::into).collect())
     }
 
     pub async fn list_sent_friend_requests(
         &self,
         space_id: &str,
-    ) -> Result<Vec<SpaceSentFriendRequestResponse>> {
+    ) -> Result<Vec<SpaceSentFriendRequest>> {
         let path = format!("/spaces/{space_id}/friends/requests/sent");
-        Ok(self
+        let requests: Vec<SpaceSentFriendRequestResponse> = self
             .api()
             .get(&path)
             .send()
             .await?
             .error_for_status()?
             .json()
-            .await?)
+            .await?;
+        Ok(requests.into_iter().map(Into::into).collect())
     }
 
     pub async fn confirm_friend_request(

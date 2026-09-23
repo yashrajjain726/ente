@@ -1,6 +1,6 @@
 use super::{
     AccountSpaceCtx, MESSAGE_KIND_POKE, MESSAGE_KIND_POST_REPLY, MESSAGE_KIND_REGULAR,
-    validate_message_payload,
+    retain_content_error, validate_message_payload,
 };
 use crate::crypto::{
     decrypt_secretbox_payload, encrypt_secretbox_payload, generate_key, open_with_keypair,
@@ -45,7 +45,11 @@ impl AccountSpaceCtx {
         }
         Ok(Conversations {
             friends,
-            pending_requests: response.pending_requests,
+            pending_requests: response
+                .pending_requests
+                .into_iter()
+                .map(Into::into)
+                .collect(),
             chat_summaries,
             latest_post_created_at: response.latest_post_created_at,
         })
@@ -109,10 +113,7 @@ impl AccountSpaceCtx {
                     })
                 })
         };
-        let content = match content {
-            Err(error) if !error.is_content_error() => return Err(error),
-            content => content,
-        };
+        let content = retain_content_error(content)?;
         Ok(Message {
             message_id: message.message_id,
             kind,
@@ -202,10 +203,7 @@ impl AccountSpaceCtx {
                 })
             })
         };
-        let content = match content {
-            Err(error) if !error.is_content_error() => return Err(error),
-            content => content,
-        };
+        let content = retain_content_error(content)?;
         Ok(MessageActivity {
             id: activity.id,
             activity_type: activity.activity_type,

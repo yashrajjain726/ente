@@ -6,7 +6,7 @@ use zeroize::ZeroizeOnDrop;
 use crate::Result;
 use crate::transport::{
     ProfileAvatarResponse, ProfileCoverResponse, SpaceActorResponse, SpaceFriendRequestResponse,
-    SpaceKeyResponse,
+    SpaceKeyResponse, SpaceSentFriendRequestResponse,
 };
 
 #[derive(Clone)]
@@ -98,6 +98,38 @@ pub struct SpaceFriend {
     pub friend: SpaceActor,
     pub share_key_version: i32,
     pub created_at: String,
+}
+
+pub struct SpaceFriendRequest {
+    pub request_id: i64,
+    pub requester: SpaceActor,
+    pub created_at: String,
+}
+
+impl From<SpaceFriendRequestResponse> for SpaceFriendRequest {
+    fn from(request: SpaceFriendRequestResponse) -> Self {
+        Self {
+            request_id: request.request_id,
+            requester: SpaceActor::from_response(request.requester, Ok(None)),
+            created_at: request.created_at,
+        }
+    }
+}
+
+pub struct SpaceSentFriendRequest {
+    pub request_id: i64,
+    pub target: SpaceActor,
+    pub created_at: String,
+}
+
+impl From<SpaceSentFriendRequestResponse> for SpaceSentFriendRequest {
+    fn from(request: SpaceSentFriendRequestResponse) -> Self {
+        Self {
+            request_id: request.request_id,
+            target: SpaceActor::from_response(request.target, Ok(None)),
+            created_at: request.created_at,
+        }
+    }
 }
 
 pub struct PostContent {
@@ -200,7 +232,7 @@ pub struct ConversationChatSummary {
 
 pub struct Conversations {
     pub friends: Vec<SpaceFriend>,
-    pub pending_requests: Vec<SpaceFriendRequestResponse>,
+    pub pending_requests: Vec<SpaceFriendRequest>,
     pub chat_summaries: BTreeMap<String, ConversationChatSummary>,
     pub latest_post_created_at: Option<String>,
 }

@@ -233,19 +233,6 @@ struct SpaceActorResponse {
     avatar: Option<ProfileAvatarResponse>,
 }
 
-impl From<ente_space::SpaceActorResponse> for SpaceActorResponse {
-    fn from(actor: ente_space::SpaceActorResponse) -> Self {
-        Self {
-            space_id: actor.space_id,
-            space_slug: actor.space_slug,
-            public_key: actor.public_key,
-            key_version: actor.key_version,
-            profile: None,
-            avatar: actor.avatar.map(Into::into),
-        }
-    }
-}
-
 #[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 pub struct PostResponse {
@@ -403,8 +390,8 @@ pub struct SpaceFriendRequestResponse {
     created_at: String,
 }
 
-impl From<ente_space::SpaceFriendRequestResponse> for SpaceFriendRequestResponse {
-    fn from(request: ente_space::SpaceFriendRequestResponse) -> Self {
+impl From<ente_space::SpaceFriendRequest> for SpaceFriendRequestResponse {
+    fn from(request: ente_space::SpaceFriendRequest) -> Self {
         Self {
             request_id: request.request_id,
             requester: request.requester.into(),
@@ -421,8 +408,8 @@ pub struct SpaceSentFriendRequestResponse {
     created_at: String,
 }
 
-impl From<ente_space::SpaceSentFriendRequestResponse> for SpaceSentFriendRequestResponse {
-    fn from(request: ente_space::SpaceSentFriendRequestResponse) -> Self {
+impl From<ente_space::SpaceSentFriendRequest> for SpaceSentFriendRequestResponse {
+    fn from(request: ente_space::SpaceSentFriendRequest) -> Self {
         Self {
             request_id: request.request_id,
             target: request.target.into(),
