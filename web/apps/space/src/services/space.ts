@@ -1300,7 +1300,9 @@ export const loadCurrentMessageConversations = async (
                     ? messageActivityFromSpaceActivity(summary.latestActivity)
                     : undefined;
                 const unreadActivities = summary
-                    ? summary.unreadActivities.map(messageActivityFromSpaceActivity)
+                    ? summary.unreadActivities.map(
+                          messageActivityFromSpaceActivity,
+                      )
                     : [];
                 const unreadCount =
                     messageConversationUnreadCount(unreadActivities);
