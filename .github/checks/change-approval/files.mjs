@@ -73,5 +73,11 @@ export function checkFiles({ files }) {
     const configs = files
         .filter(({ path }) => configFile.test(path))
         .map(({ path }) => path);
-    return { binaries, large, guardrails, configs };
+    const markdown = files
+        .filter(
+            ({ path, deleted }) =>
+                !deleted && /\.(md|markdown|mdx)$/i.test(path),
+        )
+        .map(({ path }) => path);
+    return { binaries, large, guardrails, configs, markdown };
 }

@@ -216,6 +216,70 @@ test("binary deleted is ignored", (t) => {
     assert.equal(scan(t, { "a.bin": Buffer.alloc(16) }, { "a.bin": null }), "");
 });
 
+test("Markdown additions and edits need approval in CI", (t) => {
+    const changed = {
+        "README.md": "# Updated\n",
+        "docs/empty.md": "",
+        "docs/guide.MARKDOWN": "# Guide\n",
+        "web/page.MDX": "# Page\n",
+    };
+    const { stdout, output, summary } = scan(
+        t,
+        { "README.md": "# Original\n" },
+        { ...changed, "notes.md.txt": "Not Markdown\n" },
+        { ci: true },
+    );
+    assert.equal(output, 'categories=["Markdown files"]\n');
+    assert.equal(
+        stdout,
+        "::warning title=Change approval needed::4 Markdown files\n",
+    );
+    assert.equal(
+        summary,
+        `4 Markdown files\n\n## Markdown files\n\n${Object.keys(changed)
+            .map((path) => `- \`${path}\``)
+            .join("\n")}\n`,
+    );
+});
+
+test("Markdown edits and untracked files are scanned locally", (t) => {
+    const output = scan(
+        t,
+        { "docs/guide.md": "# Original\n" },
+        { "docs/guide.md": "# Updated\n", "README.MD": "# New\n" },
+        { commit: false },
+    );
+    assert.match(output, /^2 Markdown files\n/);
+    assert.match(output, /- `docs\/guide.md`/);
+    assert.match(output, /- `README.MD`/);
+});
+
+test("renaming a text file to Markdown needs approval", (t) => {
+    const { output, summary } = scan(
+        t,
+        { "guide.txt": "# Guide\n" },
+        { "guide.txt": null, "guide.md": "# Guide\n" },
+        { ci: true },
+    );
+    assert.equal(output, 'categories=["Markdown files"]\n');
+    assert.equal(
+        summary,
+        "1 Markdown file\n\n## Markdown files\n\n- `guide.md`\n",
+    );
+});
+
+test("unchanged Markdown and deletions need no approval", (t) => {
+    const { stdout, output, summary } = scan(
+        t,
+        { "README.md": "# Keep\n", "docs/old.md": "# Remove\n" },
+        { "docs/old.md": null, "notes.txt": "Ordinary change\n" },
+        { ci: true },
+    );
+    assert.equal(stdout, "");
+    assert.equal(output, "categories=[]\n");
+    assert.equal(summary, "No approval needed.\n");
+});
+
 test("CI preserves tabs and newlines in binary and large filenames", (t) => {
     const binary = "image.png\tpayload.jar";
     const large = "large\nfile.txt";
@@ -1266,6 +1330,9 @@ test("workflow scans PR changes with the complete checker from main", (t) => {
                 "export function checkRust() { return []; }",
             [`${checkerDir}/web.mjs`]:
                 'throw new Error("loaded an untrusted rule");',
+            [`${checkerDir}/files.mjs`]:
+                'throw new Error("loaded an untrusted file rule");',
+            "docs/guide.md": "# Guide\n",
             "src/lib.rs": "pub unsafe fn call() {}",
             "web/example.ts":
                 "// eslint-disable-next-line no-console\nfirst();\n",
@@ -1274,9 +1341,10 @@ test("workflow scans PR changes with the complete checker from main", (t) => {
     );
     assert.equal(
         output,
-        'categories=["guardrail files","Rust lint policy files","Web lint policy files"]\n',
+        'categories=["guardrail files","Markdown files","Rust lint policy files","Web lint policy files"]\n',
     );
     assert.match(summary, /- `src\/lib.rs`/);
     assert.match(summary, /- `web\/example.ts`/);
     assert.match(summary, /- `rust\/Cargo.toml`/);
+    assert.match(summary, /- `docs\/guide.md`/);
 });
