@@ -119,7 +119,7 @@ export interface SpaceAppState {
     setPendingCreateProfile: React.Dispatch<
         React.SetStateAction<PendingCreateProfile | null>
     >;
-    setProfile: (profile: SetupProfile | null) => void;
+    setProfile: React.Dispatch<React.SetStateAction<SetupProfile | null>>;
     setSignupEmail: React.Dispatch<React.SetStateAction<string>>;
 }
 

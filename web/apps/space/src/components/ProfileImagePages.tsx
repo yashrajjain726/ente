@@ -71,7 +71,31 @@ export const SpaceProfileImageViewerPage: React.FC<{
                 variant == "cover"
                     ? await removeSpaceProfileCover(profile)
                     : await removeSpaceProfileAvatar(profile);
-            setProfile(savedProfile);
+            setProfile((currentProfile) => {
+                if (
+                    !currentProfile ||
+                    currentProfile.spaceId != savedProfile.spaceId
+                ) {
+                    return currentProfile;
+                }
+                if (variant == "cover") {
+                    return currentProfile.avatarObjectID ==
+                        savedProfile.avatarObjectID &&
+                        currentProfile.avatarKeyVersion ==
+                            savedProfile.avatarKeyVersion
+                        ? {
+                              ...savedProfile,
+                              avatarUrl: currentProfile.avatarUrl,
+                          }
+                        : savedProfile;
+                }
+                return currentProfile.coverObjectID ==
+                    savedProfile.coverObjectID &&
+                    currentProfile.coverKeyVersion ==
+                        savedProfile.coverKeyVersion
+                    ? { ...savedProfile, coverUrl: currentProfile.coverUrl }
+                    : savedProfile;
+            });
         } catch (error) {
             log.error("Space profile image removal failed", error);
             throw new Error(
