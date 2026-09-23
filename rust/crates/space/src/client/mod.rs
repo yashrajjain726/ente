@@ -77,6 +77,11 @@ pub struct PostPhotoAssetOptions {
     pub thumb_hash: Option<String>,
 }
 
+pub struct PostPhotoInput {
+    pub bytes: Vec<u8>,
+    pub options: PostPhotoAssetOptions,
+}
+
 fn profile_object_id_from_key(object_key: &str) -> Result<String> {
     object_key
         .rsplit('/')

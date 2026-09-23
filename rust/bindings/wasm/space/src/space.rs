@@ -1055,47 +1055,22 @@ impl SpaceAccountCtxHandle {
         photos: Vec<<PostPhotoInput as Tsify>::JsType>,
         caption: Option<String>,
     ) -> Result<<PostResponse as Tsify>::JsType, Error> {
-        if photos.is_empty() || photos.len() > 10 {
-            return Err(
-                ente_space::Error::InvalidInput("Choose between 1 and 10 photos".into()).into(),
-            );
-        }
         let photos = photos
             .into_iter()
             .map(PostPhotoInput::from_js)
             .collect::<Result<Vec<_>, _>>()?;
-        let post_key = self.inner.generate_post_key();
-        let mut objects = Vec::with_capacity(photos.len());
-        for (position, photo) in photos.into_iter().enumerate() {
-            let mut object = self
-                .inner
-                .upload_post_photo_asset(
-                    &space_id,
-                    &post_key,
-                    &photo.bytes.to_vec(),
-                    ente_space::PostPhotoAssetOptions {
-                        width: photo.options.width,
-                        height: photo.options.height,
-                        media_type: photo.options.media_type,
-                        thumb_hash: photo.options.thumb_hash,
-                    },
-                )
-                .await?;
-            object.position = Some(position as i32);
-            objects.push(object);
-        }
-        let (post_id, _) = self
-            .inner
-            .create_post(
-                &space_id,
-                &objects,
-                caption.as_ref().map(String::as_bytes),
-                Some(&post_key),
-            )
-            .await?;
+        let photos = photos.into_iter().map(|photo| ente_space::PostPhotoInput {
+            bytes: photo.bytes.to_vec(),
+            options: ente_space::PostPhotoAssetOptions {
+                width: photo.options.width,
+                height: photo.options.height,
+                media_type: photo.options.media_type,
+                thumb_hash: photo.options.thumb_hash,
+            },
+        });
         let post = self
             .inner
-            .get_post(&space_id, post_id, Some(&space_id))
+            .create_photo_post(&space_id, photos, caption.as_deref())
             .await?;
         post_to_js(post).into_js().map_err(Into::into)
     }
