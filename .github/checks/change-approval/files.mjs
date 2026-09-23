@@ -73,11 +73,10 @@ export function checkFiles({ files }) {
     const configs = files
         .filter(({ path }) => configFile.test(path))
         .map(({ path }) => path);
-    const markdown = files
+    const readmes = files
         .filter(
-            ({ path, deleted }) =>
-                !deleted && /\.(md|markdown|mdx)$/i.test(path),
+            ({ path, deleted }) => !deleted && /^readme/i.test(basename(path)),
         )
         .map(({ path }) => path);
-    return { binaries, large, guardrails, configs, markdown };
+    return { binaries, large, guardrails, configs, readmes };
 }
