@@ -51,6 +51,7 @@ import {
     spaceText,
     spaceTextMuted,
 } from "styles/colors";
+import { minimumPostPhotoFrameAspectRatio } from "styles/tiles";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { firstNameFrom, formatSpaceDate } from "utils/display";
 import { spacePostPhotos, viewerPhotosFromPost } from "utils/post-photos";
@@ -72,7 +73,6 @@ const feedAvatarSize = 38;
 const feedLikeActionSize = spaceTouchTargetSize;
 const feedActionIconSize = 20;
 const feedHorizontalPadding = "16px";
-const minimumFeedPhotoFrameAspectRatio = 3 / 4;
 const feedMediaLoadRootMargin = "640px 0px";
 const feedLoadMoreRootMargin = "0px 0px 160px 0px";
 const feedRowEnterDurationMs = 460;
@@ -1016,7 +1016,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
             dimensionsFromAspectRatio(aspectRatio).width,
     };
     const photoFrameAspectRatio = Math.max(
-        minimumFeedPhotoFrameAspectRatio,
+        minimumPostPhotoFrameAspectRatio,
         photoDimensions.width / photoDimensions.height,
     );
     const [frameAspectRatio, setFrameAspectRatio] = useState(

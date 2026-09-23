@@ -1,3 +1,4 @@
+export const minimumPostPhotoFrameAspectRatio = 3 / 4;
 export const spaceProfilePostRadius = 16;
 
 export const spaceTileCornerStyles = (radius: number) => ({
