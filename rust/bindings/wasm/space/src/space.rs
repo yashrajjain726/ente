@@ -951,6 +951,36 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
+    #[wasm_bindgen(js_name = removeSpaceProfileCover)]
+    pub async fn remove_space_profile_cover(
+        &self,
+        space_id: String,
+        profile: String,
+    ) -> Result<<UpdateSpaceProfileResponse as Tsify>::JsType, Error> {
+        UpdateSpaceProfileResponse::from(
+            self.inner
+                .remove_space_profile_cover(&space_id, profile.as_bytes())
+                .await?,
+        )
+        .into_js()
+        .map_err(Into::into)
+    }
+
+    #[wasm_bindgen(js_name = removeSpaceProfileAvatar)]
+    pub async fn remove_space_profile_avatar(
+        &self,
+        space_id: String,
+        profile: String,
+    ) -> Result<<UpdateSpaceProfileResponse as Tsify>::JsType, Error> {
+        UpdateSpaceProfileResponse::from(
+            self.inner
+                .remove_space_profile_avatar(&space_id, profile.as_bytes())
+                .await?,
+        )
+        .into_js()
+        .map_err(Into::into)
+    }
+
     #[wasm_bindgen(js_name = updateSpaceSlug)]
     pub async fn update_space_slug(
         &self,
