@@ -449,6 +449,7 @@ const addMessageNative = async (
     parentMessageUuid?: string,
     attachments: ChatAttachment[] = [],
     sources: GroundedSource[] = [],
+    preparationToken?: string,
 ): Promise<ChatMessage> => {
     const message = await invokeChat<NativeMessage>("chat_db_insert_message", {
         input: {
@@ -457,6 +458,7 @@ const addMessageNative = async (
             text,
             parentMessageUuid,
             sources,
+            preparationToken,
             attachments: attachments.map((attachment) => ({
                 id: attachment.id,
                 kind: attachment.kind,
@@ -636,6 +638,27 @@ export const createSession = async (chatKey: string) => {
     await db.put("sessions", session);
     return sessionUuid;
 };
+
+export interface PreparedAnswer {
+    token: string;
+    sessionUuid: string;
+    parentMessageUuid: string;
+    sources: GroundedSource[];
+}
+
+export const addPreparedAnswer = (
+    preparation: PreparedAnswer,
+    text: string,
+): Promise<ChatMessage> =>
+    addMessageNative(
+        preparation.sessionUuid,
+        "assistant",
+        text,
+        preparation.parentMessageUuid,
+        [],
+        preparation.sources,
+        preparation.token,
+    );
 
 export const addMessage = async (
     sessionUuid: string,

@@ -43,8 +43,13 @@ struct ChatView: View {
         )
     }
 
-    private var modelSettingsSignature: String {
-        modelSettings.modelId
+    private var modelSettingsSignature: [String] {
+        [
+            modelSettings.modelId,
+            modelSettings.contextLength,
+            modelSettings.temperature,
+            modelSettings.systemPromptBody,
+        ]
     }
 
     private let drawerWidth: CGFloat = 320
@@ -135,7 +140,7 @@ struct ChatView: View {
                 handleToastTrigger(trigger)
             }
             .onChange(of: modelSettingsSignature) { _ in
-                viewModel.refreshModelDownloadInfo()
+                viewModel.modelSelectionChanged()
             }
             .onChange(of: scenePhase) { newValue in
                 viewModel.notesStore.setForeground(newValue == .active)
@@ -278,6 +283,7 @@ struct ChatView: View {
                     streamingResponse: viewModel.displayedStreamingResponse,
                     streamingParentId: viewModel.displayedStreamingParentId,
                     isGenerating: viewModel.isGenerating,
+                    conversationStatus: viewModel.conversationStatus,
                     sessionId: viewModel.currentSessionId,
                     keyboardHeight: keyboard.height,
                     inputBarHeight: (viewModel.isModelDownloaded || viewModel.isChatUnsupported)

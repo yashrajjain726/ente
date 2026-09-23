@@ -16,6 +16,11 @@ final class ChatViewModel: ObservableObject {
         var updateTask: Task<Void, Never>?
     }
 
+    @MainActor
+    private final class ConversationPreparationState {
+        var preparation: ConversationPreparation?
+    }
+
     private static let defaultTemperature: Float = 0.5
     private static let systemPromptDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -24,7 +29,6 @@ final class ChatViewModel: ObservableObject {
     }()
     private static let systemPromptDatePlaceholder = ConfigDefaults.shared
         .systemPromptDatePlaceholder
-    private static let defaultGenerationMaxTokens = 8_192
     private static let overflowSafetyTokens = 256
     private static let imageTokenEstimate = 768
     private nonisolated static let sessionTitleMaxLength = 40
@@ -46,6 +50,7 @@ final class ChatViewModel: ObservableObject {
     @Published var streamingResponse: String = ""
     @Published var streamingParentId: UUID? = nil
     @Published var overflowAlert: OverflowAlertState? = nil
+    @Published var conversationStatus: String?
 
     var displayedStreamingResponse: String {
         guard let activeSession = activeGenerationSessionId,
@@ -263,6 +268,7 @@ final class ChatViewModel: ObservableObject {
             return
         }
 
+        resetGenerationState()
         do {
             try? FileManager.default.createDirectory(
                 at: attachmentsDir,
@@ -290,8 +296,9 @@ final class ChatViewModel: ObservableObject {
     }
 
     private func resetGenerationState(stopRequested: Bool = false) {
+        conversationStatus = nil
         generationTask?.cancel()
-        provider.stopGeneration()
+        provider.stopGeneration(invalidatePreparation: true)
         self.stopRequested = stopRequested
         activeGenerationId = nil
         activeGenerationSessionId = nil
@@ -379,6 +386,7 @@ final class ChatViewModel: ObservableObject {
             return
         }
         guard message.role == .user else { return }
+        resetGenerationState()
         editingMessageId = message.id
         draftText = message.text
         draftAttachments = message.attachments
@@ -704,6 +712,12 @@ final class ChatViewModel: ObservableObject {
         stopRequested = true
         provider.stopGeneration()
         generationTask?.cancel()
+    }
+
+    func modelSelectionChanged() {
+        resetGenerationState()
+        if let currentSessionId { rebuildMessages(for: currentSessionId) }
+        refreshModelDownloadInfo()
     }
 
     func confirmOverflowTrim() {
@@ -1051,15 +1065,15 @@ final class ChatViewModel: ObservableObject {
             showUnsupportedDeviceDialog = true
             return
         }
+        let selection = modelSettings.currentSelection()
+        let prompt = buildPrompt(text: userNode.text, attachments: userNode.attachments)
         let priorGeneration = generationTask
         let priorSummary = sessionSummaryTask
         priorGeneration?.cancel()
         priorSummary?.cancel()
-        provider.stopGeneration()
+        provider.stopGeneration(invalidatePreparation: true)
+        conversationStatus = nil
         stopRequested = false
-
-        let selection = modelSettings.currentSelection()
-        let prompt = buildPrompt(text: userNode.text, attachments: userNode.attachments)
 
         let generationId = UUID()
         activeGenerationId = generationId
@@ -1158,141 +1172,188 @@ final class ChatViewModel: ObservableObject {
 
             let generationLimits = await resolveGenerationLimits(selection)
             let normalSystemPrompt = systemPrompt()
-            let normalHistorySelection = buildHistorySelection(
-                sessionId: userNode.sessionId,
-                promptText: prompt.text,
-                promptImageCount: prompt.imageFiles.count,
-                currentMessageId: userNode.id,
-                limits: generationLimits,
-                systemPrompt: normalSystemPrompt
-            )
-
-            if normalHistorySelection.wasTrimmed && overflowBypassMessageId != userNode.id {
-                overflowBypassMessageId = nil
-                pendingOverflow = PendingOverflow(
-                    sessionId: userNode.sessionId, messageId: userNode.id)
-                activeGenerationId = nil
-                activeGenerationSessionId = nil
-                isGenerating = false
-                isDownloading = false
-                streamingResponse = ""
-                streamingParentId = nil
-                overflowAlert = OverflowAlertState(
-                    inputTokens: normalHistorySelection.inputTokens,
-                    inputBudget: normalHistorySelection.inputBudget,
-                    contextLength: generationLimits.contextLength,
-                    maxOutput: generationLimits.maxOutput
-                )
-                rebuildMessages(for: userNode.sessionId)
-                if embeddingAssetInvalid {
-                    refreshModelDownloadInfo()
-                }
-                return
-            }
-
-            overflowBypassMessageId = nil
-            pendingOverflow = nil
-            overflowAlert = nil
-
-            let remainingKnowledgeBytes = max(
-                0,
-                (normalHistorySelection.inputBudget - normalHistorySelection.inputTokens) * 4 - 2
-            )
-            let knowledgeContext = try? buildGroundedPromptContext(
-                excerpts: knowledgeHits,
-                maxUtf8Bytes: UInt32(
-                    min(
-                        Int(knowledgeEmbedding.maxContextUtf8Bytes),
-                        remainingKnowledgeBytes
-                    ))
-            )
-            let candidateSystemPrompt = knowledgeContext.map {
-                "\(normalSystemPrompt)\n\n\($0.text)"
-            }
-            let knowledgeHistorySelection = candidateSystemPrompt.map { candidate in
-                buildHistorySelection(
-                    sessionId: userNode.sessionId,
-                    promptText: prompt.text,
-                    promptImageCount: prompt.imageFiles.count,
-                    currentMessageId: userNode.id,
-                    limits: generationLimits,
-                    systemPrompt: candidate
-                )
-            }
-            let useKnowledge = knowledgeHistorySelection?.wasTrimmed == false
-            let historySelection =
-                useKnowledge
-                ? (knowledgeHistorySelection ?? normalHistorySelection) : normalHistorySelection
-            var activeCitations = useKnowledge ? (knowledgeContext?.sources ?? []) : []
-            let effectiveSystemPrompt =
-                useKnowledge ? (candidateSystemPrompt ?? normalSystemPrompt) : normalSystemPrompt
             let userMessage = LlmMessage(
                 text: prompt.text,
                 role: .user,
                 hasAttachments: !userNode.attachments.isEmpty
             )
-            var messages =
-                [
-                    LlmMessage(text: effectiveSystemPrompt, role: .system, hasAttachments: false)
-                ] + historySelection.messages + [userMessage]
+            var normalHistoryMessages: [LlmMessage] = []
+            var activeCitations: [GroundedSource] = []
+            let preparationState = ConversationPreparationState()
+            var messages = [
+                LlmMessage(text: normalSystemPrompt, role: .system, hasAttachments: false),
+                userMessage,
+            ]
+            if !prompt.imageFiles.isEmpty {
+                let normalHistorySelection = buildHistorySelection(
+                    sessionId: userNode.sessionId,
+                    promptText: prompt.text,
+                    promptImageCount: prompt.imageFiles.count,
+                    currentMessageId: userNode.id,
+                    limits: generationLimits,
+                    systemPrompt: normalSystemPrompt
+                )
+
+                if normalHistorySelection.wasTrimmed && overflowBypassMessageId != userNode.id {
+                    overflowBypassMessageId = nil
+                    pendingOverflow = PendingOverflow(
+                        sessionId: userNode.sessionId, messageId: userNode.id)
+                    activeGenerationId = nil
+                    activeGenerationSessionId = nil
+                    isGenerating = false
+                    isDownloading = false
+                    streamingResponse = ""
+                    streamingParentId = nil
+                    overflowAlert = OverflowAlertState(
+                        inputTokens: normalHistorySelection.inputTokens,
+                        inputBudget: normalHistorySelection.inputBudget,
+                        contextLength: generationLimits.contextLength,
+                        maxOutput: generationLimits.maxOutput
+                    )
+                    rebuildMessages(for: userNode.sessionId)
+                    if embeddingAssetInvalid {
+                        refreshModelDownloadInfo()
+                    }
+                    return
+                }
+
+                overflowBypassMessageId = nil
+                pendingOverflow = nil
+                overflowAlert = nil
+
+                let remainingKnowledgeBytes = max(
+                    0,
+                    (normalHistorySelection.inputBudget - normalHistorySelection.inputTokens) * 4
+                        - 2
+                )
+                let knowledgeContext = try? buildGroundedPromptContext(
+                    excerpts: knowledgeHits,
+                    maxUtf8Bytes: UInt32(
+                        min(
+                            Int(knowledgeEmbedding.maxContextUtf8Bytes),
+                            remainingKnowledgeBytes
+                        ))
+                )
+                let candidateSystemPrompt = knowledgeContext.map {
+                    "\(normalSystemPrompt)\n\n\($0.text)"
+                }
+                let knowledgeHistorySelection = candidateSystemPrompt.map { candidate in
+                    buildHistorySelection(
+                        sessionId: userNode.sessionId,
+                        promptText: prompt.text,
+                        promptImageCount: prompt.imageFiles.count,
+                        currentMessageId: userNode.id,
+                        limits: generationLimits,
+                        systemPrompt: candidate
+                    )
+                }
+                let useKnowledge = knowledgeHistorySelection?.wasTrimmed == false
+                let historySelection =
+                    useKnowledge
+                    ? (knowledgeHistorySelection ?? normalHistorySelection) : normalHistorySelection
+                activeCitations = useKnowledge ? (knowledgeContext?.sources ?? []) : []
+                let effectiveSystemPrompt =
+                    useKnowledge
+                    ? (candidateSystemPrompt ?? normalSystemPrompt) : normalSystemPrompt
+                normalHistoryMessages = normalHistorySelection.messages
+                messages =
+                    [
+                        LlmMessage(
+                            text: effectiveSystemPrompt, role: .system, hasAttachments: false)
+                    ] + historySelection.messages + [userMessage]
+            }
 
             let buffer = OSAllocatedUnfairLock(initialState: StreamingBuffer())
             let uiUpdateInterval: TimeInterval = 0.05
 
+            let onToken: @Sendable (String) -> Void = { token in
+                let snapshot = buffer.withLock { state -> String? in
+                    state.text.append(token)
+                    state.tokenCount += max(1, token.count / 4)
+                    let now = Date()
+                    if now.timeIntervalSince(state.lastUiUpdate) >= uiUpdateInterval {
+                        state.lastUiUpdate = now
+                        state.updateTask?.cancel()
+                        state.updateTask = nil
+                        return state.text
+                    }
+                    if state.updateTask == nil {
+                        state.updateTask = Task { @MainActor [weak self] in
+                            do {
+                                try await Task.sleep(for: .seconds(uiUpdateInterval))
+                            } catch {
+                                return
+                            }
+                            let snapshot = buffer.withLock { state -> String? in
+                                guard !Task.isCancelled else { return nil }
+                                state.updateTask = nil
+                                state.lastUiUpdate = Date()
+                                return state.text
+                            }
+                            guard let self, let snapshot,
+                                self.activeGenerationId == generationId
+                            else { return }
+                            self.streamingResponse = snapshot
+                        }
+                    }
+                    return nil
+                }
+                if let snapshot {
+                    Task { @MainActor in
+                        guard self.activeGenerationId == generationId else { return }
+                        self.streamingResponse = snapshot
+                    }
+                }
+            }
             do {
-                let runGeneration: () async throws -> GenerationSummary = {
-                    try await self.provider.generateChat(
+                let runGeneration: @MainActor ([LlmMessage]) async throws -> GenerationSummary = {
+                    messages in
+                    if prompt.imageFiles.isEmpty {
+                        return try await self.generatePreparedChat(
+                            selection,
+                            request: ConversationRequest(
+                                sessionUuid: userNode.sessionId.uuidString,
+                                path: self.buildConversationPath(for: userNode),
+                                system: normalSystemPrompt,
+                                current: prompt.text,
+                                expectedUserText: userNode.text,
+                                historyQuery: userNode.text,
+                                maxTokens: nil,
+                                searched: knowledgeHits
+                            ),
+                            temperature: self.resolveTemperature(),
+                            onProgress: {
+                                guard self.activeGenerationId == generationId,
+                                    preparationState.preparation == nil
+                                else { return }
+                                self.conversationStatus = "Remembering earlier messages"
+                            },
+                            onPrepared: { prepared in
+                                guard self.activeGenerationId == generationId else {
+                                    prepared.cancel()
+                                    return
+                                }
+                                preparationState.preparation = prepared
+                                self.conversationStatus = nil
+                            },
+                            onToken: onToken
+                        )
+                    }
+                    return try await self.provider.generateChat(
                         selection,
                         messages: messages,
                         imageFiles: prompt.imageFiles,
                         temperature: self.resolveTemperature(),
                         maxTokens: generationLimits.maxOutput,
-                        onToken: { token in
-                            let snapshot = buffer.withLock { state -> String? in
-                                state.text.append(token)
-                                state.tokenCount += max(1, token.count / 4)
-                                let now = Date()
-                                if now.timeIntervalSince(state.lastUiUpdate) >= uiUpdateInterval {
-                                    state.lastUiUpdate = now
-                                    state.updateTask?.cancel()
-                                    state.updateTask = nil
-                                    return state.text
-                                }
-                                if state.updateTask == nil {
-                                    state.updateTask = Task { @MainActor [weak self] in
-                                        do {
-                                            try await Task.sleep(for: .seconds(uiUpdateInterval))
-                                        } catch {
-                                            return
-                                        }
-                                        let snapshot = buffer.withLock { state -> String? in
-                                            guard !Task.isCancelled else { return nil }
-                                            state.updateTask = nil
-                                            state.lastUiUpdate = Date()
-                                            return state.text
-                                        }
-                                        guard let self, let snapshot,
-                                            self.activeGenerationId == generationId
-                                        else { return }
-                                        self.streamingResponse = snapshot
-                                    }
-                                }
-                                return nil
-                            }
-                            if let snapshot {
-                                Task { @MainActor in
-                                    guard self.activeGenerationId == generationId else { return }
-                                    self.streamingResponse = snapshot
-                                }
-                            }
-                        }
+                        onToken: onToken
                     )
                 }
                 let summary: GenerationSummary
                 do {
-                    summary = try await runGeneration()
+                    summary = try await runGeneration(messages)
                 } catch {
                     if case LlmError.PromptTooLong = error,
+                        !prompt.imageFiles.isEmpty,
                         buffer.withLock({ $0.text.isEmpty }),
                         !activeCitations.isEmpty
                     {
@@ -1304,8 +1365,8 @@ final class ChatViewModel: ObservableObject {
                                     role: .system,
                                     hasAttachments: false
                                 )
-                            ] + normalHistorySelection.messages + [userMessage]
-                        summary = try await runGeneration()
+                            ] + normalHistoryMessages + [userMessage]
+                        summary = try await runGeneration(messages)
                     } else {
                         throw error
                     }
@@ -1315,7 +1376,9 @@ final class ChatViewModel: ObservableObject {
                 finishGeneration(
                     parent: userNode, response: snapshot.text, tokenCount: snapshot.tokenCount,
                     totalTimeMs: summary.totalTimeMs, interrupted: false,
-                    generationId: generationId, citations: activeCitations)
+                    generationId: generationId, citations: activeCitations,
+                    preparation: preparationState.preparation
+                )
             } catch {
                 let snapshot = buffer.withLock { $0 }
                 let wasCancelled = stopRequested || isCancellation(error)
@@ -1323,12 +1386,18 @@ final class ChatViewModel: ObservableObject {
                     let details =
                         "session=\(userNode.sessionId.uuidString) promptLen=\(prompt.text.count) responseLen=\(snapshot.text.count) tokens=\(snapshot.tokenCount)"
                     logger.error("Generation failed", error, details: details)
-                    generationErrorMessage = "Response failed. Try again."
+                    if case let ConversationError.Other(detail) = error {
+                        generationErrorMessage = detail
+                    } else if case ConversationError.Stale = error {
+                        generationErrorMessage = "Conversation changed. Retry the message."
+                    } else {
+                        generationErrorMessage = "Response failed. Try again."
+                    }
                 }
                 finishGeneration(
                     parent: userNode, response: snapshot.text, tokenCount: snapshot.tokenCount,
                     totalTimeMs: nil, interrupted: true, generationId: generationId,
-                    citations: activeCitations)
+                    citations: activeCitations, preparation: preparationState.preparation)
             }
             if embeddingAssetInvalid {
                 refreshModelDownloadInfo()
@@ -1336,13 +1405,52 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
+    private func generatePreparedChat(
+        _ selection: LlmModelSelection,
+        request: ConversationRequest,
+        temperature: Float,
+        onProgress: @escaping @MainActor () -> Void,
+        onPrepared: @escaping @MainActor (ConversationPreparation) -> Void,
+        onToken: @escaping @Sendable (String) -> Void
+    ) async throws -> GenerationSummary {
+        let db = chatDb
+        return try await provider.withConversationContext(selection) { context, control in
+            let preparation = try await Task.detached {
+                try control.checkCancellation()
+                return try db.prepareConversation(context: context, input: request)
+            }.value
+            control.setPreparationCancellation { preparation.cancel() }
+            try control.checkCancellation()
+            let sink = ConversationProgressSink {
+                Task { @MainActor in onProgress() }
+            }
+            let result = try await Task.detached {
+                try control.checkCancellation()
+                return try preparation.run(callback: sink)
+            }.value
+            try control.beginAnswer()
+            onPrepared(preparation)
+            try await Task.detached { try preparation.validate() }.value
+            try control.checkCancellation()
+            return try await self.provider.generatePreparedChat(
+                selection,
+                messages: result.messages,
+                temperature: temperature,
+                maxTokens: result.maxTokens,
+                control: control,
+                onToken: onToken
+            )
+        }
+    }
+
     private func finishGeneration(
         parent: MessageNode, response: String, tokenCount: Int, totalTimeMs: Int64?,
-        interrupted: Bool, generationId: UUID, citations: [GroundedSource] = []
+        interrupted: Bool, generationId: UUID, citations: [GroundedSource] = [],
+        preparation: ConversationPreparation? = nil
     ) {
         let rawText = response.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmed: String
-        if rawText.isEmpty {
+        if rawText.isEmpty || preparation != nil {
             trimmed = rawText
         } else {
             do {
@@ -1376,13 +1484,18 @@ final class ChatViewModel: ObservableObject {
             if isActiveGeneration {
                 let meta: [DbAttachmentMeta] = []
                 do {
-                    let inserted = try chatDb.insertMessage(
-                        sessionUuid: parent.sessionId.uuidString,
-                        sender: .other,
-                        text: trimmed,
-                        parentMessageUuid: parent.id.uuidString,
-                        attachments: meta
-                    )
+                    let inserted: DbMessage
+                    if let preparation {
+                        inserted = try preparation.addAnswer(text: trimmed, attachments: meta)
+                    } else {
+                        inserted = try chatDb.insertMessage(
+                            sessionUuid: parent.sessionId.uuidString,
+                            sender: .other,
+                            text: trimmed,
+                            parentMessageUuid: parent.id.uuidString,
+                            attachments: meta
+                        )
+                    }
 
                     if let assistantId = UUID(uuidString: inserted.uuid) {
                         logger.info(
@@ -1397,7 +1510,7 @@ final class ChatViewModel: ObservableObject {
                             sessionId: parent.sessionId,
                             parentId: parent.id,
                             role: .assistant,
-                            text: trimmed,
+                            text: inserted.text,
                             timestamp: timestamp,
                             attachments: [],
                             isInterrupted: interrupted,
@@ -1410,7 +1523,7 @@ final class ChatViewModel: ObservableObject {
                             for: parent.sessionId, parentId: parent.id, childId: assistant.id)
                         updateSessionPreview(
                             sessionId: parent.sessionId,
-                            preview: cleanAssistantText(storedText: trimmed),
+                            preview: cleanAssistantText(storedText: inserted.text),
                             date: assistant.timestamp)
                     } else {
                         logger.warning(
@@ -1420,6 +1533,10 @@ final class ChatViewModel: ObservableObject {
                         )
                     }
                 } catch {
+                    if preparation != nil {
+                        generationErrorMessage =
+                            "The response could not be saved. Retry the message."
+                    }
                     logger.warning(
                         "Skipping assistant message persistence",
                         details:
@@ -1436,6 +1553,7 @@ final class ChatViewModel: ObservableObject {
         }
 
         if isActiveGeneration {
+            conversationStatus = nil
             isGenerating = false
             isDownloading = false
             streamingResponse = ""
@@ -1455,6 +1573,7 @@ final class ChatViewModel: ObservableObject {
 
     private func settleGenerationIfActive(generationId: UUID, sessionId: UUID) {
         guard activeGenerationId == generationId, isGenerating else { return }
+        conversationStatus = nil
         isGenerating = false
         isDownloading = false
         streamingResponse = ""
@@ -1716,6 +1835,19 @@ final class ChatViewModel: ObservableObject {
         uuid.0 ^= 0xA5
         uuid.15 ^= 0x5A
         return UUID(uuid: uuid)
+    }
+
+    private func buildConversationPath(for target: MessageNode) -> [String] {
+        let byId = Dictionary(
+            uniqueKeysWithValues: (messageStore[target.sessionId] ?? []).map { ($0.id, $0) })
+        var path: [String] = []
+        var visited = Set<UUID>()
+        var current: MessageNode? = target
+        while let node = current, visited.insert(node.id).inserted {
+            path.append(node.id.uuidString)
+            current = node.parentId.flatMap { byId[$0] }
+        }
+        return path.reversed()
     }
 
     private func buildSelectedPath(for sessionId: UUID, childrenMap: [UUID: [MessageNode]])
@@ -1994,6 +2126,7 @@ final class ChatViewModel: ObservableObject {
     private func isCancellation(_ error: Error) -> Bool {
         if error is CancellationError { return true }
         if case LlmError.Cancelled = error { return true }
+        if case ConversationError.Cancelled = error { return true }
         if case AssetDownloadError.Cancelled = error { return true }
         return (error as? URLError)?.code == .cancelled
     }
@@ -2189,15 +2322,14 @@ final class ChatViewModel: ObservableObject {
     private func resolveGenerationLimits(_ selection: LlmModelSelection) async -> GenerationLimits {
         let contextLength =
             await provider.loadedContextLength(selection) ?? selection.contextLength ?? 12000
-        let maxOutput = resolveMaxOutputTokens(
-            configuredMaxTokens: selection.maxTokens, contextLength: contextLength)
+        let maxOutput = resolveMaxOutputTokens(contextLength: contextLength)
         return GenerationLimits(contextLength: contextLength, maxOutput: maxOutput)
     }
 
-    private func resolveMaxOutputTokens(configuredMaxTokens: Int?, contextLength: Int) -> Int {
+    private func resolveMaxOutputTokens(contextLength: Int) -> Int {
         let maxAllowed = max(1, contextLength - Self.overflowSafetyTokens)
-        let implicitMax = min(Self.defaultGenerationMaxTokens, max(1, contextLength / 2))
-        return min(maxAllowed, configuredMaxTokens ?? implicitMax)
+        let implicitMax = automaticMaxOutputTokens(contextLength: contextLength)
+        return min(maxAllowed, implicitMax)
     }
 
     private func historyText(_ node: MessageNode) -> String {
@@ -2338,5 +2470,17 @@ private final class DownloadProgressTracker {
             isLoading: isLoading,
             isReady: isReady
         )
+    }
+}
+
+private final class ConversationProgressSink: ConversationProgressCallback {
+    private let handler: @Sendable () -> Void
+
+    init(handler: @escaping @Sendable () -> Void) {
+        self.handler = handler
+    }
+
+    func onProgress() {
+        handler()
     }
 }

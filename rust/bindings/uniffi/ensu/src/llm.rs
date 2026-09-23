@@ -127,6 +127,10 @@ pub struct LlmContext {
 
 #[uniffi::export]
 impl LlmContext {
+    pub fn context_size(&self) -> u32 {
+        self.handle.context_size()
+    }
+
     pub fn embed(&self, text: String) -> Result<Vec<f32>, LlmError> {
         self.handle.embed(&text).map_err(LlmError::from)
     }
@@ -182,6 +186,15 @@ impl From<LlmContextParams> for llm::ContextParams {
 
 impl From<LlmChatMessage> for llm::ChatMessage {
     fn from(value: LlmChatMessage) -> Self {
+        Self {
+            role: value.role,
+            content: value.content,
+        }
+    }
+}
+
+impl From<llm::ChatMessage> for LlmChatMessage {
+    fn from(value: llm::ChatMessage) -> Self {
         Self {
             role: value.role,
             content: value.content,

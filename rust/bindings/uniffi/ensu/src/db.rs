@@ -1,4 +1,5 @@
 use ente_ensu::db;
+use std::sync::Arc;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -115,7 +116,7 @@ pub struct DbMessage {
 
 #[derive(uniffi::Object)]
 pub struct EnsuDb {
-    inner: db::ChatDb<db::SqliteBackend>,
+    pub(crate) inner: Arc<db::ChatDb<db::SqliteBackend>>,
 }
 
 fn to_session(session: db::Session) -> DbSession {
@@ -127,7 +128,7 @@ fn to_session(session: db::Session) -> DbSession {
     }
 }
 
-fn to_message(message: db::Message) -> DbMessage {
+pub(crate) fn to_message(message: db::Message) -> DbMessage {
     DbMessage {
         uuid: message.uuid.to_string(),
         session_uuid: message.session_uuid.to_string(),
@@ -147,7 +148,9 @@ impl EnsuDb {
     #[uniffi::constructor]
     pub fn open(main_db_path: String, key: Vec<u8>) -> Result<Self, DbError> {
         let inner = db::ChatDb::open_sqlite_with_defaults(main_db_path, key)?;
-        Ok(Self { inner })
+        Ok(Self {
+            inner: Arc::new(inner),
+        })
     }
 
     pub fn create_session(&self, title: String) -> Result<DbSession, DbError> {

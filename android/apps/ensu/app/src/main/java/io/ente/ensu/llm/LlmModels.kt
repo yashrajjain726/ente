@@ -1,9 +1,11 @@
 package io.ente.ensu.llm
 
+internal fun automaticMaxOutputTokens(contextLength: Int): Int =
+    minOf(2048, maxOf(1, contextLength / 4))
+
 data class LlmModelSelection(
     val id: String,
     val contextLength: Int? = null,
-    val maxTokens: Int? = null,
 )
 
 data class DownloadProgress(

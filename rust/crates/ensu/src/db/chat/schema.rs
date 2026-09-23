@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   session_uuid TEXT PRIMARY KEY NOT NULL,
   title        BLOB NOT NULL,
   created_at   INTEGER NOT NULL,
-  updated_at   INTEGER NOT NULL
+  updated_at   INTEGER NOT NULL,
+  conversation_state BLOB
 );
 
 CREATE TABLE IF NOT EXISTS messages (

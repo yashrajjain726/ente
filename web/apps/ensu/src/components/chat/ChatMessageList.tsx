@@ -87,6 +87,7 @@ export interface ChatMessageListProps {
     attachmentPreviews: Record<string, string>;
     branchSwitchers: Record<string, BranchSwitcher>;
     loadingPhrase: string | null;
+    preparationStatus: string | null;
     loadingDots: number;
     isGenerating: boolean;
     isStreamingOutro: boolean;
@@ -406,6 +407,7 @@ interface MessageRowProps {
     isLastMessage: boolean;
     branchSwitchers: Record<string, BranchSwitcher>;
     loadingPhrase: string | null;
+    preparationStatus: string | null;
     loadingDots: number;
     isGenerating: boolean;
     isStreamingOutro: boolean;
@@ -441,6 +443,7 @@ const MessageRow = memo(
         isLastMessage,
         branchSwitchers,
         loadingPhrase,
+        preparationStatus,
         loadingDots,
         isGenerating,
         isStreamingOutro,
@@ -647,6 +650,7 @@ const MessageRow = memo(
                                         }
                                         isOutroPhase={isStreamingOutro}
                                         fallbackText={`${loadingPhrase ?? "Generating your reply"}${dots}`}
+                                        status={preparationStatus}
                                     />
                                 </Stack>
                             ) : (
@@ -921,6 +925,7 @@ export const ChatMessageList = memo(
         attachmentPreviews,
         branchSwitchers,
         loadingPhrase,
+        preparationStatus,
         loadingDots,
         isGenerating,
         isStreamingOutro,
@@ -988,6 +993,9 @@ export const ChatMessageList = memo(
                         isLastMessage={message.messageUuid === lastMessageUuid}
                         branchSwitchers={branchSwitchers}
                         loadingPhrase={isStreaming ? loadingPhrase : null}
+                        preparationStatus={
+                            isStreaming ? preparationStatus : null
+                        }
                         loadingDots={isStreaming ? loadingDots : 0}
                         isGenerating={isGenerating}
                         isStreamingOutro={isStreamingOutro}
@@ -1029,6 +1037,7 @@ export const ChatMessageList = memo(
                 isStreamingOutro,
                 loadingDots,
                 loadingPhrase,
+                preparationStatus,
                 onCopyMessage,
                 onEditMessage,
                 onNextBranch,

@@ -10,8 +10,9 @@ use super::{
     SourceCitation,
 };
 
-const MAX_PACK_HITS: usize = 2;
+pub(crate) const MAX_PACK_HITS: usize = 2;
 pub const MAX_NOTES_GROUNDING_HITS: usize = 5;
+pub(crate) const MAX_GROUNDING_HITS: usize = MAX_PACK_HITS + MAX_NOTES_GROUNDING_HITS;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -20,7 +21,7 @@ pub enum GroundedSource {
     LocalNote { reference: NoteSourceReference },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GroundedExcerpt {
     pub score: f32,
     pub source: GroundedSource,
@@ -223,7 +224,7 @@ fn grounded_label(source: &GroundedSource) -> Result<String, RetrievalError> {
     }
 }
 
-fn sanitize_excerpt(value: &str) -> String {
+pub(crate) fn sanitize_excerpt(value: &str) -> String {
     value
         .replace("\r\n", "\n")
         .replace('\r', "\n")

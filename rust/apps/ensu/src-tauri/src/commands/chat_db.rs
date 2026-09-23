@@ -24,6 +24,19 @@ struct ChatDbHolder {
     db: Arc<ChatDb<SqliteBackend>>,
 }
 
+impl ChatDbState {
+    pub(crate) fn database(&self) -> Result<Arc<ChatDb<SqliteBackend>>, ApiError> {
+        Ok(self
+            .inner
+            .lock()
+            .map_err(|_| ApiError::new("lock", "Failed to lock chat DB state"))?
+            .as_ref()
+            .ok_or_else(|| ApiError::new("db", "Chat DB not initialized"))?
+            .db
+            .clone())
+    }
+}
+
 const CHAT_DB_FILE_NAME: &str = "ensu_llmchat_v2.db";
 const ATTACHMENTS_DIR_NAME: &str = "ensu_llmchat_attachments_v2";
 
@@ -201,6 +214,7 @@ pub struct ChatMessageInsertInput {
     parent_message_uuid: Option<String>,
     attachments: Option<Vec<ChatAttachmentInput>>,
     sources: Option<Vec<GroundedSourceDto>>,
+    preparation_token: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -325,12 +339,19 @@ pub async fn chat_db_get_messages(
 #[tauri::command]
 pub async fn chat_db_insert_message(
     state: State<'_, ChatDbState>,
+    conversation_state: State<'_, super::conversation::State>,
+    window: tauri::WebviewWindow,
     input: ChatMessageInsertInput,
 ) -> Result<ChatMessageDto, ApiError> {
     let session_uuid = parse_uuid(&input.session_uuid)?;
     let parent = optional_uuid(&input.parent_message_uuid)?;
     let sender = normalize_sender(&input.sender)?;
     let attachments = convert_attachments(input.attachments)?;
+    let prepared = input
+        .preparation_token
+        .as_deref()
+        .map(|token| conversation_state.take_answer(window.app_handle(), window.label(), token))
+        .transpose()?;
     let text = if sender == "other" {
         let sources = input
             .sources
@@ -361,12 +382,13 @@ pub async fn chat_db_insert_message(
         input.text
     };
     with_chat_db_async(&state, move |db| {
-        Ok(ChatMessageDto::from(db.insert_message(
+        Ok(ChatMessageDto::from(db.insert_message_guarded(
             session_uuid,
             sender,
             &text,
             parent,
             attachments,
+            prepared.as_ref(),
         )?))
     })
     .await

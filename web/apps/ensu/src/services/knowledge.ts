@@ -48,6 +48,7 @@ export type GroundedSource =
 export interface KnowledgePromptContext {
     text: string;
     sources: GroundedSource[];
+    candidates?: unknown;
 }
 
 interface KnowledgeDownloadProgress {

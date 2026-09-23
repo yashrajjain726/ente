@@ -1,4 +1,5 @@
 pub mod config;
+pub mod conversation;
 pub mod db;
 pub mod image;
 pub mod llm;

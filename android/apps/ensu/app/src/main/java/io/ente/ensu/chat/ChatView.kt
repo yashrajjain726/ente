@@ -222,6 +222,7 @@ fun ChatView(
                                 ),
                         messages = chatState.messages,
                         streamingResponse = chatState.streamingResponse,
+                        preparationStatus = chatState.preparationStatus,
                         streamingParentId = chatState.streamingParentId,
                         isGenerating = chatState.isGenerating,
                         isModelDownloaded = chatState.isModelDownloaded,

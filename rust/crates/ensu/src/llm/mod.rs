@@ -2,11 +2,13 @@ mod context;
 mod embed;
 mod event;
 mod generate;
+mod history;
 mod model;
 
 pub use context::*;
 pub use event::*;
 pub use generate::*;
+pub use history::*;
 pub use model::*;
 
 use llama_cpp_2::llama_backend::LlamaBackend;

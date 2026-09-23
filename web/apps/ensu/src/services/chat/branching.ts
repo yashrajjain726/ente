@@ -24,6 +24,26 @@ export interface PathBuildResult {
 
 const DEDUPE_WINDOW_US = 2_000_000;
 
+export const buildConversationPath = (
+    messages: ChatMessage[],
+    target: ChatMessage,
+): string[] => {
+    const byId = new Map(
+        messages.map((message) => [message.messageUuid, message]),
+    );
+    const path: string[] = [];
+    const visited = new Set<string>();
+    let current: ChatMessage | undefined = target;
+    while (current && !visited.has(current.messageUuid)) {
+        visited.add(current.messageUuid);
+        path.push(current.messageUuid);
+        current = current.parentMessageUuid
+            ? byId.get(current.parentMessageUuid)
+            : undefined;
+    }
+    return path.reverse();
+};
+
 export const buildSelectedPath = (
     messages: ChatMessage[],
     selections: BranchSelections,
