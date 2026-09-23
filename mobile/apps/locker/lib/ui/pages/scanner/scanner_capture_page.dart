@@ -51,6 +51,9 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   bool _autoMode = true;
   bool _scannerInitFailed = false;
   bool _reviewActive = false;
+  bool _leavingAfterSave = false;
+  String? _retakePageId;
+  int? _reviewPageIndex;
 
   final _previewKey = GlobalKey();
   final _flightLayerKey = GlobalKey();
@@ -141,7 +144,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     _autoCapture.reset();
     try {
       final cameras = await availableCameras();
-      if (!mounted) return;
+      if (!mounted || _reviewActive) return;
       if (cameras.isEmpty) {
         setState(() => _status = _CameraStatus.error);
         return;
@@ -161,13 +164,13 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       await controller.initialize();
       var retainedController = false;
       try {
-        if (!mounted) return;
+        if (!mounted || _reviewActive) return;
         await controller.lockCaptureOrientation(DeviceOrientation.portraitUp);
-        if (!mounted) return;
+        if (!mounted || _reviewActive) return;
         await controller.startImageStream(_onFrame);
-        if (!mounted) return;
+        if (!mounted || _reviewActive) return;
         if (_torchOn) await _applyTorch(controller, true);
-        if (!mounted) return;
+        if (!mounted || _reviewActive) return;
         setState(() {
           _camera = controller;
           _status = _CameraStatus.ready;
@@ -316,7 +319,10 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
 
   Future<void> _capture() async {
     final camera = _camera;
-    if (camera == null || _takingPicture || _reviewActive) return;
+    if (camera == null || _takingPicture || _reviewActive) {
+      return;
+    }
+    final retakePageId = _retakePageId;
     final quad = _stableQuad ?? ScanQuad.fullFrame();
     _autoCapture.notifyCaptureStarted();
     unawaited(HapticFeedback.mediumImpact());
@@ -331,7 +337,13 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       final shot = await camera.takePicture();
       final bytes = await shot.readAsBytes();
       unawaited(_deleteQuietly(File(shot.path)));
-      _onShotTaken(bytes, quad);
+      if (retakePageId == null) {
+        _onShotTaken(bytes, quad);
+      } else {
+        final replacement = await _session.replaceCapture(retakePageId, bytes);
+        if (!mounted || replacement == null) return;
+        unawaited(_openReview());
+      }
     } catch (e, s) {
       _logger.severe('Capture failed', e, s);
       if (mounted) {
@@ -543,13 +555,16 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     }
     final navigator = Navigator.of(context);
     _reviewActive = true;
+    var retakeRequested = false;
     bool? saved;
     try {
       if (_session.pageCount > 0) {
-        await precacheImage(
-          FileImage(_session.pages.last.processedJpeg),
-          context,
+        final pages = _session.pages;
+        final index = (_reviewPageIndex ?? pages.length - 1).clamp(
+          0,
+          pages.length - 1,
         );
+        await precacheImage(FileImage(pages[index].processedJpeg), context);
         if (!mounted) return;
       }
       await _pauseCamera();
@@ -559,6 +574,14 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
           builder: (_) => ScannerReviewPage(
             session: _session,
             onUploadFiles: widget.onUploadFiles,
+            initialPageIndex: _reviewPageIndex,
+            onRetake: (pageId, index) {
+              retakeRequested = true;
+              setState(() {
+                _retakePageId = pageId;
+                _reviewPageIndex = index;
+              });
+            },
           ),
         ),
       );
@@ -567,9 +590,13 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     }
     if (!mounted) return;
     if (saved == true) {
+      setState(() => _leavingAfterSave = true);
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
       navigator.pop(true);
     } else {
       setState(() {
+        if (!retakeRequested) _retakePageId = null;
         for (final capture in _pending) {
           capture.landed = true;
           _releaseSnapshot(capture);
@@ -578,7 +605,13 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
         _purgeResolved();
       });
       unawaited(_startCamera());
+      if (_retakePageId == null) _reviewPageIndex = null;
     }
+  }
+
+  Future<void> _closeRetake() async {
+    if (_takingPicture) return;
+    await _openReview();
   }
 
   @override
@@ -590,7 +623,15 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          _buildPreview(colors),
+          PopScope<bool>(
+            canPop: _retakePageId == null || _leavingAfterSave,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop && _retakePageId != null && !_leavingAfterSave) {
+                unawaited(_closeRetake());
+              }
+            },
+            child: _buildPreview(colors),
+          ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(Spacing.lg),
@@ -601,8 +642,12 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
                     children: [
                       ScannerChromeButton(
                         icon: HugeIcons.strokeRoundedCancel01,
-                        onTap: () => Navigator.of(context).pop(false),
-                        tooltip: context.strings.close,
+                        onTap: _retakePageId == null
+                            ? () => Navigator.of(context).pop(false)
+                            : _closeRetake,
+                        tooltip: _retakePageId == null
+                            ? context.strings.close
+                            : context.strings.back,
                       ),
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -641,25 +686,27 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
                               _session.isServiceReady,
                           onTap: _capture,
                         ),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: ScannerPagesButton(
-                            key: _pagesButtonKey,
-                            count: pages.count,
-                            thumbnail: pages.thumbnail,
-                            heroFile: pages.heroFile,
-                            accent: colors.primary,
-                            onTap: _openReview,
+                        if (_retakePageId == null) ...[
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: ScannerPagesButton(
+                              key: _pagesButtonKey,
+                              count: pages.count,
+                              thumbnail: pages.thumbnail,
+                              heroFile: pages.heroFile,
+                              accent: colors.primary,
+                              onTap: _openReview,
+                            ),
                           ),
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: ScannerDoneButton(
-                            visible: pages.count > 0,
-                            accent: colors.primary,
-                            onTap: _openReview,
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: ScannerDoneButton(
+                              visible: pages.count > 0,
+                              accent: colors.primary,
+                              onTap: _openReview,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
