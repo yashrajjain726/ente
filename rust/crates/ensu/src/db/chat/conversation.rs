@@ -1,8 +1,10 @@
 use super::*;
 use crate::conversation::{self, ConversationEnvelope, ConversationState, MAX_STATE_BYTES};
+use std::collections::HashMap;
 
 const MESSAGE_COLUMNS: &str =
     "message_uuid, session_uuid, parent_message_uuid, sender, text, attachments, created_at";
+const MESSAGE_QUERY_BATCH_SIZE: usize = 100;
 
 pub struct ConversationSnapshot {
     pub(super) session_uuid: Uuid,
@@ -41,20 +43,18 @@ impl<B: Backend> ChatDb<B> {
                 id: session,
             })?;
             let mut rows = Vec::with_capacity(path.len());
-            let mut bytes = 0usize;
-            for id in path {
-                let row = message_row(tx, *id)?.ok_or(Error::NotFound {
-                    entity: EntityType::Message,
-                    id: *id,
+            let mut remaining_bytes = conversation::MAX_HISTORY_BYTES;
+            for ids in path.chunks(MESSAGE_QUERY_BATCH_SIZE) {
+                let mut batch = message_rows(tx, ids, &mut remaining_bytes)?.ok_or_else(|| {
+                    Error::UnsupportedOperation("Conversation history is too large".into())
                 })?;
-                bytes = bytes.saturating_add(row.get_blob(4)?.len());
-                bytes = bytes.saturating_add(row.get_optional_string(5)?.map_or(0, |v| v.len()));
-                if bytes > conversation::MAX_HISTORY_BYTES {
-                    return Err(Error::UnsupportedOperation(
-                        "Conversation history is too large".into(),
-                    ));
+                for id in ids {
+                    let row = batch.remove(id).ok_or(Error::NotFound {
+                        entity: EntityType::Message,
+                        id: *id,
+                    })?;
+                    rows.push(row);
                 }
-                rows.push(row);
             }
             if has_existing_parent(tx, &rows)? {
                 return Err(Error::UnsupportedOperation(
@@ -219,6 +219,46 @@ fn message_row<T: BackendTx>(tx: &T, id: Uuid) -> Result<Option<crate::db::Row>>
     )
 }
 
+fn message_rows<T: BackendTx>(
+    tx: &T,
+    ids: &[Uuid],
+    remaining_bytes: &mut usize,
+) -> Result<Option<HashMap<Uuid, crate::db::Row>>> {
+    let placeholders = vec!["?"; ids.len()].join(", ");
+    let params = ids
+        .iter()
+        .map(|id| Value::Text(id.to_string()))
+        .collect::<Vec<_>>();
+    let size = tx
+        .query_row(
+            &format!(
+                "SELECT COALESCE(SUM(octet_length(text) + COALESCE(octet_length(attachments), 0)), 0)
+                 FROM messages WHERE message_uuid IN ({placeholders})"
+            ),
+            &params,
+        )?
+        .ok_or_else(|| Error::Row("Missing message payload size".into()))?
+        .get_i64(0)?;
+    let Ok(size) = usize::try_from(size) else {
+        return Ok(None);
+    };
+    let Some(remaining) = remaining_bytes.checked_sub(size) else {
+        return Ok(None);
+    };
+    let rows = tx
+        .query(
+            &format!(
+                "SELECT {MESSAGE_COLUMNS} FROM messages WHERE message_uuid IN ({placeholders})"
+            ),
+            &params,
+        )?
+        .into_iter()
+        .map(|row| Ok((Uuid::parse_str(&row.get_string(0)?)?, row)))
+        .collect::<Result<_>>()?;
+    *remaining_bytes = remaining;
+    Ok(Some(rows))
+}
+
 fn has_existing_parent<T: BackendTx>(tx: &T, rows: &[crate::db::Row]) -> Result<bool> {
     let Some(root) = rows.first() else {
         return Ok(false);
@@ -242,9 +282,23 @@ pub(super) fn snapshot_matches<T: BackendTx>(
     {
         return Ok(false);
     }
-    for (message, expected) in snapshot.messages.iter().zip(&snapshot.rows) {
-        if message_row(tx, message.uuid)?.as_ref() != Some(expected) {
+    let mut remaining_bytes = conversation::MAX_HISTORY_BYTES;
+    for (messages, expected_rows) in snapshot
+        .messages
+        .chunks(MESSAGE_QUERY_BATCH_SIZE)
+        .zip(snapshot.rows.chunks(MESSAGE_QUERY_BATCH_SIZE))
+    {
+        let ids = messages
+            .iter()
+            .map(|message| message.uuid)
+            .collect::<Vec<_>>();
+        let Some(rows) = message_rows(tx, &ids, &mut remaining_bytes)? else {
             return Ok(false);
+        };
+        for (message, expected) in messages.iter().zip(expected_rows) {
+            if rows.get(&message.uuid) != Some(expected) {
+                return Ok(false);
+            }
         }
     }
     Ok(true)
