@@ -75,7 +75,7 @@ export const SpaceAboutContent: React.FC<{ children: React.ReactNode }> = ({
             </div>
         </Feature>
 
-        <Feature title="Like and reply to their posts." cropVisual>
+        <Feature title="Like and reply to their posts privately." cropVisual>
             <div className="screenPreview chatPreview">
                 <img
                     className="screenCapture"

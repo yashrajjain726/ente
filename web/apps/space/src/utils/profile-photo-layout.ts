@@ -17,8 +17,7 @@ export const profilePhotoRows = <Tile extends { aspectRatio: number }>(
         let aspectRatio = 0;
         for (
             let rowSize = 1;
-            rowSize <= (tiles.length < 5 ? 1 : 3) &&
-            index + rowSize <= tiles.length;
+            rowSize <= 3 && index + rowSize <= tiles.length;
             rowSize++
         ) {
             aspectRatio += tiles[index + rowSize - 1]!.aspectRatio;
