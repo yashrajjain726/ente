@@ -8,18 +8,17 @@ import {
 const photos = (ratios: number[]) =>
     ratios.map((aspectRatio, id) => ({ id, aspectRatio }));
 
-test.each([1, 2, 3, 4])(
-    "a profile with %i photos shows each at full width and its original height",
-    (count) => {
-        const tiles = photos([4 / 3, 3 / 2, 1, 9 / 16].slice(0, count));
+test.each([
+    { count: 2, rowSizes: [2] },
+    { count: 3, rowSizes: [3] },
+    { count: 4, rowSizes: [2, 2] },
+])(
+    "a profile with $count photos uses the adaptive grid",
+    ({ count, rowSizes }) => {
+        const tiles = photos(new Array<number>(count).fill(2 / 3));
         const rows = profilePhotoRows(tiles, 352);
-        expect(rows).toEqual(
-            tiles.map((tile) => ({
-                aspectRatio: tile.aspectRatio,
-                height: 352 / tile.aspectRatio,
-                tiles: [tile],
-            })),
-        );
+        expect(rows.map(({ tiles }) => tiles.length)).toEqual(rowSizes);
+        expect(rows.flatMap(({ tiles }) => tiles)).toEqual(tiles);
     },
 );
 
