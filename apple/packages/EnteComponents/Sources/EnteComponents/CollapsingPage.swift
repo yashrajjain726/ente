@@ -92,6 +92,10 @@ private struct CollapsingHeader<Actions: View>: View {
             metrics.contentTop
             + ((metrics.toolbarHeight - metrics.collapsedTitleHeight) / 2 - metrics.contentTop)
             * eased
+        let titleHeight =
+            metrics.expandedTitleHeight
+            + (metrics.collapsedTitleHeight - metrics.expandedTitleHeight) * eased
+        let rowHeight = max(metrics.toolbarHeight, titleHeight)
         ZStack(alignment: .topLeading) {
             IconAction(kind: .unfilled, size: 48, action: back) {
                 Glyph.back.image.resizable().scaledToFit()
@@ -102,22 +106,19 @@ private struct CollapsingHeader<Actions: View>: View {
             .padding(.leading, 4)
             .accessibilityLabel(backLabel)
             .accessibilityIdentifier(identifier.map { "\($0).back" } ?? "")
-            HStack(alignment: .top, spacing: EnteSpacing.sm) {
+            HStack(spacing: EnteSpacing.sm) {
                 titleView(progress: eased)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(
-                        height: metrics.expandedTitleHeight
-                            + (metrics.collapsedTitleHeight - metrics.expandedTitleHeight) * eased,
-                        alignment: .top
-                    )
+                    .frame(height: titleHeight, alignment: .top)
                     .accessibilityElement(children: .combine)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier(identifier.map { "\($0).title" } ?? "")
                 actions
             }
+            .frame(height: rowHeight)
             .padding(.leading, EnteSpacing.lg + 36 * eased)
             .padding(.trailing, EnteSpacing.lg)
-            .offset(y: titleTop)
+            .offset(y: titleTop - (rowHeight - titleHeight) / 2)
             if let subtitle {
                 Text(subtitle)
                     .font(EnteTypography.mini)

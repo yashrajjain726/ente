@@ -119,6 +119,8 @@ public fun CollapsingPage(
     val progress = (offset / extent).coerceIn(0f, 1f)
     val eased = HeaderEaseInOut.transform(progress)
     val titleTop = contentTop + ((toolbarHeight - collapsedTitleHeight) / 2 - contentTop) * eased
+    val currentTitleHeight = titleHeight + (collapsedTitleHeight - titleHeight) * eased
+    val rowHeight = maxOf(toolbarHeight, currentTitleHeight)
     Column(modifier.fillMaxSize().background(palette.background).nestedScroll(scroll)) {
         Box(Modifier.fillMaxWidth().height(expandedHeight - expansion * progress).clipToBounds()) {
             IconAction(
@@ -135,10 +137,10 @@ public fun CollapsingPage(
             }
             Row(
                 Modifier.fillMaxWidth()
-                    .offset(y = titleTop)
-                    .height(titleHeight + (collapsedTitleHeight - titleHeight) * eased)
+                    .offset(y = titleTop - (rowHeight - currentTitleHeight) / 2)
+                    .height(rowHeight)
                     .padding(start = EnteSpacing.lg + 36.dp * eased, end = EnteSpacing.lg),
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(EnteSpacing.sm),
             ) {
                 HeaderTitle(
@@ -146,6 +148,7 @@ public fun CollapsingPage(
                     eyebrow,
                     eased,
                     Modifier.weight(1f)
+                        .height(currentTitleHeight)
                         .semantics(mergeDescendants = true) { heading() }
                         .then(identifier?.let { Modifier.testTag("$it.title") } ?: Modifier),
                 )
