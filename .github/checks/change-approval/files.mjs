@@ -74,9 +74,7 @@ export function checkFiles({ files }) {
         .filter(({ path }) => configFile.test(path))
         .map(({ path }) => path);
     const readmes = files
-        .filter(
-            ({ path, deleted }) => !deleted && /^readme/i.test(basename(path)),
-        )
+        .filter(({ path }) => /^readme/i.test(basename(path)))
         .map(({ path }) => path);
     return { binaries, large, guardrails, configs, readmes };
 }

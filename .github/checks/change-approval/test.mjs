@@ -255,25 +255,52 @@ test("README edits and untracked files are scanned locally", (t) => {
     assert.match(output, /- `README`/);
 });
 
-test("renaming a file to README needs approval", (t) => {
-    const { output, summary } = scan(
-        t,
-        { "guide.txt": "# Guide\n" },
-        { "guide.txt": null, "README.txt": "# Guide\n" },
-        { ci: true },
-    );
-    assert.equal(output, 'categories=["README files"]\n');
-    assert.equal(
-        summary,
-        "1 README file\n\n## README files\n\n- `README.txt`\n",
-    );
+test("renaming a file to or from README needs approval", (t) => {
+    for (const [before, after] of [
+        ["guide.txt", "README.txt"],
+        ["README.txt", "guide.txt"],
+    ]) {
+        const { output, summary } = scan(
+            t,
+            { [before]: "# Guide\n" },
+            { [before]: null, [after]: "# Guide\n" },
+            { ci: true },
+        );
+        assert.equal(output, 'categories=["README files"]\n');
+        assert.equal(
+            summary,
+            "1 README file\n\n## README files\n\n- `README.txt`\n",
+        );
+    }
 });
 
-test("unchanged READMEs and deletions need no approval", (t) => {
+test("README deletions need approval in CI and local scans", (t) => {
+    const summary =
+        "2 README files\n\n## README files\n\n- `README`\n- `docs/readme.md`\n";
+    for (const ci of [false, true]) {
+        const result = scan(
+            t,
+            { README: "# Remove\n", "docs/readme.md": "# Remove\n" },
+            { README: null, "docs/readme.md": null },
+            { ci, commit: ci },
+        );
+        if (ci) {
+            assert.deepEqual(result, {
+                stdout: "::warning title=Change approval needed::2 README files\n",
+                output: 'categories=["README files"]\n',
+                summary,
+            });
+        } else {
+            assert.equal(result, `${summary}\n`);
+        }
+    }
+});
+
+test("unchanged READMEs and ordinary Markdown deletions need no approval", (t) => {
     const { stdout, output, summary } = scan(
         t,
-        { "README.md": "# Keep\n", "docs/README.old": "# Remove\n" },
-        { "docs/README.old": null, "notes.txt": "Ordinary change\n" },
+        { "README.md": "# Keep\n", "docs/old.md": "# Remove\n" },
+        { "docs/old.md": null, "notes.txt": "Ordinary change\n" },
         { ci: true },
     );
     assert.equal(stdout, "");
