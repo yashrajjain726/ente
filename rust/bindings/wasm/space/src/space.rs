@@ -293,6 +293,15 @@ pub struct MessagePage {
     next_cursor: String,
 }
 
+impl From<ente_space::MessagePage> for MessagePage {
+    fn from(page: ente_space::MessagePage) -> Self {
+        Self {
+            items: page.items.into_iter().map(Into::into).collect(),
+            next_cursor: page.next_cursor,
+        }
+    }
+}
+
 #[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 struct MessageConversationActivity {
@@ -337,6 +346,19 @@ struct ConversationChatSummaryResponse {
     unread_activities: Vec<MessageConversationActivity>,
 }
 
+impl From<ente_space::ConversationChatSummary> for ConversationChatSummaryResponse {
+    fn from(summary: ente_space::ConversationChatSummary) -> Self {
+        Self {
+            latest_activity: summary.latest_activity.into(),
+            unread_activities: summary
+                .unread_activities
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        }
+    }
+}
+
 #[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 pub struct ConversationsResponse {
@@ -344,6 +366,25 @@ pub struct ConversationsResponse {
     pending_requests: Vec<SpaceFriendRequestResponse>,
     chat_summaries: BTreeMap<String, ConversationChatSummaryResponse>,
     latest_post_created_at: Option<String>,
+}
+
+impl From<ente_space::Conversations> for ConversationsResponse {
+    fn from(conversations: ente_space::Conversations) -> Self {
+        Self {
+            friends: conversations.friends.into_iter().map(Into::into).collect(),
+            pending_requests: conversations
+                .pending_requests
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+            chat_summaries: conversations
+                .chat_summaries
+                .into_iter()
+                .map(|(space_id, summary)| (space_id, summary.into()))
+                .collect(),
+            latest_post_created_at: conversations.latest_post_created_at,
+        }
+    }
 }
 
 #[derive(Serialize, Tsify)]
@@ -482,80 +523,90 @@ fn decode_b64_field(value: &str) -> Result<Vec<u8>, Error> {
         .map_err(Into::into)
 }
 
-fn created_space_to_js(value: ente_space::CreatedSpace) -> CreatedSpace {
-    CreatedSpace {
-        space_id: value.space_id,
-        space_slug: value.space_slug,
+impl From<ente_space::CreatedSpace> for CreatedSpace {
+    fn from(value: ente_space::CreatedSpace) -> Self {
+        Self {
+            space_id: value.space_id,
+            space_slug: value.space_slug,
+        }
     }
 }
 
-fn profile_to_js(value: ente_space::DecryptedSpaceProfile) -> DecryptedSpaceProfile {
-    DecryptedSpaceProfile {
-        space_id: value.space_id,
-        space_slug: value.space_slug,
-        version: value.version,
-        friends: value.friends,
-        posts: None,
-        profile: value.profile.map(Into::into),
-        avatar: value.avatar.map(Into::into),
-        cover: value.cover.map(Into::into),
-        updated_at: value.updated_at,
+impl From<ente_space::DecryptedSpaceProfile> for DecryptedSpaceProfile {
+    fn from(value: ente_space::DecryptedSpaceProfile) -> Self {
+        Self {
+            space_id: value.space_id,
+            space_slug: value.space_slug,
+            version: value.version,
+            friends: value.friends,
+            posts: None,
+            profile: value.profile.map(Into::into),
+            avatar: value.avatar.map(Into::into),
+            cover: value.cover.map(Into::into),
+            updated_at: value.updated_at,
+        }
     }
 }
 
-fn actor_to_js(actor: ente_space::SpaceActor) -> SpaceActorResponse {
-    let profile = actor.profile.unwrap_or_else(|error| {
-        log::warn!(
-            "Space profile {} fell back to public fields: {}",
-            actor.space_id,
-            ente_core::error::chain(&error)
-        );
-        None
-    });
-    SpaceActorResponse {
-        space_id: actor.space_id,
-        space_slug: actor.space_slug,
-        public_key: actor.public_key,
-        key_version: actor.key_version,
-        profile: profile.map(Into::into),
-        avatar: actor.avatar.map(Into::into),
-    }
-}
-
-fn friend_to_js(friend: ente_space::SpaceFriend) -> SpaceFriendResponse {
-    SpaceFriendResponse {
-        friend: actor_to_js(friend.friend),
-        share_key_version: friend.share_key_version,
-        created_at: friend.created_at,
-    }
-}
-
-fn post_to_js(post: ente_space::Post) -> PostResponse {
-    let (caption, photos, is_unavailable) = match post.content {
-        Ok(content) => (
-            content.caption,
-            content.photos.into_iter().map(Into::into).collect(),
-            false,
-        ),
-        Err(error) => {
+impl From<ente_space::SpaceActor> for SpaceActorResponse {
+    fn from(actor: ente_space::SpaceActor) -> Self {
+        let profile = actor.profile.unwrap_or_else(|error| {
             log::warn!(
-                "Space post {} is unavailable: {}",
-                post.post_id,
+                "Space profile {} fell back to public fields: {}",
+                actor.space_id,
                 ente_core::error::chain(&error)
             );
-            (None, Vec::new(), true)
+            None
+        });
+        Self {
+            space_id: actor.space_id,
+            space_slug: actor.space_slug,
+            public_key: actor.public_key,
+            key_version: actor.key_version,
+            profile: profile.map(Into::into),
+            avatar: actor.avatar.map(Into::into),
         }
-    };
-    PostResponse {
-        post_id: post.post_id,
-        space_id: post.space_id,
-        space_slug: post.space_slug,
-        author: actor_to_js(post.author),
-        caption,
-        photos,
-        is_unavailable,
-        created_at: post.created_at,
-        viewer_liked: post.viewer_liked,
+    }
+}
+
+impl From<ente_space::SpaceFriend> for SpaceFriendResponse {
+    fn from(friend: ente_space::SpaceFriend) -> Self {
+        Self {
+            friend: friend.friend.into(),
+            share_key_version: friend.share_key_version,
+            created_at: friend.created_at,
+        }
+    }
+}
+
+impl From<ente_space::Post> for PostResponse {
+    fn from(post: ente_space::Post) -> Self {
+        let (caption, photos, is_unavailable) = match post.content {
+            Ok(content) => (
+                content.caption,
+                content.photos.into_iter().map(Into::into).collect(),
+                false,
+            ),
+            Err(error) => {
+                log::warn!(
+                    "Space post {} is unavailable: {}",
+                    post.post_id,
+                    ente_core::error::chain(&error)
+                );
+                (None, Vec::new(), true)
+            }
+        };
+        Self {
+            post_id: post.post_id,
+            space_id: post.space_id,
+            space_slug: post.space_slug,
+            author: post.author.into(),
+            caption,
+            photos,
+            is_unavailable,
+            created_at: post.created_at,
+            viewer_liked: post.viewer_liked,
+        }
     }
 }
 
@@ -625,69 +676,75 @@ impl From<ente_space::PostPhoto> for PostPhoto {
     }
 }
 
-fn post_page_to_js(page: ente_space::PostPage) -> PostPage {
-    PostPage {
-        items: page.items.into_iter().map(post_to_js).collect(),
-        next_cursor: page.next_cursor,
+impl From<ente_space::PostPage> for PostPage {
+    fn from(page: ente_space::PostPage) -> Self {
+        Self {
+            items: page.items.into_iter().map(Into::into).collect(),
+            next_cursor: page.next_cursor,
+        }
     }
 }
 
-fn message_to_js(message: ente_space::Message) -> MessageResponse {
-    let (text, reply_object_key, is_deleted, is_unavailable) = match message.content {
-        Ok(Some(content)) => (content.text, content.reply_object_key, false, false),
-        Ok(None) => (String::new(), None, true, false),
-        Err(error) => {
-            log::warn!(
-                "Space message {} is unavailable: {}",
-                message.message_id,
-                ente_core::error::chain(&error)
-            );
-            (String::new(), None, false, true)
+impl From<ente_space::Message> for MessageResponse {
+    fn from(message: ente_space::Message) -> Self {
+        let (text, reply_object_key, is_deleted, is_unavailable) = match message.content {
+            Ok(Some(content)) => (content.text, content.reply_object_key, false, false),
+            Ok(None) => (String::new(), None, true, false),
+            Err(error) => {
+                log::warn!(
+                    "Space message {} is unavailable: {}",
+                    message.message_id,
+                    ente_core::error::chain(&error)
+                );
+                (String::new(), None, false, true)
+            }
+        };
+        Self {
+            message_id: message.message_id,
+            kind: message.kind,
+            sender_space_id: message.sender_space_id,
+            recipient_space_id: message.recipient_space_id,
+            text,
+            reply_post_id: message.reply_post_id,
+            reply_object_key,
+            reply_message_id: message.reply_message_id,
+            liked: message.liked,
+            viewer_liked: message.viewer_liked,
+            is_deleted,
+            created_at: message.created_at,
+            updated_at: message.updated_at,
+            is_unavailable,
         }
-    };
-    MessageResponse {
-        message_id: message.message_id,
-        kind: message.kind,
-        sender_space_id: message.sender_space_id,
-        recipient_space_id: message.recipient_space_id,
-        text,
-        reply_post_id: message.reply_post_id,
-        reply_object_key,
-        reply_message_id: message.reply_message_id,
-        liked: message.liked,
-        viewer_liked: message.viewer_liked,
-        is_deleted,
-        created_at: message.created_at,
-        updated_at: message.updated_at,
-        is_unavailable,
     }
 }
 
-fn message_activity_to_js(activity: ente_space::MessageActivity) -> MessageConversationActivity {
-    let (text, reply_object_key, is_unavailable) = match activity.content {
-        Ok(Some(content)) => (Some(content.text), content.reply_object_key, false),
-        Ok(None) => (None, None, false),
-        Err(error) => {
-            log::warn!(
-                "Space conversation activity {} is unavailable: {}",
-                activity.id,
-                ente_core::error::chain(&error)
-            );
-            (None, None, true)
+impl From<ente_space::MessageActivity> for MessageConversationActivity {
+    fn from(activity: ente_space::MessageActivity) -> Self {
+        let (text, reply_object_key, is_unavailable) = match activity.content {
+            Ok(Some(content)) => (Some(content.text), content.reply_object_key, false),
+            Ok(None) => (None, None, false),
+            Err(error) => {
+                log::warn!(
+                    "Space conversation activity {} is unavailable: {}",
+                    activity.id,
+                    ente_core::error::chain(&error)
+                );
+                (None, None, true)
+            }
+        };
+        Self {
+            id: activity.id,
+            activity_type: activity.activity_type,
+            kind: activity.kind,
+            created_at: activity.created_at,
+            outgoing: activity.outgoing,
+            message_id: activity.message_id,
+            text,
+            post_id: activity.post_id,
+            reply_object_key,
+            post_space_id: activity.post_space_id,
+            is_unavailable,
         }
-    };
-    MessageConversationActivity {
-        id: activity.id,
-        activity_type: activity.activity_type,
-        kind: activity.kind,
-        created_at: activity.created_at,
-        outgoing: activity.outgoing,
-        message_id: activity.message_id,
-        text,
-        post_id: activity.post_id,
-        reply_object_key,
-        post_space_id: activity.post_space_id,
-        is_unavailable,
     }
 }
 
@@ -737,7 +794,7 @@ pub struct SpaceLinkCtxHandle {
 impl SpaceLinkCtxHandle {
     #[wasm_bindgen(js_name = getProfile)]
     pub fn get_profile(&self) -> Result<<DecryptedSpaceProfile as Tsify>::JsType, Error> {
-        let mut profile = profile_to_js(self.inner.profile().clone());
+        let mut profile = DecryptedSpaceProfile::from(self.inner.profile().clone());
         profile.posts = Some(self.inner.posts());
         profile.into_js().map_err(Into::into)
     }
@@ -745,7 +802,7 @@ impl SpaceLinkCtxHandle {
     #[wasm_bindgen(js_name = listPosts)]
     pub async fn list_posts(&self) -> Result<<PostPage as Tsify>::JsType, Error> {
         let page = self.inner.list_posts().await?;
-        post_page_to_js(page).into_js().map_err(Into::into)
+        PostPage::from(page).into_js().map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = subscribeWebPush)]
@@ -820,7 +877,7 @@ impl SpaceAccountCtxHandle {
         profile: String,
         referred_by_space_id: Option<String>,
     ) -> Result<<CreatedSpace as Tsify>::JsType, Error> {
-        created_space_to_js(
+        CreatedSpace::from(
             self.inner
                 .create_space_with_referrer(
                     &space_slug,
@@ -851,7 +908,7 @@ impl SpaceAccountCtxHandle {
         space_id: String,
         viewer_space_id: Option<String>,
     ) -> Result<<DecryptedSpaceProfile as Tsify>::JsType, Error> {
-        profile_to_js(
+        DecryptedSpaceProfile::from(
             self.inner
                 .get_space_profile_for_display(&space_id, viewer_space_id.as_deref(), None)
                 .await?,
@@ -956,7 +1013,7 @@ impl SpaceAccountCtxHandle {
         limit: Option<i32>,
     ) -> Result<<PostPage as Tsify>::JsType, Error> {
         let page = self.inner.list_feed(&space_id, cursor, limit).await?;
-        post_page_to_js(page).into_js().map_err(Into::into)
+        PostPage::from(page).into_js().map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = unreadStatus)]
@@ -992,7 +1049,7 @@ impl SpaceAccountCtxHandle {
         cursor: Option<String>,
         limit: Option<i32>,
     ) -> Result<<PostPage as Tsify>::JsType, Error> {
-        post_page_to_js(
+        PostPage::from(
             self.inner
                 .list_posts(&space_id, viewer_space_id.as_deref(), cursor, limit)
                 .await?,
@@ -1012,7 +1069,7 @@ impl SpaceAccountCtxHandle {
             .inner
             .get_post(&space_id, post_id, viewer_space_id.as_deref())
             .await?;
-        post_to_js(post).into_js().map_err(Into::into)
+        PostResponse::from(post).into_js().map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = createPhotoPost)]
@@ -1039,7 +1096,7 @@ impl SpaceAccountCtxHandle {
             .inner
             .create_photo_post(&space_id, photos, caption.as_deref())
             .await?;
-        post_to_js(post).into_js().map_err(Into::into)
+        PostResponse::from(post).into_js().map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = downloadPostAsset)]
@@ -1118,7 +1175,7 @@ impl SpaceAccountCtxHandle {
             .inner
             .send_message(&sender_space_id, &space_id, &text)
             .await?;
-        message_to_js(message).into_js().map_err(Into::into)
+        MessageResponse::from(message).into_js().map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = sendPoke)]
@@ -1128,7 +1185,7 @@ impl SpaceAccountCtxHandle {
         space_id: String,
     ) -> Result<<MessageResponse as Tsify>::JsType, Error> {
         let message = self.inner.send_poke(&sender_space_id, &space_id).await?;
-        message_to_js(message).into_js().map_err(Into::into)
+        MessageResponse::from(message).into_js().map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = replyToMessage)]
@@ -1143,7 +1200,7 @@ impl SpaceAccountCtxHandle {
             .inner
             .reply_to_message(&sender_space_id, &space_id, &message_id, &text)
             .await?;
-        message_to_js(message).into_js().map_err(Into::into)
+        MessageResponse::from(message).into_js().map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = replyToPost)]
@@ -1165,7 +1222,7 @@ impl SpaceAccountCtxHandle {
                 object_key.as_deref(),
             )
             .await?;
-        message_to_js(message).into_js().map_err(Into::into)
+        MessageResponse::from(message).into_js().map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = likeMessage)]
@@ -1198,37 +1255,9 @@ impl SpaceAccountCtxHandle {
         space_id: String,
     ) -> Result<<ConversationsResponse as Tsify>::JsType, Error> {
         let response = self.inner.list_conversations(&space_id).await?;
-        let friends = response.friends.into_iter().map(friend_to_js).collect();
-
-        let pending_requests = response
-            .pending_requests
-            .into_iter()
-            .map(Into::into)
-            .collect();
-
-        let mut chat_summaries = BTreeMap::new();
-        for (friend_space_id, summary) in response.chat_summaries {
-            chat_summaries.insert(
-                friend_space_id,
-                ConversationChatSummaryResponse {
-                    latest_activity: message_activity_to_js(summary.latest_activity),
-                    unread_activities: summary
-                        .unread_activities
-                        .into_iter()
-                        .map(message_activity_to_js)
-                        .collect(),
-                },
-            );
-        }
-
-        ConversationsResponse {
-            friends,
-            pending_requests,
-            chat_summaries,
-            latest_post_created_at: response.latest_post_created_at,
-        }
-        .into_js()
-        .map_err(Into::into)
+        ConversationsResponse::from(response)
+            .into_js()
+            .map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = listMessageThread)]
@@ -1243,12 +1272,7 @@ impl SpaceAccountCtxHandle {
             .inner
             .list_message_thread(&viewer_space_id, &space_id, cursor, limit)
             .await?;
-        MessagePage {
-            items: page.items.into_iter().map(message_to_js).collect(),
-            next_cursor: page.next_cursor,
-        }
-        .into_js()
-        .map_err(Into::into)
+        MessagePage::from(page).into_js().map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = updatePostCaption)]
@@ -1280,7 +1304,11 @@ impl SpaceAccountCtxHandle {
         let friends = self.inner.list_space_friends(&space_id).await?;
         friends
             .into_iter()
-            .map(|friend| friend_to_js(friend).into_js().map_err(Into::into))
+            .map(|friend| {
+                SpaceFriendResponse::from(friend)
+                    .into_js()
+                    .map_err(Into::into)
+            })
             .collect()
     }
 
