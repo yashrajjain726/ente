@@ -5,7 +5,7 @@ use zeroize::ZeroizeOnDrop;
 
 use crate::Result;
 use crate::transport::{
-    ProfileAvatarResponse, ProfileCoverResponse, SpaceFriendRequestResponse, SpaceFriendResponse,
+    ProfileAvatarResponse, ProfileCoverResponse, SpaceActorResponse, SpaceFriendRequestResponse,
     SpaceKeyResponse,
 };
 
@@ -76,6 +76,28 @@ pub struct SpaceActor {
     pub key_version: i32,
     pub profile: Result<Option<SpaceProfile>>,
     pub avatar: Option<ProfileAvatarResponse>,
+}
+
+impl SpaceActor {
+    pub(crate) fn from_response(
+        actor: SpaceActorResponse,
+        profile: Result<Option<SpaceProfile>>,
+    ) -> Self {
+        Self {
+            space_id: actor.space_id,
+            space_slug: actor.space_slug,
+            public_key: actor.public_key,
+            key_version: actor.key_version,
+            profile,
+            avatar: actor.avatar,
+        }
+    }
+}
+
+pub struct SpaceFriend {
+    pub friend: SpaceActor,
+    pub share_key_version: i32,
+    pub created_at: String,
 }
 
 pub struct PostContent {
@@ -177,7 +199,7 @@ pub struct ConversationChatSummary {
 }
 
 pub struct Conversations {
-    pub friends: Vec<SpaceFriendResponse>,
+    pub friends: Vec<SpaceFriend>,
     pub pending_requests: Vec<SpaceFriendRequestResponse>,
     pub chat_summaries: BTreeMap<String, ConversationChatSummary>,
     pub latest_post_created_at: Option<String>,

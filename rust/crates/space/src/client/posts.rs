@@ -1,4 +1,7 @@
-use super::{AccountSpaceCtx, decrypt_post_object_metadata, ensure_post_objects_are_photos};
+use super::{
+    AccountSpaceCtx, decrypt_post_object_metadata, ensure_post_objects_are_photos,
+    retain_content_error,
+};
 use crate::crypto::{decrypt_secretbox_payload, encrypt_secretbox_payload, generate_key};
 use crate::error::{Error, Result};
 use crate::models::{
@@ -421,13 +424,6 @@ fn utf8_field(bytes: Vec<u8>, field: &str) -> Result<String> {
         .map_err(|error| Error::InvalidInput(format!("invalid {field} utf8: {error}")))
 }
 
-fn retain_content_error<T>(result: Result<T>) -> Result<Result<T>> {
-    match result {
-        Err(error) if !error.is_content_error() => Err(error),
-        result => Ok(result),
-    }
-}
-
 pub(super) fn open_post_content(
     post: &mut PostResponse,
     decrypted: Result<DecryptedPost>,
@@ -472,14 +468,7 @@ pub(super) fn opened_post(
         post_id: post.post_id,
         space_id: post.space_id,
         space_slug: post.space_slug,
-        author: SpaceActor {
-            space_id: post.author.space_id,
-            space_slug: post.author.space_slug,
-            public_key: post.author.public_key,
-            key_version: post.author.key_version,
-            profile,
-            avatar: post.author.avatar,
-        },
+        author: SpaceActor::from_response(post.author, profile),
         content,
         created_at: post.created_at,
         viewer_liked: post.viewer_liked,

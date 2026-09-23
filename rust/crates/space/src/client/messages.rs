@@ -32,6 +32,10 @@ impl AccountSpaceCtx {
             .error_for_status()?
             .json()
             .await?;
+        let mut friends = Vec::with_capacity(response.friends.len());
+        for friend in response.friends {
+            friends.push(self.open_friend(friend).await?);
+        }
         let mut chat_summaries = std::collections::BTreeMap::new();
         for (friend_space_id, summary) in response.chat_summaries {
             chat_summaries.insert(
@@ -40,7 +44,7 @@ impl AccountSpaceCtx {
             );
         }
         Ok(Conversations {
-            friends: response.friends,
+            friends,
             pending_requests: response.pending_requests,
             chat_summaries,
             latest_post_created_at: response.latest_post_created_at,
@@ -469,7 +473,7 @@ impl AccountSpaceCtx {
         sender_space_id: &str,
         space_id: &str,
     ) -> Result<SpaceActorResponse> {
-        let friends = self.list_space_friends(sender_space_id).await?;
+        let friends = self.list_space_friends_raw(sender_space_id).await?;
         friends
             .into_iter()
             .map(|value| value.friend)

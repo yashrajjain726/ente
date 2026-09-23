@@ -4,7 +4,7 @@ use crate::crypto::{encrypt_asset_payload, seal_with_public_key};
 use crate::transport::{
     ConversationChatSummaryResponse, EntityKeyPayload, MessageConversationActivity,
     MessagePageResponse, MessageResponse, ProfileAvatarPayload, ProfileCoverPayload,
-    SpaceActorResponse,
+    SpaceActorResponse, SpaceFriendResponse,
 };
 
 use mockito::{Matcher, Server};
@@ -371,7 +371,6 @@ async fn account_space_key_resolution_is_cached_within_context() {
         encrypted_profile,
         ..Default::default()
     };
-
     let first = ctx
         .decrypt_actor_profile(&actor)
         .await
@@ -383,6 +382,40 @@ async fn account_space_key_resolution_is_cached_within_context() {
 
     assert_eq!(first.unwrap().full_name.as_deref(), Some("Friend"));
     assert_eq!(second.unwrap().full_name.as_deref(), Some("Friend"));
+    let opened = ctx
+        .open_friend(SpaceFriendResponse {
+            friend: actor.clone(),
+            share_key_version: 1,
+            created_at: "2026-04-16T00:00:00Z".into(),
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        opened
+            .friend
+            .profile
+            .as_ref()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .full_name
+            .as_deref(),
+        Some("Friend")
+    );
+    let mut corrupt_actor = actor;
+    corrupt_actor.encrypted_profile = "not-base64".into();
+    let opened = ctx
+        .open_friend(SpaceFriendResponse {
+            friend: corrupt_actor,
+            share_key_version: 1,
+            created_at: "2026-04-16T00:00:00Z".into(),
+        })
+        .await
+        .unwrap();
+    assert!(matches!(
+        &opened.friend.profile,
+        Err(Error::Base64Decode(_))
+    ));
     spaces.assert_async().await;
     shares.assert_async().await;
 }
@@ -1922,8 +1955,7 @@ async fn list_space_friends_uses_space_friends_endpoint() {
                     "spaceId": "space_friend",
                     "spaceSlug": "friend",
                     "publicKey": "friend-public-key",
-                    "keyVersion": 2,
-                    "encryptedProfile": "profile-cipher"
+                    "keyVersion": 2
                 },
                 "shareKeyVersion": 2,
                 "createdAt": "2026-04-16T00:00:00Z"
@@ -1940,6 +1972,7 @@ async fn list_space_friends_uses_space_friends_endpoint() {
 
     assert_eq!(response.len(), 1);
     assert_eq!(response[0].friend.space_id, "space_friend");
+    assert!(response[0].friend.profile.as_ref().unwrap().is_none());
     assert_eq!(response[0].share_key_version, 2);
     friends.assert_async().await;
 }

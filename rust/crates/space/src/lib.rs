@@ -16,7 +16,7 @@ pub use models::{
     ConversationChatSummary, Conversations, CreatedSpace, CreatedSpaceLink, DecryptedFriendShare,
     DecryptedSpaceProfile, HydratedKeys, Message, MessageActivity, MessageContent, MessagePage,
     MessagePayload, OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, Post, PostAsset, PostContent,
-    PostObjectMetadata, PostPage, PostPhoto, SpaceActor, SpaceProfile,
+    PostObjectMetadata, PostPage, PostPhoto, SpaceActor, SpaceFriend, SpaceProfile,
 };
 pub use transport::{
     ConversationChatSummaryResponse, ConversationsResponse, EntityKeyPayload,

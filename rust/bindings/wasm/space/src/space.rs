@@ -54,10 +54,6 @@ impl Error {
     fn message(&self) -> String {
         ente_core::error::chain(self)
     }
-
-    fn is_content_error(&self) -> bool {
-        matches!(self, Self::Space(error) if error.is_content_error())
-    }
 }
 
 impl From<Error> for JsValue {
@@ -237,6 +233,19 @@ struct SpaceActorResponse {
     avatar: Option<ProfileAvatarResponse>,
 }
 
+impl From<ente_space::SpaceActorResponse> for SpaceActorResponse {
+    fn from(actor: ente_space::SpaceActorResponse) -> Self {
+        Self {
+            space_id: actor.space_id,
+            space_slug: actor.space_slug,
+            public_key: actor.public_key,
+            key_version: actor.key_version,
+            profile: None,
+            avatar: actor.avatar.map(Into::into),
+        }
+    }
+}
+
 #[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 pub struct PostResponse {
@@ -353,12 +362,32 @@ pub struct SpaceFriendRequestResponse {
     created_at: String,
 }
 
+impl From<ente_space::SpaceFriendRequestResponse> for SpaceFriendRequestResponse {
+    fn from(request: ente_space::SpaceFriendRequestResponse) -> Self {
+        Self {
+            request_id: request.request_id,
+            requester: request.requester.into(),
+            created_at: request.created_at,
+        }
+    }
+}
+
 #[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 pub struct SpaceSentFriendRequestResponse {
     request_id: i64,
     target: SpaceActorResponse,
     created_at: String,
+}
+
+impl From<ente_space::SpaceSentFriendRequestResponse> for SpaceSentFriendRequestResponse {
+    fn from(request: ente_space::SpaceSentFriendRequestResponse) -> Self {
+        Self {
+            request_id: request.request_id,
+            target: request.target.into(),
+            created_at: request.created_at,
+        }
+    }
 }
 
 #[derive(Serialize, Tsify)]
@@ -474,10 +503,15 @@ fn profile_to_js(value: ente_space::DecryptedSpaceProfile) -> DecryptedSpaceProf
     }
 }
 
-fn actor_to_js(
-    actor: ente_space::SpaceActorResponse,
-    profile: Option<ente_space::SpaceProfile>,
-) -> SpaceActorResponse {
+fn actor_to_js(actor: ente_space::SpaceActor) -> SpaceActorResponse {
+    let profile = actor.profile.unwrap_or_else(|error| {
+        log::warn!(
+            "Space profile {} fell back to public fields: {}",
+            actor.space_id,
+            ente_core::error::chain(&error)
+        );
+        None
+    });
     SpaceActorResponse {
         space_id: actor.space_id,
         space_slug: actor.space_slug,
@@ -488,26 +522,12 @@ fn actor_to_js(
     }
 }
 
-async fn account_actor_to_js(
-    ctx: &AccountSpaceCtx,
-    actor: ente_space::SpaceActorResponse,
-) -> Result<SpaceActorResponse, Error> {
-    match ctx.decrypt_actor_profile(&actor).await.map_err(Error::from) {
-        Ok(profile) => Ok(actor_to_js(actor, profile)),
-        Err(error) if error.is_content_error() => {
-            log::warn!(
-                "Space profile {} fell back to public fields: {}",
-                actor.space_id,
-                error.message()
-            );
-            Ok(public_actor_to_js(actor))
-        }
-        Err(error) => Err(error),
+fn friend_to_js(friend: ente_space::SpaceFriend) -> SpaceFriendResponse {
+    SpaceFriendResponse {
+        friend: actor_to_js(friend.friend),
+        share_key_version: friend.share_key_version,
+        created_at: friend.created_at,
     }
-}
-
-fn public_actor_to_js(actor: ente_space::SpaceActorResponse) -> SpaceActorResponse {
-    actor_to_js(actor, None)
 }
 
 fn post_to_js(post: ente_space::Post) -> PostResponse {
@@ -526,26 +546,11 @@ fn post_to_js(post: ente_space::Post) -> PostResponse {
             (None, Vec::new(), true)
         }
     };
-    let profile = post.author.profile.unwrap_or_else(|error| {
-        log::warn!(
-            "Space profile {} fell back to public fields: {}",
-            post.author.space_id,
-            ente_core::error::chain(&error)
-        );
-        None
-    });
     PostResponse {
         post_id: post.post_id,
         space_id: post.space_id,
         space_slug: post.space_slug,
-        author: SpaceActorResponse {
-            space_id: post.author.space_id,
-            space_slug: post.author.space_slug,
-            public_key: post.author.public_key,
-            key_version: post.author.key_version,
-            profile: profile.map(Into::into),
-            avatar: post.author.avatar.map(Into::into),
-        },
+        author: actor_to_js(post.author),
         caption,
         photos,
         is_unavailable,
@@ -658,9 +663,7 @@ fn message_to_js(message: ente_space::Message) -> MessageResponse {
     }
 }
 
-fn message_activity_to_js(
-    activity: ente_space::MessageActivity,
-) -> MessageConversationActivity {
+fn message_activity_to_js(activity: ente_space::MessageActivity) -> MessageConversationActivity {
     let (text, reply_object_key, is_unavailable) = match activity.content {
         Ok(Some(content)) => (Some(content.text), content.reply_object_key, false),
         Ok(None) => (None, None, false),
@@ -1253,23 +1256,13 @@ impl SpaceAccountCtxHandle {
         space_id: String,
     ) -> Result<<ConversationsResponse as Tsify>::JsType, Error> {
         let response = self.inner.list_conversations(&space_id).await?;
-        let mut friends = Vec::with_capacity(response.friends.len());
-        for friend in response.friends {
-            friends.push(SpaceFriendResponse {
-                friend: account_actor_to_js(&self.inner, friend.friend).await?,
-                share_key_version: friend.share_key_version,
-                created_at: friend.created_at,
-            });
-        }
+        let friends = response.friends.into_iter().map(friend_to_js).collect();
 
-        let mut pending_requests = Vec::with_capacity(response.pending_requests.len());
-        for request in response.pending_requests {
-            pending_requests.push(SpaceFriendRequestResponse {
-                request_id: request.request_id,
-                requester: public_actor_to_js(request.requester),
-                created_at: request.created_at,
-            });
-        }
+        let pending_requests = response
+            .pending_requests
+            .into_iter()
+            .map(Into::into)
+            .collect();
 
         let mut chat_summaries = BTreeMap::new();
         for (friend_space_id, summary) in response.chat_summaries {
@@ -1343,18 +1336,10 @@ impl SpaceAccountCtxHandle {
         space_id: String,
     ) -> Result<Vec<<SpaceFriendResponse as Tsify>::JsType>, Error> {
         let friends = self.inner.list_space_friends(&space_id).await?;
-        let mut items = Vec::with_capacity(friends.len());
-        for friend in friends {
-            items.push(
-                SpaceFriendResponse {
-                    friend: account_actor_to_js(&self.inner, friend.friend).await?,
-                    share_key_version: friend.share_key_version,
-                    created_at: friend.created_at,
-                }
-                .into_js()?,
-            );
-        }
-        Ok(items)
+        friends
+            .into_iter()
+            .map(|friend| friend_to_js(friend).into_js().map_err(Into::into))
+            .collect()
     }
 
     #[wasm_bindgen(js_name = listFriendRequests)]
@@ -1363,18 +1348,14 @@ impl SpaceAccountCtxHandle {
         space_id: String,
     ) -> Result<Vec<<SpaceFriendRequestResponse as Tsify>::JsType>, Error> {
         let requests = self.inner.list_friend_requests(&space_id).await?;
-        let mut items = Vec::with_capacity(requests.len());
-        for request in requests {
-            items.push(
-                SpaceFriendRequestResponse {
-                    request_id: request.request_id,
-                    requester: public_actor_to_js(request.requester),
-                    created_at: request.created_at,
-                }
-                .into_js()?,
-            );
-        }
-        Ok(items)
+        requests
+            .into_iter()
+            .map(|request| {
+                SpaceFriendRequestResponse::from(request)
+                    .into_js()
+                    .map_err(Into::into)
+            })
+            .collect()
     }
 
     #[wasm_bindgen(js_name = listSentFriendRequests)]
@@ -1383,18 +1364,14 @@ impl SpaceAccountCtxHandle {
         space_id: String,
     ) -> Result<Vec<<SpaceSentFriendRequestResponse as Tsify>::JsType>, Error> {
         let requests = self.inner.list_sent_friend_requests(&space_id).await?;
-        let mut items = Vec::with_capacity(requests.len());
-        for request in requests {
-            items.push(
-                SpaceSentFriendRequestResponse {
-                    request_id: request.request_id,
-                    target: public_actor_to_js(request.target),
-                    created_at: request.created_at,
-                }
-                .into_js()?,
-            );
-        }
-        Ok(items)
+        requests
+            .into_iter()
+            .map(|request| {
+                SpaceSentFriendRequestResponse::from(request)
+                    .into_js()
+                    .map_err(Into::into)
+            })
+            .collect()
     }
 
     #[wasm_bindgen(js_name = confirmFriendRequest)]
@@ -1434,20 +1411,5 @@ impl SpaceAccountCtxHandle {
             .unfriend_by_space(&actor_space_id, &space_id)
             .await
             .map_err(Into::into)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn http_errors_are_not_content_errors() {
-        let error = Error::from(ente_space::Error::Http(ente_core::http::Error::Http {
-            status: 500,
-            path: "/space".into(),
-        }));
-
-        assert!(!error.is_content_error());
     }
 }
