@@ -61,6 +61,9 @@ public struct PasswordField<Trailing: View>: View {
         } trailing: {
             trailing
         }
+        .onChange(of: enabled) { enabled in
+            if !enabled { focused = false }
+        }
     }
 }
 
