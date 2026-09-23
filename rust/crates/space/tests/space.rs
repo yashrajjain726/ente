@@ -388,11 +388,10 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite(endpoint: &str) 
         .iter()
         .find(|message| message.message_id == direct_message.message_id)
         .expect("direct message should be in owner thread before unfriend");
-    let decrypted_message = owner_ctx
-        .decrypt_message(&owner_space.space_id, owner_thread_message)
-        .await
-        .expect("owner should decrypt direct message before unfriend");
-    assert_eq!(decrypted_message.payload.text, "hello before unfriend");
+    assert!(matches!(
+        &owner_thread_message.content,
+        Ok(Some(content)) if content.text == "hello before unfriend"
+    ));
     owner_ctx
         .like_message(&owner_space.space_id, &direct_message.message_id, true)
         .await
@@ -465,11 +464,10 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite(endpoint: &str) 
         .iter()
         .find(|message| message.message_id == direct_message.message_id)
         .expect("direct message should remain in owner thread after unfriend");
-    let decrypted_message = owner_ctx
-        .decrypt_message(&owner_space.space_id, owner_thread_message)
-        .await
-        .expect("owner should still decrypt old direct message after unfriend");
-    assert_eq!(decrypted_message.payload.text, "hello before unfriend");
+    assert!(matches!(
+        &owner_thread_message.content,
+        Ok(Some(content)) if content.text == "hello before unfriend"
+    ));
     space::assert_invalid_input_contains(
         friend_ctx
             .send_message(&friend_space.space_id, &owner_space.space_id, "should fail")

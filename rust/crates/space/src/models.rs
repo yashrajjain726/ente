@@ -1,8 +1,13 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use zeroize::ZeroizeOnDrop;
 
 use crate::Result;
-use crate::transport::{ProfileAvatarResponse, ProfileCoverResponse, SpaceKeyResponse};
+use crate::transport::{
+    ProfileAvatarResponse, ProfileCoverResponse, SpaceFriendRequestResponse, SpaceFriendResponse,
+    SpaceKeyResponse,
+};
 
 #[derive(Clone)]
 pub struct OpenAccountSpaceCtxInput {
@@ -130,6 +135,54 @@ pub struct PostPage {
     pub next_cursor: String,
 }
 
+pub struct Message {
+    pub message_id: String,
+    pub kind: String,
+    pub sender_space_id: String,
+    pub recipient_space_id: String,
+    pub content: Result<Option<MessageContent>>,
+    pub reply_post_id: Option<i64>,
+    pub reply_message_id: Option<String>,
+    pub liked: bool,
+    pub viewer_liked: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+pub struct MessageContent {
+    pub text: String,
+    pub reply_object_key: Option<String>,
+}
+
+pub struct MessagePage {
+    pub items: Vec<Message>,
+    pub next_cursor: String,
+}
+
+pub struct MessageActivity {
+    pub id: String,
+    pub activity_type: String,
+    pub kind: String,
+    pub created_at: String,
+    pub outgoing: bool,
+    pub message_id: Option<String>,
+    pub content: Result<Option<MessageContent>>,
+    pub post_id: Option<i64>,
+    pub post_space_id: Option<String>,
+}
+
+pub struct ConversationChatSummary {
+    pub latest_activity: MessageActivity,
+    pub unread_activities: Vec<MessageActivity>,
+}
+
+pub struct Conversations {
+    pub friends: Vec<SpaceFriendResponse>,
+    pub pending_requests: Vec<SpaceFriendRequestResponse>,
+    pub chat_summaries: BTreeMap<String, ConversationChatSummary>,
+    pub latest_post_created_at: Option<String>,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PostObjectMetadata {
@@ -155,12 +208,6 @@ pub struct MessagePayload {
     pub text: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reply_object_key: Option<String>,
-}
-
-#[derive(Clone)]
-pub struct DecryptedMessage {
-    pub message_key: Vec<u8>,
-    pub payload: MessagePayload,
 }
 
 #[derive(Clone, ZeroizeOnDrop)]

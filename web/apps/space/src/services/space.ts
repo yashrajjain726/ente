@@ -1300,14 +1300,7 @@ export const loadCurrentMessageConversations = async (
                     ? messageActivityFromSpaceActivity(summary.latestActivity)
                     : undefined;
                 const unreadActivities = summary
-                    ? summary.unreadActivities
-                          .map(messageActivityFromSpaceActivity)
-                          .map((activity) =>
-                              activity.id == latestActivity?.id &&
-                              isPokeMessageActivity(latestActivity)
-                                  ? { ...activity, kind: "poke" as const }
-                                  : activity,
-                          )
+                    ? summary.unreadActivities.map(messageActivityFromSpaceActivity)
                     : [];
                 const unreadCount =
                     messageConversationUnreadCount(unreadActivities);
