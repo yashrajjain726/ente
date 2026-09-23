@@ -882,22 +882,9 @@ impl SpaceAccountCtxHandle {
         profile: String,
         avatar_bytes: Vec<u8>,
     ) -> Result<<UpdateSpaceProfileResponse as Tsify>::JsType, Error> {
-        let space_key = self
-            .inner
-            .resolve_owned_space_key(&space_id)
-            .await?
-            .ok_or_else(|| {
-                ente_space::Error::InvalidInput(format!(
-                    "space {space_id} is not owned by the account"
-                ))
-            })?;
-        let avatar = self
-            .inner
-            .upload_avatar(&space_id, &space_key, &avatar_bytes)
-            .await?;
         UpdateSpaceProfileResponse::from(
             self.inner
-                .update_space_profile(&space_id, profile.as_bytes(), Some(avatar), false)
+                .update_space_profile_with_avatar(&space_id, profile.as_bytes(), &avatar_bytes)
                 .await?,
         )
         .into_js()
@@ -911,29 +898,9 @@ impl SpaceAccountCtxHandle {
         profile: String,
         cover_bytes: Vec<u8>,
     ) -> Result<<UpdateSpaceProfileResponse as Tsify>::JsType, Error> {
-        let space_key = self
-            .inner
-            .resolve_owned_space_key(&space_id)
-            .await?
-            .ok_or_else(|| {
-                ente_space::Error::InvalidInput(format!(
-                    "space {space_id} is not owned by the account"
-                ))
-            })?;
-        let cover = self
-            .inner
-            .upload_cover(&space_id, &space_key, &cover_bytes)
-            .await?;
         UpdateSpaceProfileResponse::from(
             self.inner
-                .update_space_profile_assets(
-                    &space_id,
-                    profile.as_bytes(),
-                    None,
-                    Some(cover),
-                    false,
-                    false,
-                )
+                .update_space_profile_with_cover(&space_id, profile.as_bytes(), &cover_bytes)
                 .await?,
         )
         .into_js()
