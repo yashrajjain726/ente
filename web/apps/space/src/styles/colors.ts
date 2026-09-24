@@ -11,3 +11,4 @@ export const spaceControlBackgroundActive = "#484848";
 export const spaceText = "#F2F2F2";
 export const spaceTextMuted = "#B0B0B0";
 export const spaceOnAccent = "#FFFFFF";
+export const spaceDanger = "#F63A3A";

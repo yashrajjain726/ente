@@ -1342,6 +1342,55 @@ async fn update_space_profile_sends_encrypted_profile_and_profile_assets() {
 }
 
 #[tokio::test]
+async fn removing_profile_images_sets_only_the_requested_asset_flag() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let space_key = generate_key();
+    let spaces = server
+        .mock("GET", "/account/space")
+        .with_status(200)
+        .with_body(owned_space_response(
+            &space_root_key,
+            &space_key,
+            "space_owner_main",
+            "owner-main",
+            3,
+        ))
+        .create_async()
+        .await;
+    let cover = server
+        .mock("POST", "/spaces/space_owner_main/profile")
+        .match_body(Matcher::Regex(
+            r#"^\{"keyVersion":3,"encryptedProfile":"[^"]+","removeCover":true\}$"#.into(),
+        ))
+        .with_status(200)
+        .with_body(r#"{"status":"updated"}"#)
+        .create_async()
+        .await;
+    let avatar = server
+        .mock("POST", "/spaces/space_owner_main/profile")
+        .match_body(Matcher::Regex(
+            r#"^\{"keyVersion":3,"encryptedProfile":"[^"]+","removeAvatar":true\}$"#.into(),
+        ))
+        .with_status(200)
+        .with_body(r#"{"status":"updated"}"#)
+        .create_async()
+        .await;
+
+    ctx.remove_space_profile_cover("space_owner_main", b"profile-v2")
+        .await
+        .expect("cover removal should succeed");
+    ctx.remove_space_profile_avatar("space_owner_main", b"profile-v2")
+        .await
+        .expect("avatar removal should succeed");
+
+    spaces.assert_async().await;
+    cover.assert_async().await;
+    avatar.assert_async().await;
+}
+
+#[tokio::test]
 async fn get_space_profile_decrypted_loads_and_decrypts_profile() {
     let mut server = Server::new_async().await;
     let space_root_key = generate_key();

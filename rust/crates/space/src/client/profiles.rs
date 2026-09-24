@@ -142,6 +142,24 @@ impl AccountSpaceCtx {
             .await
     }
 
+    pub async fn remove_space_profile_cover(
+        &self,
+        space_id: &str,
+        profile: &[u8],
+    ) -> Result<UpdateSpaceProfileResponse> {
+        self.update_space_profile_assets(space_id, profile, None, None, false, true)
+            .await
+    }
+
+    pub async fn remove_space_profile_avatar(
+        &self,
+        space_id: &str,
+        profile: &[u8],
+    ) -> Result<UpdateSpaceProfileResponse> {
+        self.update_space_profile(space_id, profile, None, true)
+            .await
+    }
+
     pub async fn update_space_profile_assets(
         &self,
         space_id: &str,
