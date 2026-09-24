@@ -126,8 +126,6 @@ class SmartAlbumsService {
         SmartAlbumSyncingEvent(collectionId: collectionId, isSyncing: false),
       );
 
-      final infoMap = config.infoMap;
-
       final updatedAtMap = await entityService.getUpdatedAts(
         EntityType.cgroup,
         config.personIDs.toList(),
@@ -138,9 +136,7 @@ class SmartAlbumsService {
 
       var newConfig = config;
       for (final personId in config.personIDs) {
-        if (updatedAtMap[personId] == null ||
-            infoMap[personId] != null &&
-                (updatedAtMap[personId]! <= infoMap[personId]!.updatedAt)) {
+        if (updatedAtMap[personId] == null) {
           continue;
         }
 
@@ -156,6 +152,10 @@ class SmartAlbumsService {
                   ) ||
                   e.ownerID != userId,
             );
+
+        if (fileIds.isEmpty) {
+          continue;
+        }
 
         pendingSyncFiles = {
           ...pendingSyncFiles,
@@ -253,7 +253,7 @@ class SmartAlbumsService {
       addWithCustomID: addWithCustomID,
     );
 
-    _lastCacheRefreshTime = 0;
+    clearCache();
     return result;
   }
 
@@ -264,6 +264,6 @@ class SmartAlbumsService {
     _logger.fine("Deleting entry for collection ($collectionId)");
     final id = getId(collectionId: collectionId, userId: userId);
     await entityService.deleteEntry(id);
-    _lastCacheRefreshTime = 0;
+    clearCache();
   }
 }
