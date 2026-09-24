@@ -57,7 +57,7 @@ export const spaceDefaultCoverImagePath = "/images/default-cover-image.jpg";
 export const spaceProfileCoverAspectRatio = 39 / 17;
 const spaceAvatarImageMaxEdge = 512;
 const spaceCoverImageMaxWidth = 1170;
-const spacePostImageMaxLongEdge = 1600;
+const spacePostImageMaxLongEdge = 1920;
 const spacePostImageWebPQuality = 0.82;
 const spacePostImageMimeType = "image/webp";
 const spaceAssetEncryptionOverheadBytes = 42;
@@ -364,6 +364,18 @@ interface CanvasPlan {
     width: number;
 }
 
+const imageCanvasContext = (canvas: HTMLCanvasElement) => {
+    let context: CanvasRenderingContext2D | null;
+    try {
+        context = canvas.getContext("2d", { colorSpace: "display-p3" });
+    } catch {
+        context = canvas.getContext("2d");
+    }
+    context ??= canvas.getContext("2d");
+    if (!context) throw new Error("Could not create image canvas");
+    return context;
+};
+
 const webPBlobFromImage = async (
     imageSource: Blob | string,
     planForSource: (width: number, height: number) => CanvasPlan,
@@ -393,8 +405,7 @@ const webPBlobFromImage = async (
         canvas.width = plan.width;
         canvas.height = plan.height;
 
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("Could not create image canvas");
+        const context = imageCanvasContext(canvas);
 
         context.drawImage(
             image,
@@ -467,8 +478,7 @@ const webPBlobFromEditedImage = async (
         canvas.width = dimensions.width;
         canvas.height = dimensions.height;
 
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("Could not create image canvas");
+        const context = imageCanvasContext(canvas);
 
         context.drawImage(
             sourceCanvas,
@@ -521,8 +531,7 @@ const rotatedImageCanvas = (
     canvas.width = rotatedWidth;
     canvas.height = rotatedHeight;
 
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Could not create image canvas");
+    const context = imageCanvasContext(canvas);
 
     context.translate(rotatedWidth / 2, rotatedHeight / 2);
     context.rotate(rotationRadians);
@@ -556,8 +565,7 @@ const croppedImageCanvas = (
     canvas.width = sourceWidth;
     canvas.height = sourceHeight;
 
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Could not create image canvas");
+    const context = imageCanvasContext(canvas);
 
     context.drawImage(
         sourceCanvas,
