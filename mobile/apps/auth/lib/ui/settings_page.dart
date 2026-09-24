@@ -81,6 +81,9 @@ class SettingsPage extends StatelessWidget {
           title: l10n.signInToBackup,
           leadingIcon: HugeIcons.strokeRoundedCloudUpload,
           state: BannerComponentState.informative,
+          foregroundColor: Theme.of(context).brightness == Brightness.dark
+              ? purpleStrokeLight
+              : context.componentColors.primaryDark,
           trailingWidget: const Icon(Icons.arrow_forward),
           onTap: () => _showBackupReminder(context),
         ),
