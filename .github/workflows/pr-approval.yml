@@ -188,6 +188,8 @@ jobs:
                       await writeFile(
                           join(codexHome, "config.toml"),
                           [
+                              'model_reasoning_effort = "high"',
+                              "",
                               `[projects.${JSON.stringify(join(process.env.GITHUB_WORKSPACE, "review"))}]`,
                               'trust_level = "untrusted"',
                               "",
@@ -215,7 +217,6 @@ jobs:
                   openai-api-key: ${{ secrets.OPENAI_API_KEY }}
                   responses-api-endpoint: ${{ format('{0}/responses', vars.OPENAI_BASE_URL) }}
                   model: ${{ vars.CODEX_MODEL || 'gpt-6-astra' }}
-                  effort: high
                   codex-args: '["--ephemeral", "review", "-"]'
                   permission-profile: ":read-only"
                   safety-strategy: drop-sudo
