@@ -131,7 +131,7 @@ interface PublicSpaceIdentityResponse {
     spaceSlug?: string;
 }
 
-export type SpaceMessageKind = MessageResponse["kind"];
+type SpaceMessageKind = MessageResponse["kind"];
 
 export interface SpaceMessageQuote {
     imageUrl?: string;
@@ -161,7 +161,7 @@ export interface SpaceMessage {
     isUnavailable?: boolean;
 }
 
-export type SpaceMessageActivityType = MessageConversationActivity["type"];
+type SpaceMessageActivityType = MessageConversationActivity["type"];
 
 export type SpaceMessageActivityPost = SpaceMessageQuote;
 

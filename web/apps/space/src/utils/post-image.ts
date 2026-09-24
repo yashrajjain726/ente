@@ -3,7 +3,7 @@ import { isHEICExtension } from "ente-media/formats";
 import { heicToJPEG } from "ente-media/heic-convert";
 import { thumbHashBase64FromCanvas } from "utils/thumbhash";
 
-export interface PreparedSpaceImage {
+interface PreparedSpaceImage {
     file: File;
     height: number;
     width: number;
@@ -65,16 +65,16 @@ const spaceAvatarUploadMaxBytes = 2 * 1024 * 1024;
 const spaceCoverUploadMaxBytes = 2 * 1024 * 1024;
 const spacePostUploadMaxBytes = 5 * 1024 * 1024;
 
-export const maxSpaceAvatarImageBytes =
+const maxSpaceAvatarImageBytes =
     spaceAvatarUploadMaxBytes - spaceAssetEncryptionOverheadBytes;
-export const maxSpaceCoverImageBytes =
+const maxSpaceCoverImageBytes =
     spaceCoverUploadMaxBytes - spaceAssetEncryptionOverheadBytes;
-export const maxSpacePostImageBytes =
+const maxSpacePostImageBytes =
     spacePostUploadMaxBytes - spaceAssetEncryptionOverheadBytes;
-export const spaceAvatarImageMaxSizeMessage =
+const spaceAvatarImageMaxSizeMessage =
     "This photo is too large. Try a smaller one.";
-export const spaceCoverImageMaxSizeMessage = spaceAvatarImageMaxSizeMessage;
-export const spacePostImageMaxSizeMessage =
+const spaceCoverImageMaxSizeMessage = spaceAvatarImageMaxSizeMessage;
+const spacePostImageMaxSizeMessage =
     "This photo is too large. Try a smaller one.";
 const unsupportedSpaceImageMessage = "Only photos can be uploaded.";
 const supportedSpaceImageMimeTypes = new Set([
@@ -94,7 +94,7 @@ const supportedSpaceImageExtensions = new Set([
     "heif",
 ]);
 
-export const prepareSpacePostImage = async (
+const prepareSpacePostImage = async (
     file: File,
 ): Promise<PreparedSpacePostImage> => {
     const renderableBlob = await renderableBlobForSpaceImage(file);
@@ -193,30 +193,6 @@ export const spacePostPreviewImageFromEdit = async (
         edit.rotationDegrees,
     );
     return { url: URL.createObjectURL(blob), height, width };
-};
-
-export const prepareSpaceAvatarImage = async (
-    file: File,
-): Promise<PreparedSpaceAvatarImage> => {
-    const renderableBlob = await renderableBlobForSpaceImage(file);
-    const { blob, height, width } = await webPBlobFromImage(
-        renderableBlob,
-        avatarCanvasPlan,
-    );
-    assertSpaceImageSize(
-        blob,
-        maxSpaceAvatarImageBytes,
-        spaceAvatarImageMaxSizeMessage,
-    );
-
-    return {
-        file: new File([blob], webPFileName(file.name), {
-            lastModified: file.lastModified || Date.now(),
-            type: spacePostImageMimeType,
-        }),
-        height,
-        width,
-    };
 };
 
 export const spaceAvatarCropImageForFile = async (
@@ -585,30 +561,6 @@ const postCanvasPlan = (width: number, height: number): CanvasPlan => {
         sourceWidth: width,
         sourceX: 0,
         sourceY: 0,
-    };
-};
-
-const avatarCanvasPlan = (width: number, height: number): CanvasPlan => {
-    if (width <= 0 || height <= 0) {
-        return {
-            height: 0,
-            sourceHeight: 0,
-            sourceWidth: 0,
-            sourceX: 0,
-            sourceY: 0,
-            width: 0,
-        };
-    }
-
-    const sourceEdge = Math.min(width, height);
-    const outputEdge = Math.min(sourceEdge, spaceAvatarImageMaxEdge);
-    return {
-        height: outputEdge,
-        sourceHeight: sourceEdge,
-        sourceWidth: sourceEdge,
-        sourceX: Math.floor((width - sourceEdge) / 2),
-        sourceY: Math.floor((height - sourceEdge) / 2),
-        width: outputEdge,
     };
 };
 
