@@ -640,10 +640,10 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         Map<string, Promise<string | null | undefined>>
     >(new Map());
     const isUnfriendActionRunning = unfriendActionPhase != null;
-    const searchTerm = searchQuery.trim().toLocaleLowerCase();
+    const searchTerm = searchQuery.trim().toLowerCase();
     const matchesSearch = (friend: FriendProfile) =>
-        friend.fullName.toLocaleLowerCase().includes(searchTerm) ||
-        `@${friend.username}`.toLocaleLowerCase().includes(searchTerm);
+        friend.fullName.toLowerCase().includes(searchTerm) ||
+        `@${friend.username}`.toLowerCase().includes(searchTerm);
     const visibleFriendRequests = searchTerm
         ? friendRequests.filter((request) => matchesSearch(request.friend))
         : friendRequests;
@@ -860,7 +860,9 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     tabIndex={-1}
                 >
                     {!isLoading &&
-                        (friendRequests.length > 0 || friends.length > 0) && (
+                        (friendRequests.length > 0 ||
+                            friends.length > 0 ||
+                            Boolean(searchTerm)) && (
                             <Box
                                 sx={{
                                     alignItems: "center",
