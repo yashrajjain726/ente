@@ -3,6 +3,7 @@ import {
     BubbleChatIcon,
     Cancel01Icon,
     MoreVerticalIcon,
+    Search01Icon,
     UserAdd02Icon,
     UserRemove01Icon,
 } from "@hugeicons/core-free-icons";
@@ -623,6 +624,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     onUnfriend,
 }) => {
     const [isAddFriendOpen, setIsAddFriendOpen] = React.useState(false);
+    const [searchQuery, setSearchQuery] = React.useState("");
     const [friendToUnfriend, setFriendToUnfriend] =
         React.useState<FriendProfile | null>(null);
     const [unfriendActionPhase, setUnfriendActionPhase] =
@@ -638,6 +640,14 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         Map<string, Promise<string | null | undefined>>
     >(new Map());
     const isUnfriendActionRunning = unfriendActionPhase != null;
+    const searchTerm = searchQuery.trim().toLocaleLowerCase();
+    const matchesSearch = (friend: FriendProfile) =>
+        friend.fullName.toLocaleLowerCase().includes(searchTerm) ||
+        `@${friend.username}`.toLocaleLowerCase().includes(searchTerm);
+    const visibleFriendRequests = searchTerm
+        ? friendRequests.filter((request) => matchesSearch(request.friend))
+        : friendRequests;
+    const visibleFriends = searchTerm ? friends.filter(matchesSearch) : friends;
 
     const loadedAvatarURLFor = React.useCallback(
         (friend: FriendProfile) =>
@@ -849,6 +859,89 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     aria-label="Friends"
                     tabIndex={-1}
                 >
+                    {!isLoading &&
+                        (friendRequests.length > 0 || friends.length > 0) && (
+                            <Box
+                                sx={{
+                                    alignItems: "center",
+                                    bgcolor: spaceSurface,
+                                    borderRadius: "14px",
+                                    display: "flex",
+                                    height: 48,
+                                    mx: "18px",
+                                    mt: "12px",
+                                    px: "14px",
+                                    "&:focus-within": {
+                                        outline: `2px solid ${green}`,
+                                    },
+                                }}
+                            >
+                                <HugeiconsIcon
+                                    icon={Search01Icon}
+                                    size={20}
+                                    color={textSoft}
+                                    strokeWidth={1.8}
+                                />
+                                <Box
+                                    component="input"
+                                    type="text"
+                                    inputMode="search"
+                                    aria-label="Search friends"
+                                    autoComplete="off"
+                                    onChange={(event) =>
+                                        setSearchQuery(event.target.value)
+                                    }
+                                    placeholder="Search friends"
+                                    value={searchQuery}
+                                    sx={{
+                                        bgcolor: "transparent",
+                                        border: 0,
+                                        color: textBase,
+                                        flex: 1,
+                                        fontFamily:
+                                            '"Inter Variable", Inter, sans-serif',
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        height: "100%",
+                                        minWidth: 0,
+                                        ml: "10px",
+                                        outline: 0,
+                                        p: 0,
+                                        "&::placeholder": {
+                                            color: textSoft,
+                                            opacity: 1,
+                                        },
+                                    }}
+                                />
+                                {searchQuery && (
+                                    <Box
+                                        component="button"
+                                        type="button"
+                                        aria-label="Clear search"
+                                        onClick={() => setSearchQuery("")}
+                                        sx={{
+                                            alignItems: "center",
+                                            bgcolor: "transparent",
+                                            border: 0,
+                                            color: textSoft,
+                                            cursor: "pointer",
+                                            display: "flex",
+                                            height: spaceTouchTargetSize,
+                                            justifyContent: "center",
+                                            mr: "-14px",
+                                            p: 0,
+                                            width: spaceTouchTargetSize,
+                                        }}
+                                    >
+                                        <HugeiconsIcon
+                                            icon={Cancel01Icon}
+                                            size={18}
+                                            strokeWidth={1.8}
+                                        />
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
                     {isLoading ? (
                         <Box
                             sx={{
@@ -861,7 +954,8 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                         >
                             <SpaceLoadingSpinner ariaLabel="Loading friends" />
                         </Box>
-                    ) : friendRequests.length > 0 || friends.length > 0 ? (
+                    ) : visibleFriendRequests.length > 0 ||
+                      visibleFriends.length > 0 ? (
                         <Box
                             component="ul"
                             sx={{
@@ -874,7 +968,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                                 width: "100%",
                             }}
                         >
-                            {friendRequests.map((request) => (
+                            {visibleFriendRequests.map((request) => (
                                 <FriendRequestRow
                                     key={`request-${request.requestId}`}
                                     request={request}
@@ -882,7 +976,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                                     onDelete={onDeleteFriendRequest}
                                 />
                             ))}
-                            {friends.map((friend) => (
+                            {visibleFriends.map((friend) => (
                                 <FriendRow
                                     key={friend.id}
                                     avatarUrl={loadedAvatarURLFor(friend)}
@@ -898,6 +992,20 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                                     }}
                                 />
                             ))}
+                        </Box>
+                    ) : searchTerm ? (
+                        <Box
+                            role="status"
+                            sx={{
+                                color: textSoft,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 14,
+                                mt: "72px",
+                                textAlign: "center",
+                            }}
+                        >
+                            No results found.
                         </Box>
                     ) : (
                         <Box
