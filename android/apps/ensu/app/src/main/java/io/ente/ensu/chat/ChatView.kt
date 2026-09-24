@@ -73,6 +73,7 @@ fun ChatView(
     onDismissUnsupportedDeviceDialog: () -> Unit,
     onOverflowTrim: () -> Unit,
     onOverflowCancel: () -> Unit,
+    onVoiceInputStarted: () -> Unit,
 ) {
     val density = LocalDensity.current
     val context = LocalContext.current
@@ -117,6 +118,7 @@ fun ChatView(
             pendingVoiceSessionKey = null
             if (granted) {
                 if (requestedSessionKey != null) {
+                    onVoiceInputStarted()
                     voiceController.startRecording {
                         latestSessionKey == requestedSessionKey && latestCanStartVoiceInput
                     }
@@ -296,6 +298,7 @@ fun ChatView(
                                 ) == PackageManager.PERMISSION_GRANTED
                             if (canStartVoiceInput && hasMicrophonePermission) {
                                 val requestedSessionKey = sessionKey
+                                onVoiceInputStarted()
                                 voiceController.startRecording {
                                     latestSessionKey == requestedSessionKey &&
                                         latestCanStartVoiceInput

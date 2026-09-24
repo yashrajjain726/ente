@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import os
 import SwiftUI
@@ -92,6 +93,11 @@ final class ChatViewModel: ObservableObject {
     @Published var draftCursorMoveToken = UUID()
     let knowledgeStore: KnowledgeStore
     let notesStore: NotesStore
+    private var chatActive = false
+    private var warmupSuppressed = false
+    private var warmupTask: Task<Void, Never>?
+    private var warmupAttempt: (owner: UUID, selection: ModelReadyKey)?
+    private var warmupObservation: AnyCancellable?
 
     private let provider: LlmProvider
     private let knowledgeEmbedding: KnowledgeEmbeddingConfig
@@ -219,10 +225,70 @@ final class ChatViewModel: ObservableObject {
 
         refreshDeviceCapability()
         refreshModelDownloadInfo()
+        warmupObservation = Publishers.CombineLatest(knowledgeStore.$packs, notesStore.$collections)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.refreshChatWarmup() }
+            }
         Task {
             async let knowledge: Void = knowledgeStore.bootstrap()
             async let notes: Void = notesStore.bootstrap()
             _ = await (knowledge, notes)
+        }
+    }
+
+    func setChatActive(_ active: Bool) {
+        guard chatActive != active else { return }
+        chatActive = active
+        if active { warmupSuppressed = false }
+        refreshChatWarmup()
+    }
+
+    func suppressChatWarmup() {
+        warmupSuppressed = true
+        cancelChatWarmup()
+    }
+
+    private func cancelChatWarmup() {
+        warmupTask?.cancel()
+        warmupTask = nil
+        let owner = warmupAttempt?.owner
+        warmupAttempt = nil
+        if let owner {
+            Task { await provider.releaseChatWarmup(owner: owner) }
+        }
+    }
+
+    private func refreshChatWarmup() {
+        let selection = modelSettings.currentSelection()
+        let key = modelReadyKey(for: selection)
+        let eligible =
+            chatActive && !warmupSuppressed && !isChatUnsupported
+            && !voiceInputState.isWorking
+            && knowledgeStore.packs.allSatisfy { !$0.enabled } && notesStore.collections.isEmpty
+        guard eligible else {
+            cancelChatWarmup()
+            return
+        }
+        if let attempt = warmupAttempt, attempt.selection != key { cancelChatWarmup() }
+        guard warmupAttempt == nil, !isGenerating, !isDownloading,
+            isModelDownloaded
+        else { return }
+        let owner = UUID()
+        warmupAttempt = (owner, key)
+        warmupTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await Task.sleep(nanoseconds: 350_000_000)
+                await knowledgeStore.bootstrap()
+                await notesStore.bootstrap()
+                try Task.checkCancellation()
+                guard !isGenerating, !isDownloading, !voiceInputState.isWorking,
+                    knowledgeStore.packs.allSatisfy({ !$0.enabled }), notesStore.collections.isEmpty
+                else { return }
+                try await provider.prewarmChatModelIfDownloaded(selection, owner: owner)
+            } catch {
+                if !isCancellation(error) { logger.info("Chat warm-up skipped") }
+            }
         }
     }
 
@@ -400,6 +466,7 @@ final class ChatViewModel: ObservableObject {
     }
 
     func toggleVoiceInput() {
+        suppressChatWarmup()
         if voiceInputState.isRecording {
             voiceTranscriber.stopAndTranscribe(
                 onState: { [weak self] state in
@@ -743,6 +810,7 @@ final class ChatViewModel: ObservableObject {
     }
 
     func refreshModelDownloadInfo() {
+        defer { refreshChatWarmup() }
         notesStore.modelReadinessChanged()
         guard !isChatUnsupported else {
             isDownloading = false
@@ -1997,7 +2065,7 @@ final class ChatViewModel: ObservableObject {
                 provider: provider,
                 selection: selection
             )
-            guard let summary else { return }
+            guard !Task.isCancelled, let summary else { return }
 
             await MainActor.run {
                 self.applySessionSummary(sessionId: sessionId, summary: summary)
@@ -2098,13 +2166,9 @@ final class ChatViewModel: ObservableObject {
         let buffer = OSAllocatedUnfairLock(initialState: "")
 
         do {
-            try await provider.ensureModelReady(selection) { _ in }
-            _ = try await provider.generateChat(
+            try await provider.generateTitle(
                 selection,
-                messages: messages,
-                imageFiles: [],
-                temperature: 0.2,
-                maxTokens: 64
+                messages: messages
             ) { token in
                 buffer.withLock { $0.append(token) }
             }

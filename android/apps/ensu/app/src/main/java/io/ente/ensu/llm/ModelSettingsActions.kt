@@ -11,12 +11,17 @@ import io.ente.ensu.coroutines.runCatchingCancellable
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.logging.LogLevel
+import io.ente.ensu.notes.NotesStore
 import io.ente.ensu.settings.IS_ENSU_PACKS_ENABLED
 import io.ente.ensu.settings.SessionPreferencesDataStore
+import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -25,12 +30,24 @@ internal class ModelSettingsActions(
     private val sessionPreferences: SessionPreferencesDataStore,
     private val llmProvider: LlmProvider,
     private val logRepository: FileLogRepository,
+    private val notesStore: NotesStore,
+    private val awaitKnowledgeReady: suspend () -> Unit,
 ) {
     private var scope: CoroutineScope? = null
     private var modelDownloadJob: Job? = null
+    private var chatActive = false
+    private var warmupSuppressed = false
+    private var warmupJob: Job? = null
+    private var warmupOwner: String? = null
+    private var warmupSelection: LlmModelSelection? = null
 
-    fun setScope(scope: CoroutineScope) {
+    fun bootstrap(scope: CoroutineScope) {
         this.scope = scope
+        scope.launch {
+            awaitKnowledgeReady()
+            notesStore.awaitReady()
+            combine(state, notesStore.state) { _, _ -> Unit }.collect { refreshChatWarmup() }
+        }
     }
 
     fun updateModelSettings(settings: ModelSettingsState) {
@@ -299,6 +316,79 @@ internal class ModelSettingsActions(
                 }
                 modelDownloadJob = null
                 refreshModelDownloadInfo()
+            }
+        }
+    }
+
+    fun setChatActive(active: Boolean) {
+        if (chatActive == active) return
+        chatActive = active
+        if (active) warmupSuppressed = false
+        refreshChatWarmup()
+    }
+
+    fun suppressChatWarmup() {
+        warmupSuppressed = true
+        cancelChatWarmup()
+    }
+
+    private fun cancelChatWarmup() {
+        warmupJob?.cancel()
+        warmupJob = null
+        val owner = warmupOwner
+        warmupOwner = null
+        warmupSelection = null
+        if (owner != null) scope?.launch { llmProvider.releaseChatWarmup(owner) }
+    }
+
+    private fun refreshChatWarmup() {
+        val current = state.value
+        val selection = resolveSelection(current.modelSettings)
+        val eligible =
+            chatActive &&
+                !warmupSuppressed &&
+                current.chat.deviceCapability.isChatSupported() &&
+                current.knowledge.packs.values.none { it.enabled } &&
+                notesStore.state.value.collections.isEmpty()
+        if (!eligible || (warmupSelection != null && warmupSelection != selection)) {
+            cancelChatWarmup()
+        }
+        if (
+            !eligible ||
+                warmupOwner != null ||
+                current.chat.isGenerating ||
+                current.chat.isDownloading ||
+                !current.chat.isModelDownloaded
+        )
+            return
+        val scope = scope ?: return
+        val owner = UUID.randomUUID().toString()
+        warmupOwner = owner
+        warmupSelection = selection
+        warmupJob = scope.launch {
+            try {
+                delay(350)
+                awaitKnowledgeReady()
+                notesStore.awaitReady()
+                coroutineContext.ensureActive()
+                val latest = state.value
+                if (
+                    latest.chat.isGenerating ||
+                        latest.chat.isDownloading ||
+                        latest.knowledge.packs.values.any { it.enabled } ||
+                        notesStore.state.value.collections.isNotEmpty()
+                )
+                    return@launch
+                llmProvider.prewarmChatModelIfDownloaded(selection, owner)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                logRepository.log(
+                    LogLevel.Info,
+                    "Chat warm-up skipped",
+                    tag = "Model",
+                    throwable = error,
+                )
             }
         }
     }

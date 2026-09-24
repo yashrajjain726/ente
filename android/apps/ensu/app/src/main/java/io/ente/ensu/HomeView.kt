@@ -3,8 +3,10 @@
 package io.ente.ensu
 
 import android.annotation.SuppressLint
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
@@ -197,20 +199,47 @@ fun HomeView(
             scope.launch { drawerState.close() }
         }
 
-        DisposableEffect(lifecycleOwner) {
+        DisposableEffect(lifecycleOwner, isChatRoute) {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
                     latestStore.notesStore.setForeground(true)
                     latestStore.refreshModelDownloadInfo()
+                    latestStore.setChatActive(isChatRoute)
                 } else if (event == Lifecycle.Event.ON_STOP) {
                     latestStore.notesStore.setForeground(false)
+                    latestStore.setChatActive(false)
                 }
             }
             latestStore.notesStore.setForeground(
                 lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
             )
             lifecycleOwner.lifecycle.addObserver(observer)
-            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+            latestStore.setChatActive(
+                isChatRoute &&
+                    lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+            )
+            onDispose {
+                latestStore.setChatActive(false)
+                lifecycleOwner.lifecycle.removeObserver(observer)
+            }
+        }
+
+        DisposableEffect(context) {
+            @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+            val callbacks =
+                object : ComponentCallbacks2 {
+                    override fun onConfigurationChanged(config: Configuration) = Unit
+
+                    override fun onLowMemory() = latestStore.suppressChatWarmup()
+
+                    override fun onTrimMemory(level: Int) {
+                        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+                            latestStore.suppressChatWarmup()
+                        }
+                    }
+                }
+            context.applicationContext.registerComponentCallbacks(callbacks)
+            onDispose { context.applicationContext.unregisterComponentCallbacks(callbacks) }
         }
 
         LaunchedEffect(whatsNewService) {
