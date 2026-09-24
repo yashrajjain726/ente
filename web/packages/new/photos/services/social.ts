@@ -47,24 +47,6 @@ export const getUnifiedSocialDiff = async (
     return decryptSocialDiff(collectionKey, await res.json());
 };
 
-// Remote filters this feed to activity relevant to the current user.
-// This includes replies or reactions to them and activity on files they own.
-export const getAlbumFeed = async (
-    collectionID: number,
-    collectionKey: string,
-): Promise<UnifiedSocialDiff> => {
-    const res = await fetch(
-        await apiURL("/social/album-feed", {
-            collectionID,
-            sinceTime: 0,
-            limit: 1000,
-        }),
-        { headers: await authenticatedRequestHeaders() },
-    );
-    ensureOk(res);
-    return decryptSocialDiff(collectionKey, await res.json());
-};
-
 const decryptSocialDiff = async (
     collectionKey: string,
     responseJson: unknown,

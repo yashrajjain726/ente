@@ -121,7 +121,7 @@ const cloneSetupProfile = (profile: SetupProfile | null) =>
 const cloneOwnedSpace = (space: SpaceKeyResponse | undefined) =>
     space ? { ...space } : undefined;
 
-export const openCurrentSpaceContext = async () => {
+const openCurrentSpaceContext = async () => {
     const config = await currentSpaceContextConfig();
     if (!config) return undefined;
 
