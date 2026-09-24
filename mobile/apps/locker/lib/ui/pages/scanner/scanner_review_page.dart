@@ -166,8 +166,32 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
     return pages[_index.clamp(0, pages.length - 1)];
   }
 
-  Future<File> _buildPdf() async {
+  Future<File?> _buildPdf() async {
     await widget.session.waitForPending();
+    if (!mounted) return null;
+    for (final page in widget.session.pages.where(
+      (page) => page.needsCropReview,
+    )) {
+      if (_pageController.hasClients) {
+        _jumpToPage(
+          widget.session.pages.indexWhere(
+            (candidate) => candidate.id == page.id,
+          ),
+        );
+      }
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              ScannerCropPage(session: widget.session, pageId: page.id),
+        ),
+      );
+      if (!mounted ||
+          widget.session.pages.any(
+            (candidate) => candidate.id == page.id && candidate.needsCropReview,
+          )) {
+        return null;
+      }
+    }
     return widget.session.buildPdf();
   }
 
@@ -183,7 +207,7 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
 
   Future<void> _saveToEnte() => _runExclusive(() async {
     final pdf = await _buildPdf();
-    if (!mounted) return;
+    if (!mounted || pdf == null) return;
     final didUpload = await widget.onUploadFiles([pdf]);
     if (!mounted) return;
     if (didUpload) {
@@ -194,6 +218,7 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
 
   Future<void> _share() => _runExclusive(() async {
     final pdf = await _buildPdf();
+    if (!mounted || pdf == null) return;
     await SharePlus.instance.share(ShareParams(files: [XFile(pdf.path)]));
   });
 
@@ -578,6 +603,18 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
                             },
                           ),
                   ),
+                  if (pageCount > 0 && pages[current].needsCropReview)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: Spacing.lg,
+                        vertical: Spacing.sm,
+                      ),
+                      child: Text(
+                        l10n.scannerCropReviewRequired,
+                        textAlign: TextAlign.center,
+                        style: TextStyles.mini.copyWith(color: colors.warning),
+                      ),
+                    ),
                   if (pageCount > 0)
                     Text(
                       l10n.scanPageOfTotal(

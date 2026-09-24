@@ -21,6 +21,13 @@ pub struct RustQuad {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub struct RustCaptureRegion {
+    pub normalized_quad: RustQuad,
+    pub frame_width: u32,
+    pub frame_height: u32,
+}
+
+#[derive(Clone, Copy, Debug)]
 pub enum RustColorMode {
     Color,
     Grayscale,
@@ -49,6 +56,7 @@ pub struct RustReprocessOptions {
 pub struct RustScanResult {
     // Decoded-source coordinates (EXIF applied, before `rotation_degrees`); `None` when nothing was detected.
     pub quad: Option<RustQuad>,
+    pub needs_crop_review: bool,
     pub color_mode: RustColorMode,
     pub output_width: u32,
     pub output_height: u32,
@@ -122,9 +130,18 @@ impl ScannerSession {
         &self,
         image_bytes: Vec<u8>,
         max_pixels: Option<u32>,
+        region: Option<RustCaptureRegion>,
     ) -> Result<RustScanResult, RustScanError> {
         catch_panic(|| {
-            let result = self.inner.process_capture(&image_bytes, max_pixels)?;
+            let result = self.inner.process_capture_with_region(
+                &image_bytes,
+                max_pixels,
+                region.map(|region| scan::CaptureRegion {
+                    normalized_quad: to_quad(region.normalized_quad),
+                    frame_width: region.frame_width,
+                    frame_height: region.frame_height,
+                }),
+            )?;
             Ok(to_api_scan_result(result))
         })
     }
@@ -237,6 +254,7 @@ fn to_api_point(point: scan::Point) -> RustPoint {
 fn to_api_scan_result(result: scan::ScanResult) -> RustScanResult {
     RustScanResult {
         quad: result.quad.map(to_api_quad),
+        needs_crop_review: result.needs_crop_review,
         color_mode: to_api_color_mode(result.color_mode),
         output_width: result.output_width,
         output_height: result.output_height,
