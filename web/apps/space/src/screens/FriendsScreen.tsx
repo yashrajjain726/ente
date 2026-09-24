@@ -893,7 +893,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                                     onChange={(event) =>
                                         setSearchQuery(event.target.value)
                                     }
-                                    placeholder="Search friends"
+                                    placeholder="Search"
                                     value={searchQuery}
                                     sx={{
                                         bgcolor: "transparent",
@@ -965,7 +965,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                                 flexDirection: "column",
                                 gap: "4px",
                                 m: 0,
-                                mt: "8px",
+                                mt: "18px",
                                 p: 0,
                                 width: "100%",
                             }}
@@ -1000,10 +1000,13 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             role="status"
                             sx={{
                                 color: textSoft,
+                                display: "grid",
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',
                                 fontSize: 14,
-                                mt: "72px",
+                                lineHeight: "20px",
+                                minHeight: "max(0px, calc(100svh - 116px))",
+                                placeItems: "center",
                                 textAlign: "center",
                             }}
                         >
