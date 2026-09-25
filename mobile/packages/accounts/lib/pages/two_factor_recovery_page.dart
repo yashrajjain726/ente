@@ -62,7 +62,7 @@ class _TwoFactorRecoveryPageState extends State<TwoFactorRecoveryPage> {
         title: const AccountAppBarLogo(),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          color: colorScheme.primary700,
+          color: getAccountAppBarColor(context),
           onPressed: () {
             Navigator.of(context).pop();
           },

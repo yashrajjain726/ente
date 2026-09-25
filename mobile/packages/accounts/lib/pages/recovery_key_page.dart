@@ -96,7 +96,7 @@ class _RecoveryKeyPageState extends State<RecoveryKeyPage> {
                 onPressed: () {
                   Navigator.of(context).pop();
                 },
-                color: colorScheme.primary700,
+                color: getAccountAppBarColor(context),
               ),
       ),
       body: SafeArea(

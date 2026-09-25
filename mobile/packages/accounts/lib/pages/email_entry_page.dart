@@ -96,7 +96,7 @@ class _EmailEntryPageState extends State<EmailEntryPage> {
         title: const AccountAppBarLogo(),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          color: colorScheme.primary700,
+          color: getAccountAppBarColor(context),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),

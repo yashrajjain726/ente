@@ -72,7 +72,7 @@ class _PasswordReentryPageState extends State<PasswordReentryPage> {
         title: const AccountAppBarLogo(),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          color: colorScheme.primary700,
+          color: getAccountAppBarColor(context),
           onPressed: () {
             Navigator.of(context).pop();
           },
