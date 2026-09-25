@@ -1,0 +1,1 @@
+- Limited iOS QR scanning to the visible scan frame.
