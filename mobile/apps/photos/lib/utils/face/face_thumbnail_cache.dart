@@ -387,14 +387,22 @@ Future<Map<String, Uint8List>?> _getFaceCrops(
 }) async {
   late String? imagePath;
   if (useFullFile && file.fileType != FileType.video) {
-    final File? ioFile = await getFile(file);
+    File? ioFile = await getFile(file);
+    if (ioFile == null && file.isUploaded && !file.isRemoteOnlyFile) {
+      ioFile = await getFile(EnteFile.from(file)..localID = null);
+    }
     if (ioFile == null) {
       _logger.severe("Failed to get file for face crop generation");
       return null;
     }
     imagePath = ioFile.path;
   } else {
-    final thumbnail = await getThumbnailForUploadedFile(file);
+    var thumbnail = await getThumbnailForUploadedFile(file);
+    if (thumbnail == null && file.isUploaded && !file.isRemoteOnlyFile) {
+      thumbnail = await getThumbnailForUploadedFile(
+        EnteFile.from(file)..localID = null,
+      );
+    }
     if (thumbnail == null) {
       _logger.severe("Failed to get thumbnail for face crop generation");
       return null;
