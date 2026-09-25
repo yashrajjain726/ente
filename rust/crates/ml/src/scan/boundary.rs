@@ -946,8 +946,8 @@ pub(super) fn refine_capture(
     refine_capture_with_support(source, quad, needs_complete_support, 3)
 }
 
-pub(super) fn refine_capture_region(source: &ImageU8, quad: Quad) -> OpResult<Option<Quad>> {
-    refine_capture_with_support(source, quad, false, 4)
+pub(super) fn refine_capture_region(source: &ImageU8, quad: Quad) -> OpResult<Quad> {
+    Ok(refine_capture_with_support(source, quad, false, 4)?.unwrap_or(quad))
 }
 
 fn refine_capture_with_support(

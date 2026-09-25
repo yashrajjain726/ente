@@ -226,7 +226,10 @@ impl ScannerSession {
         let bgr = codec::decode_bgr(image_bytes)?;
         let extent = SourceExtent::new(bgr.width, bgr.height).map_err(ScanError::InvalidInput)?;
         let quad = if let Some(region) = region {
-            refine_capture_region(&bgr, region.in_source(extent)?).map_err(ScanError::Pipeline)?
+            Some(
+                refine_capture_region(&bgr, region.in_source(extent)?)
+                    .map_err(ScanError::Pipeline)?,
+            )
         } else {
             let mask = self.segment(&bgr)?;
             let detection = locate(&mask, extent, SearchBudget::Capture);
@@ -429,28 +432,29 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_capture_region_preserves_source_and_allows_manual_adjustment()
+    fn capture_region_survives_missing_still_edges_and_allows_manual_adjustment()
     -> Result<(), ScanError> {
         let session = ScannerSession {
             segmenter: Segmenter::unavailable_for_render_tests(),
         };
         let source = ImageU8::new(120, 80, 3, vec![180; 120 * 80 * 3]).map_err(ScanError::Codec)?;
         let bytes = codec::encode_jpeg(source, 90)?;
-        let result =
-            session.process_capture_with_region(&bytes, None, Some(centered_region(120, 80)))?;
-        assert_eq!(result.quad, None);
-        assert_eq!((result.output_width, result.output_height), (120, 80));
+        let region = centered_region(120, 80);
+        let extent = SourceExtent::new(120, 80).map_err(ScanError::InvalidInput)?;
+        let mapped_quad = region.in_source(extent)?;
+        let result = session.process_capture_with_region(&bytes, None, Some(region))?;
+        assert_eq!(result.quad, Some(mapped_quad));
+        assert_eq!((result.output_width, result.output_height), (60, 40));
         let adjusted = session.reprocess(
             &bytes,
             &ReprocessOptions {
-                quad: centered_region(120, 80)
-                    .in_source(SourceExtent::new(120, 80).map_err(ScanError::InvalidInput)?)?,
+                quad: extent.full_frame(),
                 rotation_degrees: 0,
                 color_mode: result.color_mode,
                 max_pixels: None,
             },
         )?;
-        assert_eq!((adjusted.output_width, adjusted.output_height), (60, 40));
+        assert_eq!((adjusted.output_width, adjusted.output_height), (120, 80));
         Ok(())
     }
 
@@ -508,8 +512,7 @@ mod tests {
     }
 
     #[test]
-    fn capture_region_distinguishes_photo_edges_from_interior_preview_edges()
-    -> Result<(), ScanError> {
+    fn capture_region_preserves_preview_edges_inside_wider_photos() -> Result<(), ScanError> {
         let session = ScannerSession {
             segmenter: Segmenter::unavailable_for_render_tests(),
         };
@@ -545,23 +548,21 @@ mod tests {
                         frame_height: 80,
                     };
                     let result = session.process_capture_with_region(&bytes, None, Some(region))?;
-                    assert_eq!(
-                        result.quad.is_none(),
-                        wider,
-                        "{width}x{height}, edge {edge}"
-                    );
+                    let quad = result.quad.expect("captured region must remain cropped");
                     if wider {
-                        assert_eq!(result.quad, None);
                         assert_eq!(
-                            (result.output_width, result.output_height),
-                            (width as u32, height as u32)
+                            quad,
+                            region.in_source(
+                                SourceExtent::new(width as i32, height as i32)
+                                    .map_err(ScanError::InvalidInput)?
+                            )?
                         );
                     } else {
-                        let quad = result.quad.expect("photo edge must remain supported");
                         assert_eq!(quad.top_right.x, width as f64);
                         assert_eq!(quad.bottom_right.x, width as f64);
-                        assert!((result.output_width as i32 - 40 * scale as i32).abs() <= 3);
                     }
+                    assert!((result.output_width as i32 - 40 * scale as i32).abs() <= 3);
+                    assert!((result.output_height as i32 - 40 * scale as i32).abs() <= 3);
                 }
             }
         }
