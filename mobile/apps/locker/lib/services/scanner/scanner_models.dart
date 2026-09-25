@@ -186,7 +186,6 @@ class ScannedPage {
     required this.sourceHeight,
     required this.width,
     required this.height,
-    this.needsCropReview = false,
   });
 
   final String id;
@@ -196,8 +195,6 @@ class ScannedPage {
   final File processedJpeg;
 
   final ScanQuad quad;
-
-  final bool needsCropReview;
 
   final int rotationDegrees;
 
@@ -216,13 +213,11 @@ class ScannedPage {
     ScanColorMode? resolvedColorMode,
     int? width,
     int? height,
-    bool? needsCropReview,
   }) => ScannedPage(
     id: id,
     sourceJpeg: sourceJpeg,
     processedJpeg: processedJpeg ?? this.processedJpeg,
     quad: quad ?? this.quad,
-    needsCropReview: needsCropReview ?? this.needsCropReview,
     rotationDegrees: rotationDegrees ?? this.rotationDegrees,
     resolvedColorMode: resolvedColorMode ?? this.resolvedColorMode,
     sourceWidth: sourceWidth,

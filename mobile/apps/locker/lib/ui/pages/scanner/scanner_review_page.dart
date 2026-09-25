@@ -169,29 +169,6 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
   Future<File?> _buildPdf() async {
     await widget.session.waitForPending();
     if (!mounted) return null;
-    for (final page in widget.session.pages.where(
-      (page) => page.needsCropReview,
-    )) {
-      if (_pageController.hasClients) {
-        _jumpToPage(
-          widget.session.pages.indexWhere(
-            (candidate) => candidate.id == page.id,
-          ),
-        );
-      }
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) =>
-              ScannerCropPage(session: widget.session, pageId: page.id),
-        ),
-      );
-      if (!mounted ||
-          widget.session.pages.any(
-            (candidate) => candidate.id == page.id && candidate.needsCropReview,
-          )) {
-        return null;
-      }
-    }
     return widget.session.buildPdf();
   }
 
@@ -603,18 +580,6 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
                             },
                           ),
                   ),
-                  if (pageCount > 0 && pages[current].needsCropReview)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: Spacing.lg,
-                        vertical: Spacing.sm,
-                      ),
-                      child: Text(
-                        l10n.scannerCropReviewRequired,
-                        textAlign: TextAlign.center,
-                        style: TextStyles.mini.copyWith(color: colors.warning),
-                      ),
-                    ),
                   if (pageCount > 0)
                     Text(
                       l10n.scanPageOfTotal(

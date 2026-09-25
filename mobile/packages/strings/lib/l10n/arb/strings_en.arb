@@ -3725,7 +3725,6 @@
   "scannerTorchOn": "Turn on torch",
   "scannerCapture": "Capture",
   "scannerPreparing": "Preparing scanner...",
-  "scannerCropReviewRequired": "Check the crop before saving to avoid cutting off part of the document.",
   "scanProcessing": "Processing your scan...",
   "scanPageOfTotal": "Page {current} of {total}",
   "@scanPageOfTotal": {

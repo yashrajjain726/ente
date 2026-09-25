@@ -91,7 +91,6 @@ pub struct ReprocessOptions {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScanResult {
     pub quad: Option<Quad>,
-    pub needs_crop_review: bool,
     pub color_mode: ColorMode,
     pub output_width: u32,
     pub output_height: u32,
@@ -246,18 +245,18 @@ impl ScannerSession {
                 None => None,
             }
         };
-        let mut result = if let Some(quad) = quad {
+        if let Some(quad) = quad {
             let plan = RenderPlan::new(quad, extent, 0, budget).map_err(ScanError::Pipeline)?;
             let mut page = plan.render(&bgr).map_err(ScanError::Pipeline)?;
             drop(bgr);
             let mode = render_document(&mut page.image, page.valid.as_deref(), None)
                 .map_err(ScanError::Pipeline)?;
-            finish(Some(quad), mode, extent, page.image, DEFAULT_JPEG_QUALITY)?
+            finish(Some(quad), mode, extent, page.image, DEFAULT_JPEG_QUALITY)
         } else {
             let plan = RenderPlan::new(extent.full_frame(), extent, 0, budget)
                 .map_err(ScanError::Pipeline)?;
             if plan.width == bgr.width && plan.height == bgr.height {
-                finish(None, ColorMode::Color, extent, bgr, DEFAULT_JPEG_QUALITY)?
+                finish(None, ColorMode::Color, extent, bgr, DEFAULT_JPEG_QUALITY)
             } else {
                 let page = plan.render(&bgr).map_err(ScanError::Pipeline)?;
                 drop(bgr);
@@ -267,11 +266,9 @@ impl ScannerSession {
                     extent,
                     page.image,
                     DEFAULT_JPEG_QUALITY,
-                )?
+                )
             }
-        };
-        result.needs_crop_review = region.is_some() && quad.is_none();
-        Ok(result)
+        }
     }
 
     pub fn reprocess(
@@ -357,7 +354,6 @@ fn finish(
 
     Ok(ScanResult {
         quad,
-        needs_crop_review: false,
         color_mode,
         output_width,
         output_height,
@@ -408,7 +404,6 @@ mod tests {
         let region = centered_region(120, 80);
         let result = session.process_capture_with_region(&bytes, Some(4_000_000), Some(region))?;
         let expected_quad = result.quad.expect("supported page must be cropped");
-        assert!(!result.needs_crop_review);
         assert!((result.output_width as i32 - 60).abs() <= 2);
         assert!((result.output_height as i32 - 40).abs() <= 2);
         let decoded = codec::decode_bgr(&result.processed_image)?;
@@ -434,8 +429,8 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_capture_region_keeps_source_until_explicit_reprocessing() -> Result<(), ScanError>
-    {
+    fn unsupported_capture_region_preserves_source_and_allows_manual_adjustment()
+    -> Result<(), ScanError> {
         let session = ScannerSession {
             segmenter: Segmenter::unavailable_for_render_tests(),
         };
@@ -443,10 +438,9 @@ mod tests {
         let bytes = codec::encode_jpeg(source, 90)?;
         let result =
             session.process_capture_with_region(&bytes, None, Some(centered_region(120, 80)))?;
-        assert!(result.needs_crop_review);
         assert_eq!(result.quad, None);
         assert_eq!((result.output_width, result.output_height), (120, 80));
-        let confirmed = session.reprocess(
+        let adjusted = session.reprocess(
             &bytes,
             &ReprocessOptions {
                 quad: centered_region(120, 80)
@@ -456,8 +450,7 @@ mod tests {
                 max_pixels: None,
             },
         )?;
-        assert!(!confirmed.needs_crop_review);
-        assert_eq!((confirmed.output_width, confirmed.output_height), (60, 40));
+        assert_eq!((adjusted.output_width, adjusted.output_height), (60, 40));
         Ok(())
     }
 
@@ -498,7 +491,6 @@ mod tests {
         let bytes = codec::encode_jpeg(document_source()?, 90)?;
         let region = centered_region(120, 80);
         let expected = session.process_capture_with_region(&bytes, None, Some(region))?;
-        assert!(!expected.needs_crop_review);
         let corners = points(region.normalized_quad);
         for start in 1..4 {
             let shifted = CaptureRegion {
@@ -554,7 +546,8 @@ mod tests {
                     };
                     let result = session.process_capture_with_region(&bytes, None, Some(region))?;
                     assert_eq!(
-                        result.needs_crop_review, wider,
+                        result.quad.is_none(),
+                        wider,
                         "{width}x{height}, edge {edge}"
                     );
                     if wider {
@@ -668,7 +661,6 @@ mod tests {
                 (capture.source_width, capture.source_height),
                 (width, height)
             );
-            assert!(!capture.needs_crop_review);
             assert!((capture.output_width as i32 - width as i32 / 2).abs() <= 2);
             assert!((capture.output_height as i32 - height as i32 / 2).abs() <= 2);
             let expected = session.reprocess(

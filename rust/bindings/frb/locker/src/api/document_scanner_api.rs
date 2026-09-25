@@ -56,7 +56,6 @@ pub struct RustReprocessOptions {
 pub struct RustScanResult {
     // Decoded-source coordinates (EXIF applied, before `rotation_degrees`); `None` when nothing was detected.
     pub quad: Option<RustQuad>,
-    pub needs_crop_review: bool,
     pub color_mode: RustColorMode,
     pub output_width: u32,
     pub output_height: u32,
@@ -254,7 +253,6 @@ fn to_api_point(point: scan::Point) -> RustPoint {
 fn to_api_scan_result(result: scan::ScanResult) -> RustScanResult {
     RustScanResult {
         quad: result.quad.map(to_api_quad),
-        needs_crop_review: result.needs_crop_review,
         color_mode: to_api_color_mode(result.color_mode),
         output_width: result.output_width,
         output_height: result.output_height,

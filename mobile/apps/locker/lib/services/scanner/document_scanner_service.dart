@@ -176,7 +176,6 @@ class DocumentScannerService {
         sourceHeight: result.sourceHeight,
         width: result.outputWidth,
         height: result.outputHeight,
-        needsCropReview: result.needsCropReview,
       );
     } catch (e, s) {
       _logger.severe('processCapture failed', e, s);
@@ -217,7 +216,6 @@ class DocumentScannerService {
         rotationDegrees: rotationDegrees,
         width: result.outputWidth,
         height: result.outputHeight,
-        needsCropReview: quad == null ? page.needsCropReview : false,
       );
     } catch (e, s) {
       _logger.severe('updatePage failed', e, s);

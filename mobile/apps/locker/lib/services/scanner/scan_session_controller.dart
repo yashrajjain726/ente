@@ -207,9 +207,6 @@ class ScanSessionController extends ChangeNotifier {
   Future<File> buildPdf() async {
     await waitForPending();
     final pages = List.of(_pages);
-    if (pages.any((page) => page.needsCropReview)) {
-      throw StateError('Document crops must be reviewed before export');
-    }
     final fileName = _fileName;
     if (fileName == null) {
       throw StateError('fileName has not been set');

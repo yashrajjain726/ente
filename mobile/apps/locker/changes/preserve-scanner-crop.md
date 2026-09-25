@@ -1,1 +1,1 @@
-- Keep supported camera crops when reviewing and saving scans, including retakes. Ask for crop review when the photo cannot support the detected edges.
+- Keep supported camera crops when reviewing and saving scans, including retakes. Preserve the full photo when the detected edges cannot be confirmed, with manual crop adjustment available as usual.
