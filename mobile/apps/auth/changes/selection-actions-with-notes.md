@@ -1,1 +1,0 @@
-- Kept multi-select actions visible when codes have long notes.
