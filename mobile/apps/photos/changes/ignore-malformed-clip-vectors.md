@@ -1,1 +1,0 @@
-- Prevented image embeddings with invalid dimensions from interrupting Magic Search and Smart Memories.
