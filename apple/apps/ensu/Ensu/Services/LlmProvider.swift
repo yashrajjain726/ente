@@ -250,7 +250,10 @@ actor LlmProvider {
         _ selection: LlmModelSelection, owner: UUID
     ) async throws {
         try await withModelLock {
-            guard loadedContextLength(selection) == nil, isChatModelReady(selection) else { return }
+            guard isChatModelReady(selection) else { return }
+            unloadTranscriptionModelIfLoaded()
+            try Task.checkCancellation()
+            guard loadedContextLength(selection) == nil else { return }
             do {
                 try await ensureModelReadyLocked(
                     selection, onProgress: { _ in }, allowRecovery: false, shouldDownload: false)

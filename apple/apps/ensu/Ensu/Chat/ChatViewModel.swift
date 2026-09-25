@@ -73,6 +73,7 @@ final class ChatViewModel: ObservableObject {
         return streamingParentId
     }
     @Published var isGenerating: Bool = false
+    @Published private(set) var isSendPending: Bool = false
     @Published var isDownloading: Bool = false
     @Published var isProcessingAttachments: Bool = false
     @Published var draftText: String = ""
@@ -117,6 +118,8 @@ final class ChatViewModel: ObservableObject {
     private var reloadTask: Task<Void, Never>?
     private let rootId = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
     private var generationTask: Task<Void, Never>?
+    private var pendingSendTask: Task<Void, Never>?
+    private var pendingSendId: UUID?
     private var modelDownloadTask: Task<Void, Never>?
     private var voiceTransientErrorTask: Task<Void, Never>?
     private var sharedModelReadyTask: Task<Void, Error>?
@@ -293,7 +296,10 @@ final class ChatViewModel: ObservableObject {
                 guard !isGenerating, !isDownloading, !voiceInputState.isWorking,
                     !voiceTranscriber.hasActiveTasks,
                     knowledgeStore.packs.allSatisfy({ !$0.enabled }), notesStore.collections.isEmpty
-                else { return }
+                else {
+                    if warmupAttempt?.owner == owner { cancelChatWarmup() }
+                    return
+                }
                 try await provider.prewarmChatModelIfDownloaded(selection, owner: owner)
             } catch {
                 guard !Task.isCancelled, !isCancellation(error), warmupAttempt?.owner == owner,
@@ -326,6 +332,7 @@ final class ChatViewModel: ObservableObject {
         knowledgeStore.downloadsAllowed = capability.isChatSupported
         logger.info("Chat device capability evaluated", details: "\(capability)")
         guard !capability.isChatSupported else { return }
+        cancelPendingSend()
         showUnsupportedDeviceDialog = true
         isDownloading = false
         downloadToast = nil
@@ -382,6 +389,7 @@ final class ChatViewModel: ObservableObject {
     }
 
     private func resetGenerationState(stopRequested: Bool = false) {
+        cancelPendingSend()
         conversationStatus = nil
         generationTask?.cancel()
         provider.stopGeneration(invalidatePreparation: true)
@@ -479,6 +487,7 @@ final class ChatViewModel: ObservableObject {
     }
 
     func cancelEditing() {
+        cancelPendingSend()
         discardUnstoredAttachments(draftAttachments)
         editingMessageId = nil
         draftText = ""
@@ -692,27 +701,56 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
+    private func cancelPendingSend() {
+        guard isSendPending else { return }
+        pendingSendTask?.cancel()
+        clearPendingSend()
+    }
+
+    private func clearPendingSend() {
+        pendingSendTask = nil
+        pendingSendId = nil
+        isSendPending = false
+        isDownloading = false
+        if downloadToast?.phase == .loading || downloadToast?.phase == .downloading {
+            downloadToast = nil
+            clearDownloadProgressMemory()
+        }
+    }
+
     func sendDraft() {
-        guard !isGenerating && !isDownloading else { return }
+        guard !isGenerating && !isDownloading && !isSendPending else { return }
         guard !isChatUnsupported else {
             showUnsupportedDeviceDialog = true
             return
         }
 
-        let trimmed = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = draftText
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let attachments = draftAttachments
         guard !trimmed.isEmpty || !attachments.isEmpty else { return }
 
-        Task { @MainActor in
-            let selection = self.modelSettings.currentSelection()
+        let sessionId = currentSessionId
+        let editingId = editingMessageId
+        let selection = modelSettings.currentSelection()
+        let sendId = UUID()
+        pendingSendId = sendId
+        isSendPending = true
+        pendingSendTask = Task { @MainActor in
+            defer {
+                if self.pendingSendId == sendId {
+                    self.clearPendingSend()
+                }
+            }
+            guard !Task.isCancelled, self.pendingSendId == sendId else { return }
             self.hasRequestedModelDownload = true
 
             do {
-                try await self.ensureChatModelReady(selection)
+                try await self.ensureChatModelReady(selection, pendingSendId: sendId)
             } catch {
-                if self.isCancellation(error) {
-                    return
-                }
+                guard !Task.isCancelled, self.pendingSendId == sendId,
+                    !self.isCancellation(error)
+                else { return }
                 self.isDownloading = false
                 self.downloadToast = DownloadToastState(
                     phase: .errorDownload,
@@ -725,8 +763,14 @@ final class ChatViewModel: ObservableObject {
                 return
             }
 
-            let sessionId = self.currentSessionId ?? self.createSessionForDraft()
-            self.sendDraftMessage(trimmed: trimmed, attachments: attachments, sessionId: sessionId)
+            guard !Task.isCancelled, self.pendingSendId == sendId,
+                self.currentSessionId == sessionId, self.editingMessageId == editingId,
+                self.draftText == text, self.draftAttachments == attachments,
+                self.modelSettings.currentSelection() == selection
+            else { return }
+            let destination = sessionId ?? self.createSessionForDraft()
+            self.sendDraftMessage(
+                trimmed: trimmed, attachments: attachments, sessionId: destination)
         }
     }
 
@@ -880,18 +924,23 @@ final class ChatViewModel: ObservableObject {
         ModelReadyKey(id: selection.id, requestedContextLength: selection.contextLength)
     }
 
-    private func ensureChatModelReady(_ selection: LlmModelSelection) async throws {
+    private func ensureChatModelReady(
+        _ selection: LlmModelSelection, pendingSendId: UUID? = nil
+    ) async throws {
         if isChatUnsupported {
             throw UnsupportedDeviceMemoryError(capability: deviceCapability)
         }
         var retryCount = 0
         while true {
             do {
+                try Task.checkCancellation()
                 try await provider.ensureModelReady(selection) { progress in
                     Task { @MainActor in
+                        if let pendingSendId, self.pendingSendId != pendingSendId { return }
                         self.handleProgress(progress)
                     }
                 }
+                try Task.checkCancellation()
                 return
             } catch {
                 if isCancellation(error) || !shouldRetryModelDownload(error, retryCount: retryCount)
@@ -1070,6 +1119,7 @@ final class ChatViewModel: ObservableObject {
             userNode = messageStore[sessionId]?.first(where: { $0.id == parentId })
         }
         guard let userNode else { return }
+        cancelPendingSend()
         priorGeneration?.cancel()
         priorSummary?.cancel()
         provider.stopGeneration()
@@ -1083,6 +1133,7 @@ final class ChatViewModel: ObservableObject {
     }
 
     func changeBranch(for message: RenderedChatMessage, delta: Int) {
+        cancelPendingSend()
         if isGenerating {
             stopGenerating()
         }
@@ -1153,6 +1204,7 @@ final class ChatViewModel: ObservableObject {
             defer {
                 notesScope.close()
                 settleGenerationIfActive(generationId: generationId, sessionId: userNode.sessionId)
+                refreshChatWarmup()
             }
             await notesStore.awaitMaintenance()
             _ = await priorGeneration?.result

@@ -389,8 +389,10 @@ internal class ModelSettingsActions(
                         latest.chat.isDownloading ||
                         latest.knowledge.packs.values.any { it.enabled } ||
                         notesStore.state.value.collections.isNotEmpty()
-                )
+                ) {
+                    if (warmupOwner == owner) cancelChatWarmup()
                     return@launch
+                }
                 llmProvider.prewarmChatModelIfDownloaded(selection, owner)
             } catch (error: CancellationException) {
                 throw error

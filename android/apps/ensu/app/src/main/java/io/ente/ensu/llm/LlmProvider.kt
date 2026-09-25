@@ -96,8 +96,10 @@ class LlmProvider(
     ): Unit = withModelContext {
         modelLoadMutex.withLock {
             currentCoroutineContext().ensureActive()
-            if (loadedContextLength(selection) != null || !isChatModelReady(selection))
-                return@withLock
+            if (!isChatModelReady(selection)) return@withLock
+            unloadTranscriptionModelIfLoaded()
+            currentCoroutineContext().ensureActive()
+            if (loadedContextLength(selection) != null) return@withLock
             try {
                 ensureModelReadyLocked(selection, {}, allowRecovery = false, shouldDownload = false)
                 currentCoroutineContext().ensureActive()
