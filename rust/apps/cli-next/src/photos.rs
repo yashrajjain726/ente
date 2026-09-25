@@ -21,6 +21,9 @@ pub async fn run(
     selected: Option<&str>,
     options: &Options,
 ) -> Result<()> {
+    if let PhotosLibraryCommand::Export(args) = command {
+        return crate::export::run(args, selected, options).await;
+    }
     ensure!(
         !options.offline
             || !matches!(
@@ -35,7 +38,7 @@ pub async fn run(
     let (account, home) = open_account(selected, !options.offline)?;
     let session = api::session(&account, Product::Photos)?;
     let mut db = db::open(&home.path, &account.db_key, !options.offline)?;
-    let mut replica = Replica::new(&mut db);
+    let mut replica = Replica::new(&mut db, session.user_id);
     if !options.offline {
         replica.sync_collections(&session).await?;
     } else {
@@ -45,6 +48,7 @@ pub async fn run(
         );
     }
     match command {
+        PhotosLibraryCommand::Export(_) => unreachable!(),
         PhotosLibraryCommand::Album { command } => album(command, &replica, options),
         PhotosLibraryCommand::File { album, command } => {
             file(command, album.as_deref(), &session, &mut replica, options).await

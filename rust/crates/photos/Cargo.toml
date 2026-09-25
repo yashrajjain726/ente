@@ -3,6 +3,7 @@ name = "ente-photos"
 edition.workspace = true
 
 [dependencies]
+chrono = { workspace = true, features = ["std"] }
 ente-assets.workspace = true
 ente-collections.workspace = true
 ente-core.workspace = true
@@ -18,6 +19,7 @@ thiserror.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 futures-util.workspace = true
+zip.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

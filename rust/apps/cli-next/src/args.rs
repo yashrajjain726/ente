@@ -108,6 +108,8 @@ pub enum PhotosCommand {
 
 #[derive(Subcommand)]
 pub enum PhotosLibraryCommand {
+    #[command(about = "Maintain an independent copy of your Photos library")]
+    Export(ExportArgs),
     #[command(about = "Manage albums")]
     Album {
         #[command(subcommand)]
@@ -125,6 +127,27 @@ pub enum PhotosLibraryCommand {
         #[command(subcommand)]
         command: FileCommand,
     },
+}
+
+#[derive(Args)]
+pub struct ExportArgs {
+    #[arg(
+        long,
+        value_name = "ALBUM",
+        help = "Include an album ID or exact name; repeat for multiple albums"
+    )]
+    pub album: Vec<String>,
+    #[arg(long, value_name = "ALBUM", help = "Exclude an album ID or exact name")]
+    pub exclude_album: Vec<String>,
+    #[arg(
+        long,
+        help = "Reconnect an existing export after moving it or losing local state"
+    )]
+    pub adopt: bool,
+    #[arg(long, help = "Attempt selected saved decryption failures once more")]
+    pub retry_failed: bool,
+    #[arg(value_name = "DESTINATION")]
+    pub destination: PathBuf,
 }
 
 #[derive(Subcommand)]

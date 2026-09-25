@@ -2447,9 +2447,12 @@ dependencies = [
  "dialoguer",
  "dirs 5.0.1",
  "ente-accounts",
+ "ente-collections",
  "ente-core",
  "ente-photos",
  "ente-test-support",
+ "futures-util",
+ "icu_casemap",
  "keyring",
  "mockito",
  "reqwest 0.12.28",
@@ -2459,9 +2462,11 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "unicode-normalization",
  "url",
  "uuid",
  "zeroize",
+ "zip 8.6.0",
 ]
 
 [[package]]
@@ -2470,6 +2475,7 @@ version = "0.0.0"
 dependencies = [
  "ente-core",
  "serde",
+ "serde_json",
  "thiserror 2.0.18",
 ]
 
@@ -2771,6 +2777,7 @@ dependencies = [
 name = "ente-photos"
 version = "0.0.0"
 dependencies = [
+ "chrono",
  "ente-assets",
  "ente-collections",
  "ente-core",
@@ -2785,6 +2792,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.18",
+ "zip 8.6.0",
 ]
 
 [[package]]

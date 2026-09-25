@@ -7,7 +7,7 @@ pub use rusqlite::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error(transparent)]
+    #[error("{0}")]
     Sqlite(#[from] SqliteError),
     #[error("database version {current} is newer than this build supports ({target})")]
     Downgrade { current: i64, target: i64 },
@@ -20,6 +20,10 @@ pub struct Db(Connection);
 impl Db {
     pub fn new(connection: Connection) -> Self {
         Self(connection)
+    }
+
+    pub fn connection(&self) -> &Connection {
+        &self.0
     }
 
     pub fn migrate(&mut self, scripts: &[&str]) -> Result<()> {

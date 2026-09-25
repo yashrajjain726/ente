@@ -742,3 +742,6 @@ mod files;
 #[cfg(feature = "museum")]
 #[path = "support/museum.rs"]
 mod museum;
+
+#[path = "support/export_sources.rs"]
+mod export_sources;
