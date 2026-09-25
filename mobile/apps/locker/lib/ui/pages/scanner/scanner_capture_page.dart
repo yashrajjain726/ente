@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
@@ -489,7 +488,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
         _flights.removeWhere((flight) => flight.capture == oldest);
         markFailed = false;
       } else {
-        oldest.processed = true;
+        oldest.pageId = _session.lastPage!.id;
       }
       unresolved--;
     }
@@ -522,10 +521,14 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   }
 
   ({int count, Widget? thumbnail, File? heroFile}) _pagesButtonState() {
-    final hiddenPages = _pending
-        .where((capture) => capture.processed && !capture.landed)
-        .length;
-    final shownPages = math.max(0, _session.pageCount - hiddenPages);
+    final hiddenPageIds = {
+      for (final capture in _pending)
+        if (capture.processed && !capture.landed) capture.pageId!,
+    };
+    final shownPages = _session.pages
+        .where((page) => !hiddenPageIds.contains(page.id))
+        .toList();
+    final lastPage = shownPages.isEmpty ? null : shownPages.last;
     final landedUnprocessed = _pending
         .where((capture) => capture.landed && !capture.resolved)
         .length;
@@ -534,24 +537,21 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
         if (capture.landed && !capture.failed && capture.spec != null) capture,
     ];
     Widget? thumbnail;
-    final heroFile = shownPages > 0
-        ? _session.pages[shownPages - 1].processedJpeg
-        : null;
+    final heroFile = lastPage?.processedJpeg;
     if (showingSnapshot.isNotEmpty) {
       final capture = showingSnapshot.last;
       thumbnail = CaptureSnapshotThumbnail(
         key: ValueKey('capture-${capture.id}'),
         spec: capture.spec!,
       );
-    } else if (shownPages > 0) {
-      final page = _session.pages[shownPages - 1];
+    } else if (lastPage != null) {
       thumbnail = ScannerProcessedThumbnail(
-        key: ValueKey(page.processedJpeg.path),
-        page: page,
+        key: ValueKey(lastPage.processedJpeg.path),
+        page: lastPage,
       );
     }
     return (
-      count: shownPages + landedUnprocessed,
+      count: shownPages.length + landedUnprocessed,
       thumbnail: thumbnail,
       heroFile: heroFile,
     );
@@ -830,8 +830,10 @@ class _PendingCapture {
   final int id;
   CaptureFlightSpec? spec;
   bool landed = false;
-  bool processed = false;
+  String? pageId;
   bool failed = false;
+
+  bool get processed => pageId != null;
 
   bool get resolved => processed || failed;
 }
