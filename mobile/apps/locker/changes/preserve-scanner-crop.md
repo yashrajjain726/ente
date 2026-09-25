@@ -1,1 +1,1 @@
-- Keep the camera's detected crop when reviewing and saving scans, including automatic captures and retakes. Use the captured corners when photo refinement is inconclusive, with manual crop adjustment available as usual.
+- Keep the camera's detected crop when reviewing and saving scans, including automatic captures and retakes. Use the captured corners when photo refinement is inconclusive, with manual crop adjustment available as usual. Cancel pending exports when leaving review and keep the camera open if processing then fails.
