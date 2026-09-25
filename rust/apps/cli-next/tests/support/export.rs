@@ -1,4 +1,5 @@
 use super::*;
+use crate::export_process::ExportChild;
 use ente_core::crypto::hash;
 use std::{
     path::Path,
@@ -10,31 +11,120 @@ use std::{
 mod resources;
 
 #[test]
-fn export_lifecycle_and_adoption() -> TestResult {
+fn export_selection_reuses_independent_album_copies() -> TestResult {
     Museum::run(|museum| {
         tokio::runtime::Runtime::new()?.block_on(async {
-            let origin=museum.endpoint();
-            let objects=museum.object_store();
-            let email=format!("export-{}@example.org",Uuid::new_v4());
-            let account=create_account(origin,&email).await;
-            let home=TestHome::new();login(&home,"photos",&email,&["--host",origin]);
-            let destination=tempfile::tempdir()?;
-            let root=destination.path().join("photos");
-            let (family,family_key)=create_album(origin,&account,"Family","album").await;
-            let (travel,travel_key)=create_album(origin,&account,"Travel","folder").await;
-            let (work,work_key)=create_album(origin,&account,"Work","album").await;
-            let (favorites,favorites_key)=create_album(origin,&account,"Favorites","favorites").await;
-            let (empty,_)=create_album(origin,&account,"Trash","album").await;
-            let original=b"unmodified original bytes";
-            let (file,key)=upload_fixture(origin,&account,family,&family_key,original,metadata("A.jpg",original)).await;
-            place(origin,&account,travel,&travel_key,file,&key,"add-files").await;
-            let (work_file,work_file_key)=upload_fixture(origin,&account,work,&work_key,b"work",metadata("Work.jpg",b"work")).await;
-            let initial_reads=objects.reads();
-            let result=export(&home,&root,&["--album","Family"]);
-            assert_eq!(result["copies"]["completed"],1);
-            assert_eq!(objects.reads(),initial_reads+1);
+            let origin = museum.endpoint();
+            let objects = museum.object_store();
+            let (account, home, _) = export_account(origin).await;
+            let destination = tempfile::tempdir()?;
+            let root = destination.path().join("photos");
+            let (family, family_key) = create_album(origin, &account, "Family", "album").await;
+            let (travel, travel_key) = create_album(origin, &account, "Travel", "folder").await;
+            let (work, work_key) = create_album(origin, &account, "Work", "album").await;
+            let (empty, _) = create_album(origin, &account, "Trash", "album").await;
+            let original = b"unmodified original bytes";
+            let (file, key) = upload_fixture(
+                origin,
+                &account,
+                family,
+                &family_key,
+                original,
+                metadata("A.jpg", original),
+            )
+            .await;
+            place(
+                origin,
+                &account,
+                travel,
+                &travel_key,
+                file,
+                &key,
+                "add-files",
+            )
+            .await;
+            upload_fixture(
+                origin,
+                &account,
+                work,
+                &work_key,
+                b"work",
+                metadata("Work.jpg", b"work"),
+            )
+            .await;
+            let initial_reads = objects.reads();
+            let result = export(&home, &root, &["--album", "Family"]);
+            assert_eq!(result["copies"]["completed"], 1);
+            assert_eq!(objects.reads(), initial_reads + 1);
             assert!(!root.join("Travel").exists());
-            let root_bytes=fs::read(root.join("export.json"))?;
+            let result = export(&home, &root, &["--album", "Family", "--album", "Travel"]);
+            assert_eq!(result["copies"]["expected"], 2);
+            assert_eq!(objects.reads(), initial_reads + 1);
+            assert_eq!(fs::read(root.join("Travel/A.jpg"))?, original);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt;
+                assert_ne!(
+                    fs::metadata(root.join("Travel/A.jpg"))?.ino(),
+                    fs::metadata(root.join("Family/A.jpg"))?.ino()
+                );
+            }
+            let travel_time = fs::metadata(root.join("Travel/A.jpg"))?.modified()?;
+            export(&home, &root, &["--album", "Family"]);
+            assert_eq!(
+                fs::metadata(root.join("Travel/A.jpg"))?.modified()?,
+                travel_time
+            );
+            let scoped = export(
+                &home,
+                &root,
+                &[
+                    "--album",
+                    "Family",
+                    "--album",
+                    "Family",
+                    "--album",
+                    "Travel",
+                    "--album",
+                    "Work",
+                    "--album",
+                    &empty.to_string(),
+                    "--exclude-album",
+                    "Work",
+                ],
+            );
+            assert_eq!(scoped["copies"]["expected"], 2);
+            assert!(root.join("Trash-1/metadata.json").exists());
+            assert_eq!(
+                read_json(&root.join("Trash-1/metadata.json"))["ente"]["albumID"],
+                empty.to_string()
+            );
+            assert!(!root.join("Work").exists());
+            export(&home, &root, &[]);
+            assert_eq!(objects.reads(), initial_reads + 2);
+            assert_eq!(fs::read(root.join("Work/Work.jpg"))?, b"work");
+            Ok(())
+        })
+    })
+}
+
+#[test]
+fn export_metadata_updates_and_repairs_preserve_source_values() -> TestResult {
+    Museum::run(|museum| {
+        tokio::runtime::Runtime::new()?.block_on(async {
+            let origin = museum.endpoint();
+            let objects = museum.object_store();
+            let (account, home, _) = export_account(origin).await;
+            let destination = tempfile::tempdir()?;
+            let root = destination.path().join("photos");
+            let (family, family_key) = create_album(origin, &account, "Family", "album").await;
+            let (travel, travel_key) = create_album(origin, &account, "Travel", "folder").await;
+            let original = b"unmodified original bytes";
+            let (file, key) = upload_fixture(origin, &account, family, &family_key, original, metadata("A.jpg", original)).await;
+            place(origin, &account, travel, &travel_key, file, &key, "add-files").await;
+            let initial_reads = objects.reads();
+            export(&home, &root, &["--album", "Family"]);
+            let (favorites,favorites_key)=create_album(origin,&account,"Favorites","favorites").await;
             let original_time=fs::metadata(root.join("Family/A.jpg"))?.modified()?;
             assert_eq!(original_time,UNIX_EPOCH+Duration::from_micros(1_700_000_001_123_456));
             let sidecar=root.join("Family/metadata/A.jpg.json");
@@ -69,55 +159,27 @@ fn export_lifecycle_and_adoption() -> TestResult {
                 let after=fs::metadata(root.join("Family/A.jpg"))?;
                 assert_eq!((before.ctime(),before.ctime_nsec()),(after.ctime(),after.ctime_nsec()));
             }
-            let result=export(&home,&root,&["--album","Family","--album","Travel"]);
-            assert_eq!(result["copies"]["expected"],2);
-            assert_eq!(objects.reads(),initial_reads+1);
-            assert_eq!(fs::read(root.join("Travel/A.jpg"))?,original);
-            #[cfg(unix)] {
-                use std::os::unix::fs::MetadataExt;
-                assert_ne!(fs::metadata(root.join("Travel/A.jpg"))?.ino(),fs::metadata(root.join("Family/A.jpg"))?.ino());
-            }
-            let travel_time=fs::metadata(root.join("Travel/A.jpg"))?.modified()?;
-            export(&home,&root,&["--album","Family"]);
-            assert_eq!(fs::metadata(root.join("Travel/A.jpg"))?.modified()?,travel_time);
-            let scoped=export(&home,&root,&["--album","Family","--album","Family","--album","Travel","--album","Work","--album",&empty.to_string(),"--exclude-album","Work"]);
-            assert_eq!(scoped["copies"]["expected"],2);
-            assert!(root.join("Trash-1/metadata.json").exists());
-            assert_eq!(read_json(&root.join("Trash-1/metadata.json"))["ente"]["albumID"],empty.to_string());
-            assert!(!root.join("Work").exists());
-            export(&home,&root,&[]);
-            assert_eq!(objects.reads(),initial_reads+2);
-            assert_eq!(fs::read(root.join("Work/Work.jpg"))?,b"work");
-
-            #[cfg(unix)] {
-                use std::os::unix::fs::PermissionsExt;
-                fs::write(root.join("Family/metadata/A.jpg.json"),b"{\"custom\":true}")?;
-                fs::write(root.join("Work/metadata/Work.jpg.json"),b"{\"custom\":true}")?;
-                let protected=root.join("Work/metadata");let permissions=fs::metadata(&protected)?.permissions();
-                fs::set_permissions(&protected,fs::Permissions::from_mode(0o500))?;
-                let output=home.run(&["photos","export",root.to_str().unwrap(),"--json"]);
-                fs::set_permissions(&protected,permissions)?;
-                failure(&output);
-                let result:Value=serde_json::from_slice(&output.stdout)?;
-                assert_eq!(result["copies"],json!({"expected":3,"completed":2,"pending":1}));
-                assert_eq!(result["failures"],1);
-                assert!(read_json(&root.join("Family/metadata/A.jpg.json")).get("custom").is_none());
-                export(&home,&root,&["--album","Work"]);
-            }
+            export(&home, &root, &["--album", "Travel"]);
             place(origin,&account,favorites,&favorites_key,file,&key,"add-files").await;
             for (version,lat,long) in [(1,0,77),(2,12,0),(3,0,0)] {
                 edit_file(origin,&account,file,&key,version,json!({"editedName":"Renamed.jpg","editedTime":1_700_000_002_654_321i64,"caption":"","lat":lat,"long":long,"dateTime":"2023:11:15 03:43:22","offsetTime":"+05:30","w":4096,"h":3072,"cameraMake":"Example","cameraModel":"Camera","uploaderName":"Guest","mediaType":1,"mvi":123})).await;
                 export(&home,&root,&["--album","Family"]);
                 let record=read_json(&root.join("Family/metadata/Renamed.jpg.json"));
-                assert_eq!(record["description"],"");assert_eq!(record["favorited"],true);
+                assert_eq!(record["description"],"");
+                assert_eq!(record["favorited"],true);
                 assert_eq!(record["ente"]["creationTime"],"2023-11-14T22:13:22.654321Z");
                 assert_eq!(record["ente"]["name"],"Renamed.jpg");
                 assert_eq!(record["photoTakenTime"]["timestamp"],"1700000002");
                 assert!(!record.to_string().contains("2023-11-14T22:13:20.123456Z"));
                 assert!(!record.to_string().contains("not portable"));
                 for (field,value) in [("localDateTime",json!("2023:11:15 03:43:22")),("utcOffset",json!("+05:30")),("width",json!(4096)),("height",json!(3072)),("cameraMake",json!("Example")),("cameraModel",json!("Camera")),("uploaderName",json!("Guest")),("panorama",json!(true)),("motionPhotoVideoOffset",json!(123))] { assert_eq!(record["ente"][field],value); }
-                if lat==0 && long==0 {assert!(record.get("geoData").is_none());assert!(record["ente"].get("location").is_none());}
-                else {assert_eq!(record["geoData"],json!({"latitude":lat as f64,"longitude":long as f64}));assert_eq!(record["ente"]["location"],record["geoData"]);}
+                if lat==0 && long==0 {
+                    assert!(record.get("geoData").is_none());
+                    assert!(record["ente"].get("location").is_none());
+                } else {
+                    assert_eq!(record["geoData"],json!({"latitude":lat as f64,"longitude":long as f64}));
+                    assert_eq!(record["ente"]["location"],record["geoData"]);
+                }
             }
             assert!(root.join("Travel/A.jpg").exists());
             fs::write(root.join("Family/metadata/Renamed.jpg.json"),b"{\"custom\":true}")?;
@@ -126,8 +188,95 @@ fn export_lifecycle_and_adoption() -> TestResult {
             fs::write(root.join("Family/Renamed.jpg"),vec![0;original.len()])?;
             export(&home,&root,&["--album","Family"]);
             assert_eq!(fs::read(root.join("Family/Renamed.jpg"))?,original);
-            assert_eq!(objects.reads(),initial_reads+2);
+            assert_eq!(objects.reads(),initial_reads+1);
+            Ok(())
+        })
+    })
+}
 
+#[cfg(unix)]
+#[test]
+fn export_metadata_failure_does_not_block_an_independent_album() -> TestResult {
+    Museum::run(|museum| {
+        tokio::runtime::Runtime::new()?.block_on(async {
+            let origin = museum.endpoint();
+            let (account, home, _) = export_account(origin).await;
+            let destination = tempfile::tempdir()?;
+            let root = destination.path().join("photos");
+            use std::os::unix::fs::PermissionsExt;
+            let (family, family_key) = create_album(origin, &account, "Family", "album").await;
+            upload_fixture(
+                origin,
+                &account,
+                family,
+                &family_key,
+                b"family",
+                metadata("A.jpg", b"family"),
+            )
+            .await;
+            let (work, work_key) = create_album(origin, &account, "Work", "album").await;
+            upload_fixture(
+                origin,
+                &account,
+                work,
+                &work_key,
+                b"work",
+                metadata("Work.jpg", b"work"),
+            )
+            .await;
+            export(&home, &root, &[]);
+            fs::write(
+                root.join("Family/metadata/A.jpg.json"),
+                b"{\"custom\":true}",
+            )?;
+            fs::write(
+                root.join("Work/metadata/Work.jpg.json"),
+                b"{\"custom\":true}",
+            )?;
+            let protected = root.join("Work/metadata");
+            let permissions = fs::metadata(&protected)?.permissions();
+            fs::set_permissions(&protected, fs::Permissions::from_mode(0o500))?;
+            let output = home.run(&["photos", "export", root.to_str().unwrap(), "--json"]);
+            fs::set_permissions(&protected, permissions)?;
+            assert!(
+                failure(&output)
+                    .to_lowercase()
+                    .contains("permission denied")
+            );
+            let result: Value = serde_json::from_slice(&output.stdout)?;
+            assert_eq!(
+                result["copies"],
+                json!({"expected":2,"completed":1,"pending":1})
+            );
+            assert_eq!(result["failures"], 1);
+            assert!(
+                read_json(&root.join("Family/metadata/A.jpg.json"))
+                    .get("custom")
+                    .is_none()
+            );
+            export(&home, &root, &["--album", "Work"]);
+            Ok(())
+        })
+    })
+}
+
+#[test]
+fn export_retention_restoration_and_album_removal_preserve_history() -> TestResult {
+    Museum::run(|museum| {
+        tokio::runtime::Runtime::new()?.block_on(async {
+            let origin = museum.endpoint();
+            let objects = museum.object_store();
+            let (account, home, email) = export_account(origin).await;
+            let destination = tempfile::tempdir()?;
+            let root = destination.path().join("photos");
+            let (family, family_key) = create_album(origin, &account, "Family", "album").await;
+            let (travel, travel_key) = create_album(origin, &account, "Travel", "folder").await;
+            let original = b"unmodified original bytes";
+            let (file, key) = upload_fixture(origin, &account, family, &family_key, original, metadata("Renamed.jpg", original)).await;
+            place(origin, &account, travel, &travel_key, file, &key, "add-files").await;
+            let initial_reads = objects.reads();
+            export(&home, &root, &["--album", "Family"]);
+            export(&home, &root, &["--album", "Travel"]);
             move_file(origin,&account,family,(travel,&travel_key),(file,&key)).await;
             let result=export(&home,&root,&["--album","Family"]);
             assert_eq!(result["changes"]["retained"],1);
@@ -138,7 +287,7 @@ fn export_lifecycle_and_adoption() -> TestResult {
             assert_eq!(export(&home,&root,&["--album","Family"])["changes"]["retained"],0);
             place(origin,&account,family,&family_key,file,&key,"add-files").await;
             export(&home,&root,&["--album","Family"]);
-            assert_eq!(objects.reads(),initial_reads+2);
+            assert_eq!(objects.reads(),initial_reads+1);
             assert_eq!(fs::read(root.join("Trash/Family/metadata/Renamed.jpg.json"))?,retained_record);
             assert_eq!(fs::metadata(&retained)?.modified()?,retained_time);
             fs::remove_dir_all(root.join("Trash"))?;
@@ -148,7 +297,8 @@ fn export_lifecycle_and_adoption() -> TestResult {
             export(&home,&root,&["--album","Family"]);
             assert_eq!(read_json(&root.join("Trash/Family/metadata.json"))["ente"]["albumID"],family.to_string());
             assert_eq!(fs::read(root.join("Trash/Family/Renamed-1.jpg"))?,original);
-            let recovery=TestHome::new();login(&recovery,"photos",&email,&["--host",origin]);
+            let recovery=TestHome::new();
+            login(&recovery,"photos",&email,&["--host",origin]);
             export(&recovery,&root,&["--adopt","--album","Family"]);
             place(origin,&account,family,&family_key,file,&key,"add-files").await;
             export(&home,&root,&["--album","Family"]);
@@ -165,37 +315,130 @@ fn export_lifecycle_and_adoption() -> TestResult {
             fs::remove_dir_all(root.join("Trash"))?;
             export(&home,&root,&["--album",&family.to_string()]);
             assert!(!root.join("Trash").exists());
-
-            let relocated=destination.path().join("relocated");fs::rename(&root,&relocated)?;
-            let fresh=TestHome::new();login(&fresh,"photos",&email,&["--host",origin]);
-            assert!(failure(&fresh.run(&["photos","export",relocated.to_str().unwrap()])).contains("--adopt"));
-            let reads=objects.reads();
-            export(&fresh,&relocated,&["--adopt","--album","Travel"]);
-            assert_eq!(objects.reads(),reads);
-            assert_eq!(fs::read(relocated.join("export.json"))?,root_bytes);
-            fs::write(relocated.join("Work/Work.jpg"),b"xxxx")?;
-            export(&fresh,&relocated,&["--album","Work"]);
-            assert_eq!(objects.reads(),reads+1);
-            assert_eq!(fs::read(relocated.join("Work/Work.jpg"))?,b"work");
-            request(origin,&account,reqwest::Method::POST,"/files/trash",json!({"items":[{"fileID":work_file,"collectionID":work}]})).await;
-            let trashed=export(&fresh,&relocated,&["--album","Work"]);
-            assert_eq!(trashed["copies"]["expected"],0);
-            assert_eq!(trashed["changes"]["retained"],1);
-            assert!(!relocated.join("Work/Work.jpg").exists());
-            assert!(!relocated.join("Work/metadata/Work.jpg.json").exists());
-            assert_eq!(fs::read(relocated.join("Trash/Work/Work.jpg"))?,b"work");
-            assert_eq!(read_json(&relocated.join("Trash/Work/metadata/Work.jpg.json"))["ente"]["fileID"],work_file.to_string());
-            place(origin,&account,work,&work_key,work_file,&work_file_key,"restore-files").await;
-            let reads=objects.reads();
-            export(&fresh,&relocated,&["--album","Work"]);
-            assert_eq!(objects.reads(),reads);
             Ok(())
         })
     })
 }
 
 #[test]
-fn export_bounds_failed_stages_and_keeps_servicing_existing_output() -> TestResult {
+fn export_adopts_relocated_output_and_verifies_later_selections() -> TestResult {
+    Museum::run(|museum| {
+        tokio::runtime::Runtime::new()?.block_on(async {
+            let origin = museum.endpoint();
+            let objects = museum.object_store();
+            let (account, home, email) = export_account(origin).await;
+            let destination = tempfile::tempdir()?;
+            let root = destination.path().join("photos");
+            let (travel, travel_key) = create_album(origin, &account, "Travel", "album").await;
+            upload_fixture(
+                origin,
+                &account,
+                travel,
+                &travel_key,
+                b"travel",
+                metadata("A.jpg", b"travel"),
+            )
+            .await;
+            let (work, work_key) = create_album(origin, &account, "Work", "album").await;
+            upload_fixture(
+                origin,
+                &account,
+                work,
+                &work_key,
+                b"work",
+                metadata("Work.jpg", b"work"),
+            )
+            .await;
+            export(&home, &root, &[]);
+            let root_bytes = fs::read(root.join("export.json"))?;
+            let relocated = destination.path().join("relocated");
+            fs::rename(&root, &relocated)?;
+            let fresh = TestHome::new();
+            login(&fresh, "photos", &email, &["--host", origin]);
+            assert!(
+                failure(&fresh.run(&["photos", "export", relocated.to_str().unwrap()]))
+                    .contains("--adopt")
+            );
+            let reads = objects.reads();
+            export(&fresh, &relocated, &["--adopt", "--album", "Travel"]);
+            assert_eq!(objects.reads(), reads);
+            assert_eq!(fs::read(relocated.join("export.json"))?, root_bytes);
+            fs::write(relocated.join("Work/Work.jpg"), b"xxxx")?;
+            export(&fresh, &relocated, &["--album", "Work"]);
+            assert_eq!(objects.reads(), reads + 1);
+            assert_eq!(fs::read(relocated.join("Work/Work.jpg"))?, b"work");
+            Ok(())
+        })
+    })
+}
+
+#[test]
+fn export_restores_a_trashed_original_from_retained_output() -> TestResult {
+    Museum::run(|museum| {
+        tokio::runtime::Runtime::new()?.block_on(async {
+            let origin = museum.endpoint();
+            let objects = museum.object_store();
+            let (account, home, _) = export_account(origin).await;
+            let destination = tempfile::tempdir()?;
+            let root = destination.path().join("photos");
+            let (work, work_key) = create_album(origin, &account, "Work", "album").await;
+            let (work_file, work_file_key) = upload_fixture(
+                origin,
+                &account,
+                work,
+                &work_key,
+                b"work",
+                metadata("Work.jpg", b"work"),
+            )
+            .await;
+            export(&home, &root, &[]);
+            request(
+                origin,
+                &account,
+                reqwest::Method::POST,
+                "/files/trash",
+                json!({"items":[{"fileID":work_file,"collectionID":work}]}),
+            )
+            .await;
+            let trashed = export(&home, &root, &["--album", "Work"]);
+            assert_eq!(trashed["copies"]["expected"], 0);
+            assert_eq!(trashed["changes"]["retained"], 1);
+            assert!(!root.join("Work/Work.jpg").exists());
+            assert!(!root.join("Work/metadata/Work.jpg.json").exists());
+            assert_eq!(fs::read(root.join("Trash/Work/Work.jpg"))?, b"work");
+            assert_eq!(
+                read_json(&root.join("Trash/Work/metadata/Work.jpg.json"))["ente"]["fileID"],
+                work_file.to_string()
+            );
+            place(
+                origin,
+                &account,
+                work,
+                &work_key,
+                work_file,
+                &work_file_key,
+                "restore-files",
+            )
+            .await;
+            let reads = objects.reads();
+            let restored = export(&home, &root, &["--album", "Work"]);
+            assert_eq!(
+                restored["copies"],
+                json!({"expected":1,"completed":1,"pending":0})
+            );
+            assert_eq!(fs::read(root.join("Work/Work.jpg"))?, b"work");
+            assert_eq!(
+                read_json(&root.join("Work/metadata/Work.jpg.json"))["ente"]["fileID"],
+                work_file.to_string()
+            );
+            assert_eq!(objects.reads(), reads);
+            Ok(())
+        })
+    })
+}
+
+#[test]
+fn export_destination_conflicts_do_not_block_other_jobs() -> TestResult {
     Museum::run(|museum| {
         tokio::runtime::Runtime::new()?.block_on(async {
             let origin = museum.endpoint();
@@ -209,8 +452,7 @@ fn export_bounds_failed_stages_and_keeps_servicing_existing_output() -> TestResu
             let destination = tempfile::tempdir()?;
             let root = destination.path().join("export");
             export(&home, &root, &[]);
-            let limit = 256 * 1024 * 1024 / stream::DECRYPTION_CHUNK_SIZE;
-            let total = limit + 2;
+            let total = 4;
             for index in 0..total {
                 let name = format!("{index}.jpg");
                 upload_fixture(
@@ -241,33 +483,39 @@ fn export_bounds_failed_stages_and_keeps_servicing_existing_output() -> TestResu
                 file,
                 &key,
                 1,
-                json!({"caption":"updated while staging is full"}),
+                json!({"caption":"updated despite other conflicts"}),
             )
             .await;
-            let output = home.run(&["photos", "export", root.to_str().unwrap(), "--json"]);
-            assert!(failure(&output).contains("filled export staging"));
+            let output = home.run(&[
+                "photos",
+                "export",
+                root.to_str().unwrap(),
+                "--jobs",
+                "2",
+                "--json",
+            ]);
+            assert!(failure(&output).contains("unrelated occupant"));
             let result: Value = serde_json::from_slice(&output.stdout)?;
             assert_eq!(result["copies"]["completed"], 1);
             assert_eq!(result["copies"]["pending"], total);
-            assert_eq!(objects.reads(), reads + limit);
+            assert_eq!(objects.reads(), reads + total);
             assert_eq!(
                 read_json(&root.join("Healthy/metadata/Healthy.jpg.json"))["description"],
-                "updated while staging is full"
+                "updated despite other conflicts"
             );
             let db = export_database(&home);
-            let staged: i64 = db.query_row(
-                "SELECT count(DISTINCT json_extract(record,'$.file')) FROM temporaries",
-                [],
-                |r| r.get(0),
-            )?;
-            assert_eq!(staged, limit as i64);
+            let staged: i64 = db.query_row("SELECT count(*) FROM temporaries", [], |r| r.get(0))?;
+            assert_eq!(staged, 0);
             for index in 0..total {
                 let path = root.join("Blocked").join(format!("{index}.jpg"));
                 assert_eq!(fs::read(&path)?, b"unrelated");
                 fs::remove_file(path)?;
             }
-            assert_eq!(export(&home, &root, &[])["copies"]["completed"], total + 1);
-            assert_eq!(objects.reads(), reads + total);
+            assert_eq!(
+                export(&home, &root, &["--jobs", "1"])["copies"]["completed"],
+                total + 1
+            );
+            assert_eq!(objects.reads(), reads + 2 * total);
             assert_eq!(
                 db.query_row("SELECT count(*) FROM temporaries", [], |r| r
                     .get::<_, i64>(0))?,
@@ -341,7 +589,9 @@ fn export_resumes_a_live_pair_after_publication_failure() -> TestResult {
             let root = destination.path().join("export");
             export(&home, &root, &[]);
             let db = export_database(&home);
-            db.execute_batch("CREATE TRIGGER fail_video_publication BEFORE UPDATE ON temporaries WHEN json_extract(new.record,'$.destination')='Live/Motion.mov' BEGIN SELECT RAISE(ABORT,'injected publication failure'); END;")?;
+            db.execute_batch(
+                "CREATE TRIGGER fail_video_publication BEFORE UPDATE ON pending WHEN json_extract(new.action,'$.Publish.output.Media.role')='video' BEGIN SELECT RAISE(ABORT,'injected publication failure'); END;",
+            )?;
             upload_live(origin, &account, album, &key, "Motion.heic", b"image", b"video").await;
             let output = home.run(&["photos", "export", root.to_str().unwrap(), "--json"]);
             assert!(failure(&output).contains("injected publication failure"));
@@ -350,13 +600,13 @@ fn export_resumes_a_live_pair_after_publication_failure() -> TestResult {
             assert_eq!(fs::read(root.join("Live/Motion.heic"))?, b"image");
             assert!(!root.join("Live/Motion.mov").exists());
             assert!(!root.join("Live/metadata/Motion.heic.json").exists());
-            let pending: String = db.query_row("SELECT path FROM temporaries WHERE json_extract(record,'$.role')='video' AND json_extract(record,'$.hash') IS NOT NULL", [], |r| r.get(0))?;
-            assert_eq!(fs::read(root.join(&pending))?, b"video");
+            assert_eq!(db.query_row("SELECT count(*) FROM temporaries", [], |r| r.get::<_, i64>(0))?, 0);
+            let image_time = fs::metadata(root.join("Live/Motion.heic"))?.modified()?;
             let reads = objects.reads();
             db.execute_batch("DROP TRIGGER fail_video_publication;")?;
             export(&home, &root, &[]);
-            assert_eq!(objects.reads(), reads);
-            assert!(!root.join(pending).exists());
+            assert_eq!(objects.reads(), reads + 1);
+            assert_eq!(fs::metadata(root.join("Live/Motion.heic"))?.modified()?, image_time);
             assert_eq!(fs::read(root.join("Live/Motion.heic"))?, b"image");
             assert_eq!(fs::read(root.join("Live/Motion.mov"))?, b"video");
             for name in ["Motion.heic", "Motion.mov"] {
@@ -369,7 +619,7 @@ fn export_resumes_a_live_pair_after_publication_failure() -> TestResult {
             let fresh = TestHome::new();
             fresh.write_vault(&home.read_vault());
             export(&fresh, &root, &["--adopt"]);
-            assert_eq!(objects.reads(), reads);
+            assert_eq!(objects.reads(), reads + 1);
             assert_eq!(read_json(&sidecar)["ente"]["components"][0]["role"], "image");
             Ok(())
         })
@@ -377,7 +627,173 @@ fn export_resumes_a_live_pair_after_publication_failure() -> TestResult {
 }
 
 #[test]
-fn export_live_photos_parallel_transfers_and_locking() -> TestResult {
+fn export_adopts_live_sidecars_with_different_metadata() -> TestResult {
+    Museum::run(|museum| {
+        tokio::runtime::Runtime::new()?.block_on(async {
+            let origin = museum.endpoint();
+            let objects = museum.object_store();
+            let email = format!("live-adoption-{}@example.org", Uuid::new_v4());
+            let account = create_account(origin, &email).await;
+            let home = TestHome::new();
+            login(&home, "photos", &email, &["--host", origin]);
+            let (active, active_key) = create_album(origin, &account, "Active", "album").await;
+            let (unselected, unselected_key) =
+                create_album(origin, &account, "Unselected", "album").await;
+            let (history, history_key) = create_album(origin, &account, "History", "album").await;
+            let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+            for (name, bytes) in [("image.heic", b"image"), ("video.mov", b"video")] {
+                zip.start_file(
+                    name,
+                    zip::write::SimpleFileOptions::default()
+                        .compression_method(zip::CompressionMethod::Stored),
+                )?;
+                zip.write_all(bytes)?;
+            }
+            let archive = zip.finish()?.into_inner();
+            let mut data = metadata("Motion.heic", &archive);
+            data["fileType"] = json!(2);
+            data["hash"] = json!(format!("{}:{}", digest(b"image"), digest(b"video")));
+            let (file, key) =
+                upload_fixture(origin, &account, active, &active_key, &archive, data).await;
+            for (album, album_key) in [(unselected, &unselected_key), (history, &history_key)] {
+                place(origin, &account, album, album_key, file, &key, "add-files").await;
+            }
+            let destination = tempfile::tempdir()?;
+            let root = destination.path().join("export");
+            export(&home, &root, &[]);
+            move_file(
+                origin,
+                &account,
+                history,
+                (active, &active_key),
+                (file, &key),
+            )
+            .await;
+            request(
+                origin,
+                &account,
+                reqwest::Method::DELETE,
+                &format!("/collections/v3/{history}?collectionID={history}&keepFiles=true"),
+                json!({}),
+            )
+            .await;
+            export(&home, &root, &[]);
+            edit_file(
+                origin,
+                &account,
+                file,
+                &key,
+                1,
+                json!({"caption":"current remote caption","w":640}),
+            )
+            .await;
+            let reads = objects.reads();
+            let mut preserved = Vec::new();
+            for folder in ["Active", "Unselected", "Trash/History"] {
+                for (index, name) in ["Motion.heic", "Motion.mov"].into_iter().enumerate() {
+                    let sidecar = root
+                        .join(folder)
+                        .join("metadata")
+                        .join(format!("{name}.json"));
+                    let mut record = read_json(&sidecar);
+                    record["description"] = json!(format!("{folder} component {index}"));
+                    record["ente"]["width"] = json!(1024 + index);
+                    fs::write(&sidecar, serde_json::to_vec(&record)?)?;
+                    if folder != "Active" {
+                        preserved.push((
+                            sidecar.clone(),
+                            fs::read(&sidecar)?,
+                            fs::metadata(&sidecar)?.modified()?,
+                        ));
+                    }
+                    let media = root.join(folder).join(name);
+                    preserved.push((
+                        media.clone(),
+                        fs::read(&media)?,
+                        fs::metadata(&media)?.modified()?,
+                    ));
+                }
+            }
+            let fresh = TestHome::new();
+            fresh.write_vault(&home.read_vault());
+            export(&fresh, &root, &["--adopt", "--album", "Active"]);
+            assert_eq!(objects.reads(), reads);
+            for name in ["Motion.heic", "Motion.mov"] {
+                let record = read_json(&root.join("Active/metadata").join(format!("{name}.json")));
+                assert_eq!(record["description"], "current remote caption");
+                assert_eq!(record["ente"]["width"], 640);
+            }
+            for (path, bytes, modified) in preserved {
+                assert_eq!(fs::read(&path)?, bytes);
+                assert_eq!(fs::metadata(path)?.modified()?, modified);
+            }
+            move_file(
+                origin,
+                &account,
+                unselected,
+                (active, &active_key),
+                (file, &key),
+            )
+            .await;
+            for name in ["Motion.heic", "Motion.mov"] {
+                fs::remove_file(
+                    root.join("Unselected/metadata")
+                        .join(format!("{name}.json")),
+                )?;
+            }
+            export(&fresh, &root, &["--album", "Unselected"]);
+            for (index, name) in ["Motion.heic", "Motion.mov"].into_iter().enumerate() {
+                let record = read_json(
+                    &root
+                        .join("Trash/Unselected/metadata")
+                        .join(format!("{name}.json")),
+                );
+                assert_eq!(
+                    record["description"],
+                    format!("Unselected component {index}")
+                );
+                assert_eq!(record["ente"]["width"], 1024 + index);
+            }
+            for folder in ["Active", "Trash/History"] {
+                let sidecar = root.join(folder).join("metadata/Motion.mov.json");
+                let original = fs::read(&sidecar)?;
+                for (pointer, value) in [
+                    ("/ente/fileID", json!((file + 1).to_string())),
+                    ("/ente/components/0/path", json!("Other.heic")),
+                    ("/ente/components/0/size", json!(100)),
+                    ("/ente/components/0/hash", json!(digest(b"other"))),
+                    ("/ente/component", json!("image")),
+                ] {
+                    let mut record: Value = serde_json::from_slice(&original)?;
+                    *record.pointer_mut(pointer).unwrap() = value;
+                    fs::write(&sidecar, serde_json::to_vec(&record)?)?;
+                    let ambiguous = TestHome::new();
+                    ambiguous.write_vault(&home.read_vault());
+                    let output = ambiguous.run(&[
+                        "photos",
+                        "export",
+                        root.to_str().unwrap(),
+                        "--adopt",
+                        "--album",
+                        "Active",
+                    ]);
+                    let error = failure(&output);
+                    assert!(
+                        error.contains("conflict:")
+                            || error.contains("contradictory sidecar location"),
+                        "{folder} {pointer}: {error}"
+                    );
+                    fs::write(&sidecar, &original)?;
+                }
+            }
+            assert_eq!(objects.reads(), reads);
+            Ok(())
+        })
+    })
+}
+
+#[test]
+fn export_live_pairs_retry_and_reuse_without_rewriting_unchanged_output() -> TestResult {
     Museum::run(|museum| {
         tokio::runtime::Runtime::new()?.block_on(async {
             let origin = museum.endpoint();
@@ -386,8 +802,6 @@ fn export_live_photos_parallel_transfers_and_locking() -> TestResult {
             let account = create_account(origin, &email).await;
             let home = TestHome::new();
             login(&home, "photos", &email, &["--host", origin]);
-            let other = TestHome::new();
-            login(&other, "photos", &email, &["--host", origin]);
             let (album, key) = create_album(origin, &account, "Live", "album").await;
             let (copy, copy_key) = create_album(origin, &account, "Copies", "album").await;
             let image = vec![61u8; stream::ENCRYPTION_CHUNK_SIZE + 17];
@@ -419,39 +833,22 @@ fn export_live_photos_parallel_transfers_and_locking() -> TestResult {
                 "add-files",
             )
             .await;
-            for index in 0..4 {
-                let bytes = vec![index as u8; stream::ENCRYPTION_CHUNK_SIZE + index + 100];
-                upload_fixture(
-                    origin,
-                    &account,
-                    album,
-                    &key,
-                    &bytes,
-                    metadata(&format!("{index}.jpg"), &bytes),
-                )
-                .await;
-            }
+            let original = vec![0; stream::ENCRYPTION_CHUNK_SIZE + 100];
+            upload_fixture(
+                origin,
+                &account,
+                album,
+                &key,
+                &original,
+                metadata("0.jpg", &original),
+            )
+            .await;
             let destination = tempfile::tempdir()?;
             let root = destination.path().join("export");
-            objects.delay_chunks(Duration::from_millis(15));
             objects.interrupt_reads(1);
-            let child = home
-                .command(&["photos", "export", root.to_str().unwrap(), "--json"])
-                .spawn()?;
-            let deadline = std::time::Instant::now() + Duration::from_secs(20);
-            while !root.join("export.json").exists() && std::time::Instant::now() < deadline {
-                std::thread::sleep(Duration::from_millis(10));
-            }
-            let started = std::time::Instant::now();
-            assert!(
-                failure(&other.run(&["photos", "export", root.to_str().unwrap(), "--adopt"]))
-                    .contains("another writer")
-            );
-            assert!(started.elapsed() < Duration::from_secs(3));
-            let result: Value = serde_json::from_slice(&success(child.wait_with_output()?).stdout)?;
-            assert_eq!(result["copies"]["completed"], 6);
-            assert!(objects.peak_reads() > 1);
-            assert_eq!(objects.reads(), 6);
+            let result = export(&home, &root, &[]);
+            assert_eq!(result["copies"]["completed"], 3);
+            assert_eq!(objects.reads(), 3);
             for folder in ["Live", "Copies"] {
                 assert_eq!(fs::read(root.join(folder).join("Motion.heic"))?, image);
                 assert_eq!(fs::read(root.join(folder).join("Motion.mov"))?, video);
@@ -461,6 +858,64 @@ fn export_live_photos_parallel_transfers_and_locking() -> TestResult {
             }
             let reads = objects.reads();
             export(&home, &root, &[]);
+            let paths = [
+                "export.json",
+                "Live/metadata.json",
+                "Live/0.jpg",
+                "Live/metadata/0.jpg.json",
+                "Live/Motion.heic",
+                "Live/Motion.mov",
+                "Live/metadata/Motion.heic.json",
+                "Live/metadata/Motion.mov.json",
+                "Copies/metadata.json",
+                "Copies/Motion.heic",
+                "Copies/Motion.mov",
+                "Copies/metadata/Motion.heic.json",
+                "Copies/metadata/Motion.mov.json",
+            ];
+            let unchanged: Vec<_> = paths
+                .iter()
+                .map(|path| {
+                    let path = root.join(path);
+                    (
+                        fs::read(&path).unwrap(),
+                        fs::metadata(&path).unwrap().modified().unwrap(),
+                    )
+                })
+                .collect();
+            let db = export_database(&home);
+            for table in ["albums", "placements", "components", "json_records", "pending"] {
+                for action in ["INSERT", "UPDATE", "DELETE"] {
+                    db.execute_batch(&format!(
+                        "CREATE TRIGGER unchanged_{table}_{action} BEFORE {action} ON {table} BEGIN SELECT RAISE(ABORT,'unchanged association write'); END;",
+                    ))?;
+                }
+            }
+            let result = success(
+                home.command(&["photos", "export", root.to_str().unwrap(), "--json"])
+                    .env("TOKIO_WORKER_THREADS", "1")
+                    .output()?,
+            );
+            let result: Value = serde_json::from_slice(&result.stdout)?;
+            assert_eq!(result["complete"], true);
+            assert_eq!(
+                result["copies"],
+                json!({"expected":3,"completed":3,"pending":0})
+            );
+            assert_eq!(
+                result["changes"],
+                json!({"exported":0,"metadataUpdated":0,"renamed":0,"retained":0})
+            );
+            assert_eq!(objects.reads(), reads);
+            for (path, before) in paths.iter().zip(unchanged) {
+                let path = root.join(path);
+                assert_eq!((fs::read(&path)?, fs::metadata(&path)?.modified()?), before);
+            }
+            for table in ["albums", "placements", "components", "json_records", "pending"] {
+                for action in ["INSERT", "UPDATE", "DELETE"] {
+                    db.execute_batch(&format!("DROP TRIGGER unchanged_{table}_{action};"))?;
+                }
+            }
             for entry in fs::read_dir(root.join("Live"))? {
                 let entry = entry?;
                 if entry.file_type()?.is_file() && entry.file_name() != "metadata.json" {
@@ -476,7 +931,81 @@ fn export_live_photos_parallel_transfers_and_locking() -> TestResult {
             export(&home, &root, &[]);
             assert_eq!(objects.reads(), reads);
             assert_eq!(fs::read(root.join("Live/Motion.mov"))?, video);
-            let unrelated = root.join("Live/.ente-11111111111111111111111111111111.part");
+            Ok(())
+        })
+    })
+}
+
+#[test]
+fn export_excludes_another_writer_while_downloads_are_running() -> TestResult {
+    Museum::run(|museum| {
+        tokio::runtime::Runtime::new()?.block_on(async {
+            let origin = museum.endpoint();
+            let objects = museum.object_store();
+            let (account, home, email) = export_account(origin).await;
+            let other = TestHome::new();
+            login(&other, "photos", &email, &["--host", origin]);
+            let (album, key) = create_album(origin, &account, "Album", "album").await;
+            for name in ["First.jpg", "Second.jpg"] {
+                upload_fixture(
+                    origin,
+                    &account,
+                    album,
+                    &key,
+                    name.as_bytes(),
+                    metadata(name, name.as_bytes()),
+                )
+                .await;
+            }
+            let destination = tempfile::tempdir()?;
+            let root = destination.path().join("photos");
+            let held = objects.hold_reads(0);
+            let child = ExportChild::spawn(&mut home.command(&[
+                "photos",
+                "export",
+                root.to_str().unwrap(),
+                "-j",
+                "2",
+                "--json",
+            ]))?;
+            held.wait_for(2);
+            let second = ExportChild::spawn(&mut other.command(&[
+                "photos",
+                "export",
+                root.to_str().unwrap(),
+                "--adopt",
+            ]))?;
+            assert!(failure(&second.wait_with_output()?).contains("another writer"));
+            drop(held);
+            let result: Value = serde_json::from_slice(&success(child.wait_with_output()?).stdout)?;
+            assert_eq!(result["copies"]["completed"], 2);
+            assert_eq!(objects.peak_reads(), 2);
+            Ok(())
+        })
+    })
+}
+
+#[test]
+fn export_recovers_after_cancelled_and_killed_downloads() -> TestResult {
+    Museum::run(|museum| {
+        tokio::runtime::Runtime::new()?.block_on(async {
+            let origin = museum.endpoint();
+            let objects = museum.object_store();
+            let (account, home, _) = export_account(origin).await;
+            let (album, key) = create_album(origin, &account, "Album", "album").await;
+            upload_fixture(
+                origin,
+                &account,
+                album,
+                &key,
+                b"original",
+                metadata("Photo.jpg", b"original"),
+            )
+            .await;
+            let destination = tempfile::tempdir()?;
+            let root = destination.path().join("photos");
+            export(&home, &root, &[]);
+            let unrelated = root.join("Album/.ente-11111111111111111111111111111111.part");
             fs::write(&unrelated, b"unassociated")?;
             let unchanged_root = fs::read(root.join("export.json"))?;
             for graceful in [true, false] {
@@ -484,26 +1013,13 @@ fn export_live_photos_parallel_transfers_and_locking() -> TestResult {
                 if graceful {
                     continue;
                 }
-                for index in 0..4 {
-                    fs::remove_file(root.join(format!("Live/{index}.jpg")))?;
-                }
-                objects.delay_chunks(Duration::from_millis(30));
-                let before = objects.reads();
-                let mut child = home
-                    .command(&[
-                        "photos",
-                        "export",
-                        root.to_str().unwrap(),
-                        "--album",
-                        "Live",
-                        "--json",
-                    ])
-                    .spawn()?;
-                let deadline = std::time::Instant::now() + Duration::from_secs(20);
-                while objects.reads() == before && std::time::Instant::now() < deadline {
-                    std::thread::sleep(Duration::from_millis(10));
-                }
-                assert!(objects.reads() > before);
+                fs::remove_file(root.join("Album/Photo.jpg"))?;
+                let held = objects.hold_reads(0);
+                let mut child = ExportChild::spawn(
+                    home.command(&["photos", "export", root.to_str().unwrap(), "--json"])
+                        .env("TOKIO_WORKER_THREADS", "1"),
+                )?;
+                held.wait_for(1);
                 if graceful {
                     assert!(
                         Command::new("kill")
@@ -515,13 +1031,17 @@ fn export_live_photos_parallel_transfers_and_locking() -> TestResult {
                     child.kill()?;
                 }
                 let interrupted = child.wait_with_output()?;
-                failure(&interrupted);
+                let error = failure(&interrupted);
                 if graceful {
-                    let result: Value = serde_json::from_slice(&interrupted.stdout)?;
-                    assert_eq!(result["complete"], false);
+                    assert!(error.contains("cancelled"), "{error}");
+                    assert_eq!(
+                        serde_json::from_slice::<Value>(&interrupted.stdout)?["complete"],
+                        false
+                    );
                 }
-                objects.delay_chunks(Duration::ZERO);
-                export(&home, &root, &["--album", "Live"]);
+                drop(held);
+                export(&home, &root, &[]);
+                assert_eq!(fs::read(root.join("Album/Photo.jpg"))?, b"original");
                 assert_eq!(fs::read(&unrelated)?, b"unassociated");
                 assert_eq!(fs::read(root.join("export.json"))?, unchanged_root);
             }
@@ -928,7 +1448,16 @@ fn export_allocates_live_pairs_from_their_actual_extensions() -> TestResult {
 }
 
 #[test]
-fn export_refills_transfers_while_a_large_original_is_pending() -> TestResult {
+fn export_refills_transfers_while_an_ordinary_original_is_held() -> TestResult {
+    export_refills_transfers(false)
+}
+
+#[test]
+fn export_refills_transfers_while_a_live_original_is_held() -> TestResult {
+    export_refills_transfers(true)
+}
+
+fn export_refills_transfers(live: bool) -> TestResult {
     Museum::run(|museum| {
         tokio::runtime::Runtime::new()?.block_on(async {
             let origin = museum.endpoint();
@@ -937,117 +1466,112 @@ fn export_refills_transfers_while_a_large_original_is_pending() -> TestResult {
             let account = create_account(origin, &email).await;
             let home = TestHome::new();
             login(&home, "photos", &email, &["--host", origin]);
-            let small_count = std::thread::available_parallelism()
-                .map(usize::from)
-                .unwrap_or(1)
-                .min(63)
-                + 2;
-            for live in [false, true] {
-                let (album, key) = create_album(
+            let small_count = 4;
+            let (album, key) = create_album(
+                origin,
+                &account,
+                if live { "Live" } else { "Ordinary" },
+                "album",
+            )
+            .await;
+            let large = vec![31u8; stream::ENCRYPTION_CHUNK_SIZE + 17];
+            if live {
+                upload_live(
                     origin,
                     &account,
-                    if live { "Live" } else { "Ordinary" },
-                    "album",
+                    album,
+                    &key,
+                    "IMG:1.heic",
+                    &large,
+                    b"video",
                 )
                 .await;
-                let large = vec![31u8; 32 * 1024 * 1024];
-                if live {
-                    upload_live(
-                        origin,
-                        &account,
-                        album,
-                        &key,
-                        "IMG:1.heic",
-                        &large,
-                        b"video",
-                    )
-                    .await;
-                    let mut contender = metadata("IMG?1.mov", b"ordinary contender");
-                    contender["fileType"] = json!(1);
-                    upload_fixture(
-                        origin,
-                        &account,
-                        album,
-                        &key,
-                        b"ordinary contender",
-                        contender,
-                    )
-                    .await;
-                    upload_live(
-                        origin,
-                        &account,
-                        album,
-                        &key,
-                        "IMG?1-1.heic",
-                        b"small image",
-                        b"small video",
-                    )
-                    .await;
-                } else {
-                    upload_fixture(
-                        origin,
-                        &account,
-                        album,
-                        &key,
-                        &large,
-                        metadata("Slow.jpg", &large),
-                    )
-                    .await;
-                }
-                for index in 0..small_count {
-                    upload_fixture(
-                        origin,
-                        &account,
-                        album,
-                        &key,
-                        b"independent",
-                        metadata(&format!("Small-{index}.jpg"), b"independent"),
-                    )
-                    .await;
-                }
-                objects.delay_chunks(Duration::from_millis(30));
-                let destination = tempfile::tempdir()?;
-                let root = destination.path().join("export");
-                let folder = root.join(if live { "Live" } else { "Ordinary" });
-                let child = home
-                    .command(&[
-                        "photos",
-                        "export",
-                        root.to_str().unwrap(),
-                        "--album",
-                        &album.to_string(),
-                        "--json",
-                    ])
-                    .spawn()?;
-                let last = folder.join(format!("Small-{}.jpg", small_count - 1));
-                let deadline = std::time::Instant::now() + Duration::from_secs(40);
-                while !last.exists() && std::time::Instant::now() < deadline {
-                    std::thread::sleep(Duration::from_millis(10));
-                }
-                assert!(last.exists(), "independent transfers did not make progress");
-                assert!(
-                    !folder
-                        .join(if live { "IMG_1-2.heic" } else { "Slow.jpg" })
-                        .exists(),
-                    "a slow first transfer blocked later placements"
-                );
-                success(child.wait_with_output()?);
-                objects.delay_chunks(Duration::ZERO);
-                if live {
-                    assert_eq!(fs::read(folder.join("IMG_1-2.heic"))?, large);
-                    assert_eq!(fs::read(folder.join("IMG_1-2.mov"))?, b"video");
-                    assert_eq!(fs::read(folder.join("IMG_1-1.heic"))?, b"small image");
-                    assert_eq!(fs::read(folder.join("IMG_1-1.mov"))?, b"small video");
-                    assert_eq!(fs::read(folder.join("IMG_1.mov"))?, b"ordinary contender");
-                    assert!(!folder.join("IMG_1.heic").exists());
-                } else {
-                    assert_eq!(fs::read(folder.join("Slow.jpg"))?, large);
-                }
-                assert_eq!(
-                    export(&home, &root, &["--album", &album.to_string()])["changes"],
-                    json!({"exported":0,"metadataUpdated":0,"renamed":0,"retained":0})
-                );
+                let mut contender = metadata("IMG?1.mov", b"ordinary contender");
+                contender["fileType"] = json!(1);
+                upload_fixture(
+                    origin,
+                    &account,
+                    album,
+                    &key,
+                    b"ordinary contender",
+                    contender,
+                )
+                .await;
+                upload_live(
+                    origin,
+                    &account,
+                    album,
+                    &key,
+                    "IMG?1-1.heic",
+                    b"small image",
+                    b"small video",
+                )
+                .await;
+            } else {
+                upload_fixture(
+                    origin,
+                    &account,
+                    album,
+                    &key,
+                    &large,
+                    metadata("Slow.jpg", &large),
+                )
+                .await;
             }
+            for index in 0..small_count {
+                upload_fixture(
+                    origin,
+                    &account,
+                    album,
+                    &key,
+                    b"independent",
+                    metadata(&format!("Small-{index}.jpg"), b"independent"),
+                )
+                .await;
+            }
+            let held = objects.hold_reads(1024 * 1024);
+            let destination = tempfile::tempdir()?;
+            let root = destination.path().join("export");
+            let folder = root.join(if live { "Live" } else { "Ordinary" });
+            let child = ExportChild::spawn(&mut home.command(&[
+                "photos",
+                "export",
+                root.to_str().unwrap(),
+                "--album",
+                &album.to_string(),
+                "-j",
+                "2",
+                "--json",
+            ]))?;
+            held.wait_for(1);
+            let last = folder.join(format!("Small-{}.jpg", small_count - 1));
+            let deadline = std::time::Instant::now() + Duration::from_secs(60);
+            while !last.exists() && std::time::Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert!(last.exists(), "independent transfers did not make progress");
+            assert!(
+                !folder
+                    .join(if live { "IMG_1-2.heic" } else { "Slow.jpg" })
+                    .exists(),
+                "a slow first transfer blocked later placements"
+            );
+            drop(held);
+            success(child.wait_with_output()?);
+            if live {
+                assert_eq!(fs::read(folder.join("IMG_1-2.heic"))?, large);
+                assert_eq!(fs::read(folder.join("IMG_1-2.mov"))?, b"video");
+                assert_eq!(fs::read(folder.join("IMG_1-1.heic"))?, b"small image");
+                assert_eq!(fs::read(folder.join("IMG_1-1.mov"))?, b"small video");
+                assert_eq!(fs::read(folder.join("IMG_1.mov"))?, b"ordinary contender");
+                assert!(!folder.join("IMG_1.heic").exists());
+            } else {
+                assert_eq!(fs::read(folder.join("Slow.jpg"))?, large);
+            }
+            assert_eq!(
+                export(&home, &root, &["--album", &album.to_string()])["changes"],
+                json!({"exported":0,"metadataUpdated":0,"renamed":0,"retained":0})
+            );
             Ok(())
         })
     })
@@ -1098,4 +1622,12 @@ async fn upload_live_parts(
     upload_fixture(origin, account, album, key, &archive, data)
         .await
         .0
+}
+
+async fn export_account(origin: &str) -> (AuthenticatedAccount, TestHome, String) {
+    let email = format!("export-{}@example.org", Uuid::new_v4());
+    let account = create_account(origin, &email).await;
+    let home = TestHome::new();
+    login(&home, "photos", &email, &["--host", origin]);
+    (account, home, email)
 }

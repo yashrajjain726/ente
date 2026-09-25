@@ -7,76 +7,51 @@ use uuid::Uuid;
 
 use super::{
     names,
-    store::{Album, JsonRecord, Media, Placement, Properties, Store},
+    store::{Album, JsonRecord, Location, Placement, Properties, Store},
 };
 
 pub fn scan(root: &Path, store: &Store) -> Result<()> {
-    let transaction = store.db.connection().unchecked_transaction()?;
-    store.db.connection().execute_batch(
-        "DELETE FROM placements; DELETE FROM albums; DELETE FROM json_records; DELETE FROM names; DELETE FROM allocations;",
-    )?;
+    store
+        .db
+        .connection()
+        .execute_batch(
+            "DELETE FROM components; DELETE FROM json_records; DELETE FROM placements; DELETE FROM albums; DELETE FROM pending; DELETE FROM temporaries;",
+        )?;
     for entry in fs::read_dir(root)? {
         let entry = entry?;
-        let name = entry
-            .file_name()
-            .into_string()
-            .map_err(|_| anyhow::anyhow!("export contains a non-UTF-8 directory name"))?;
-        if name == "Trash" {
+        if entry.file_name() == "Trash" {
             ensure!(
                 entry.file_type()?.is_dir(),
-                super::Conflict("at Trash: expected a directory".into())
+                super::Conflict("at Trash: expected directory".into())
             );
             for entry in fs::read_dir(entry.path())? {
                 let entry = entry?;
                 if entry.file_type()?.is_dir() {
-                    let name = entry
-                        .file_name()
-                        .into_string()
-                        .map_err(|_| anyhow::anyhow!("retained album name is not UTF-8"))?;
-                    album(root, store, &format!("Trash/{name}"), true)?;
+                    album(root, store, &entry.path(), true)?;
                 }
             }
         } else if entry.file_type()?.is_dir() {
-            album(root, store, &name, false)?;
+            album(root, store, &entry.path(), false)?;
         }
     }
-    let mut query = store
-        .db
-        .connection()
-        .prepare("SELECT record FROM placements WHERE json_extract(record,'$.complete')=0")?;
-    let mut rows = query.query([])?;
-    while let Some(row) = rows.next()? {
-        let mut placement: Placement = serde_json::from_str(&row.get::<_, String>(0)?)?;
-        let template = placement
-            .metadata
-            .iter()
-            .find(|record| !record.is_null())
-            .context("placement has no metadata")?
-            .clone();
-        for (media, record) in placement.media.iter().zip(&mut placement.metadata) {
-            if record.is_null() {
-                *record = template.clone();
-                record["title"] = Value::String(media.component.path.clone());
-                record["ente"]["component"] = serde_json::to_value(&media.component.role)?;
-            }
-        }
-        store.save_placement(&placement)?;
-    }
-    drop(rows);
-    drop(query);
-    transaction.commit()?;
     Ok(())
 }
 
-fn album(root: &Path, store: &Store, folder: &str, retained: bool) -> Result<()> {
-    let path = names::check(root, &format!("{folder}/metadata.json"))?;
-    if !path.try_exists()? {
+fn album(root: &Path, store: &Store, directory: &Path, retained: bool) -> Result<()> {
+    let path = directory.join("metadata.json");
+    let Some(properties) = Properties::optional(&path)? else {
         return Ok(());
-    }
-    let record = read_record(root, store, &format!("{folder}/metadata.json"))?;
+    };
+    let bytes = fs::read(&path)?;
+    let record: Value = serde_json::from_slice(&bytes)?;
     let Some(identity) = record.get("ente") else {
         return Ok(());
     };
+    let folder = directory
+        .strip_prefix(root)?
+        .to_str()
+        .context("claimed Ente album path is not UTF-8")?;
+    names::check(root, &format!("{folder}/metadata.json"))?;
     let id = parse_id(identity, "albumID")?;
     let name = record["title"]
         .as_str()
@@ -104,13 +79,15 @@ fn album(root: &Path, store: &Store, folder: &str, retained: bool) -> Result<()>
         super::Conflict(format!("active album ID {id}"))
     );
     let album = Album {
-        key: Uuid::new_v4().to_string(),
+        key: if retained {
+            Uuid::new_v4().to_string()
+        } else {
+            format!("active:{id}")
+        },
         id,
+        retained,
         name,
         path: folder.into(),
-        retained,
-        metadata: record,
-        initialized: true,
     };
     let (parent, name) = folder.rsplit_once('/').unwrap_or(("", folder));
     ensure!(
@@ -118,10 +95,21 @@ fn album(root: &Path, store: &Store, folder: &str, retained: bool) -> Result<()>
         "reserved active album path {folder}"
     );
     ensure!(
-        names::reserve(store, parent, name, &album.key, "album")?,
+        names::available(store, parent, &[name.into()], &album.key, "album")?,
         super::Conflict(format!("overlapping album paths at {folder}"))
     );
     store.save_album(&album)?;
+    store.save_json(&JsonRecord {
+        owner: album.key.clone(),
+        role: None,
+        location: Some(Location {
+            folder: album.key.clone(),
+            name: "metadata.json".into(),
+        }),
+        value: record,
+        hash: Some(digest(&bytes)?),
+        properties: Some(properties),
+    })?;
     let metadata = names::check(root, &format!("{folder}/metadata"))?;
     if !metadata.try_exists()? {
         return Ok(());
@@ -135,22 +123,24 @@ fn album(root: &Path, store: &Store, folder: &str, retained: bool) -> Result<()>
     );
     for entry in fs::read_dir(metadata)? {
         let entry = entry?;
-        if entry.path().extension().is_none_or(|ext| ext != "json") {
+        if entry
+            .path()
+            .extension()
+            .is_none_or(|extension| extension != "json")
+        {
             continue;
         }
-        let name = entry
-            .file_name()
-            .into_string()
-            .map_err(|_| anyhow::anyhow!("sidecar name is not UTF-8"))?;
-        let path = names::check(root, &format!("{folder}/metadata/{name}"))?;
-        ensure!(
-            entry.file_type()?.is_file(),
-            super::Conflict(format!("at {}: expected a sidecar", path.display()))
-        );
-        let record = read_record(root, store, &format!("{folder}/metadata/{name}"))?;
+        let properties = Properties::read(&entry.path())?;
+        let bytes = fs::read(entry.path())?;
+        let record: Value = serde_json::from_slice(&bytes)?;
         let Some(identity) = record.get("ente") else {
             continue;
         };
+        let name = entry
+            .file_name()
+            .into_string()
+            .map_err(|_| anyhow::anyhow!("claimed Ente sidecar name is not UTF-8"))?;
+        names::check(root, &format!("{folder}/metadata/{name}"))?;
         let file = parse_id(identity, "fileID")?;
         let display_name = identity["name"]
             .as_str()
@@ -210,20 +200,27 @@ fn album(root: &Path, store: &Store, folder: &str, retained: bool) -> Result<()>
                 && name == format!("{}.json", components[index].path),
             "contradictory sidecar location for file {file}"
         );
+        let kind = if kind == "livePhoto" {
+            "livephoto"
+        } else {
+            kind
+        };
         let existing = if retained {
-            let mut query = store.db.connection().prepare(
-                "SELECT record FROM placements WHERE album=?1 AND file=?2 AND retained=1",
-            )?;
+            let mut query = store
+                .db
+                .connection()
+                .prepare(
+                    "SELECT DISTINCT p.id,p.album,p.file,p.retained,p.name,p.kind FROM placements p JOIN components c ON c.placement=p.id WHERE p.album=?1 AND p.file=?2 AND p.retained=1 AND c.folder=?3",
+                )?;
+            let mut rows = query.query(rusqlite::params![id, file, album.key])?;
             let mut found = None;
-            let mut rows = query.query(rusqlite::params![id, file])?;
             while let Some(row) = rows.next()? {
-                let candidate: Placement = serde_json::from_str(&row.get::<_, String>(0)?)?;
-                if candidate.folder == folder
-                    && candidate
-                        .media
-                        .iter()
-                        .map(|m| &m.component)
-                        .eq(components.iter())
+                let candidate = Placement::read(row)?;
+                if store
+                    .components(&candidate.id)?
+                    .iter()
+                    .map(super::store::Component::portable)
+                    .eq(components.iter().cloned())
                 {
                     found = Some(candidate);
                     break;
@@ -233,94 +230,94 @@ fn album(root: &Path, store: &Store, folder: &str, retained: bool) -> Result<()>
         } else {
             store.placement(id, file)?
         };
-        let mut placement = existing.unwrap_or_else(|| Placement {
+        let fresh = existing.is_none();
+        let placement = existing.unwrap_or_else(|| Placement {
             id: Uuid::new_v4().to_string(),
             album: id,
-            folder: folder.into(),
             file,
             retained,
             name: display_name.into(),
-            original: String::new(),
-            media: components
-                .iter()
-                .cloned()
-                .map(|component| Media {
-                    component,
-                    properties: None,
-                    intended_time: None,
-                })
-                .collect(),
-            metadata: vec![Value::Null; components.len()],
-            complete: false,
-            retaining: false,
+            kind: kind.into(),
         });
-        let owner = if retained {
-            placement.id.clone()
-        } else {
-            format!("file:{id}:{file}")
-        };
-        for component in &components {
+        if !fresh {
             ensure!(
-                names::reserve(store, folder, &component.path, &owner, kind)?,
-                super::Conflict(format!("overlapping media paths in {folder}"))
+                placement.kind == kind
+                    && store
+                        .components(&placement.id)?
+                        .iter()
+                        .all(|component| component.location.folder == album.key)
+                    && store
+                        .components(&placement.id)?
+                        .iter()
+                        .map(super::store::Component::portable)
+                        .eq(components.iter().cloned()),
+                super::Conflict(format!("active placement for file {file} in album {id}"))
             );
         }
         ensure!(
-            placement.folder == folder
-                && placement
-                    .media
-                    .iter()
-                    .map(|m| &m.component)
-                    .eq(components.iter()),
-            super::Conflict(format!("active placement for file {file} in album {id}"))
-        );
-        ensure!(
-            placement.metadata[index].is_null(),
+            !store
+                .json_record(&placement.id, Some(&own))?
+                .is_some_and(|record| record.location.is_some()),
             "duplicate component identity for file {file}"
         );
-        if let Some(other) = placement.metadata.iter().find(|value| !value.is_null()) {
-            let mut a = other.clone();
-            let mut b = record.clone();
-            a.as_object_mut()
-                .context("invalid sidecar")?
-                .remove("title");
-            b.as_object_mut()
-                .context("invalid sidecar")?
-                .remove("title");
-            a["ente"]
-                .as_object_mut()
-                .context("invalid Ente record")?
-                .remove("component");
-            b["ente"]
-                .as_object_mut()
-                .context("invalid Ente record")?
-                .remove("component");
-            a["ente"]["components"] = serde_json::to_value(&components)?;
-            b["ente"]["components"] = a["ente"]["components"].clone();
-            ensure!(a == b, "contradictory Live Photo metadata for file {file}");
-        }
-        placement.metadata[index] = record;
-        placement.complete = placement.metadata.iter().all(|record| !record.is_null());
+        let media_names: Vec<_> = components
+            .iter()
+            .map(|component| component.path.clone())
+            .collect();
+        ensure!(
+            names::available(store, &album.key, &media_names, &placement.id, kind)?,
+            super::Conflict(format!("overlapping media paths in {folder}"))
+        );
         store.save_placement(&placement)?;
+        if fresh {
+            for component in &components {
+                store.save_component(&super::store::Component {
+                    placement: placement.id.clone(),
+                    role: component.role.clone(),
+                    location: Location {
+                        folder: album.key.clone(),
+                        name: component.path.clone(),
+                    },
+                    size: component.size,
+                    hash: component.hash.clone(),
+                    signature: None,
+                    properties: None,
+                    intended_time: None,
+                })?;
+                let mut fallback = record.clone();
+                fallback["title"] = Value::String(component.path.clone());
+                fallback["ente"]["component"] = serde_json::to_value(&component.role)?;
+                store.save_json(&JsonRecord {
+                    owner: placement.id.clone(),
+                    role: Some(component.role.clone()),
+                    location: None,
+                    value: fallback,
+                    hash: None,
+                    properties: None,
+                })?;
+            }
+        }
+        store.save_json(&JsonRecord {
+            owner: placement.id,
+            role: Some(own),
+            location: Some(Location {
+                folder: album.key.clone(),
+                name: format!("metadata/{name}"),
+            }),
+            value: record,
+            hash: Some(digest(&bytes)?),
+            properties: Some(properties),
+        })?;
     }
     Ok(())
 }
 
-fn read_record(root: &Path, store: &Store, relative: &str) -> Result<Value> {
-    let path = names::check(root, relative)?;
-    let bytes = fs::read(&path)?;
-    let record: Value = serde_json::from_slice(&bytes)?;
-    if record.get("ente").is_some() {
-        let cached = JsonRecord {
-            hash: ente_core::b64::encode(&ente_core::crypto::hash::hash(&bytes, Some(64), None)?),
-            properties: Properties::read(&path)?,
-        };
-        store.db.connection().execute(
-            "INSERT INTO json_records VALUES(?1,?2)",
-            rusqlite::params![relative, serde_json::to_string(&cached)?],
-        )?;
-    }
-    Ok(record)
+fn digest(bytes: &[u8]) -> Result<String> {
+    Ok(ente_core::b64::encode(&ente_core::crypto::hash::hash(
+        bytes,
+        Some(64),
+        None,
+    )?))
 }
 
 fn parse_id(value: &Value, field: &str) -> Result<i64> {

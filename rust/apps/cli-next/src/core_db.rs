@@ -7,7 +7,7 @@ pub use rusqlite::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("{0}")]
+    #[error(transparent)]
     Sqlite(#[from] SqliteError),
     #[error("database version {current} is newer than this build supports ({target})")]
     Downgrade { current: i64, target: i64 },

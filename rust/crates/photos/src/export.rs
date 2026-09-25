@@ -4,7 +4,7 @@ use ente_core::{
     crypto::{Key, kdf},
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 
 use crate::{
     collections::{Collection, Visibility},
@@ -59,7 +59,7 @@ pub struct Component {
 pub fn album(album: &Collection) -> Value {
     let mut metadata = json!({
         "albumID": album.id.to_string(), "type": album.kind.name(), "visibility": album.visibility.name(),
-    }).as_object().cloned().unwrap_or_default();
+    });
     optional(&mut metadata, "displayOrder", album.display_order);
     optional(&mut metadata, "muted", album.muted);
     optional(
@@ -95,10 +95,7 @@ pub fn file(
         "creationTime": timestamp(file.created_at_micros)?,
         "component": selected.role,
         "components": components,
-    })
-    .as_object()
-    .cloned()
-    .unwrap_or_default();
+    });
     optional(
         &mut metadata,
         "modificationTime",
@@ -138,17 +135,14 @@ pub fn file(
         "favorited": favorited,
         "ente": metadata,
     });
-    let object = record
-        .as_object_mut()
-        .ok_or(MetadataError("invalid file record"))?;
     optional(
-        object,
+        &mut record,
         "modificationTime",
         file.modified_at_micros.map(common_time).transpose()?,
     );
-    optional(object, "description", file.caption.as_deref());
+    optional(&mut record, "description", file.caption.as_deref());
     optional(
-        object,
+        &mut record,
         "geoData",
         file.location
             .as_ref()
@@ -157,9 +151,9 @@ pub fn file(
     Ok(record)
 }
 
-fn optional(object: &mut Map<String, Value>, name: &str, value: Option<impl Into<Value>>) {
+fn optional(object: &mut Value, name: &str, value: Option<impl Into<Value>>) {
     if let Some(value) = value {
-        object.insert(name.into(), value.into());
+        object[name] = value.into();
     }
 }
 

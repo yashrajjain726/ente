@@ -3,16 +3,16 @@ use ente_core::{
     crypto::{self, Header, Key, blob},
     http,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    collections::{Collection, Visibility},
+    collections::Visibility,
     source::{self, Documents, MetadataError},
 };
 
 pub use ente_collections::client::File as RemoteFile;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct File {
     pub id: i64,
     pub owner_id: i64,
@@ -36,11 +36,13 @@ pub struct File {
     pub panorama: Option<bool>,
     pub motion_video_offset: Option<u64>,
     pub warnings: Vec<String>,
+    #[serde(with = "source::key")]
     pub key: Key,
+    #[serde(with = "source::header")]
     pub header: Header,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Kind {
     Image,
     Video,
@@ -59,63 +61,26 @@ impl Kind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Location {
     pub latitude: f64,
     pub longitude: f64,
 }
 
-pub struct Change {
-    pub id: i64,
-    pub file: Option<File>,
-}
-
-pub struct Page {
-    pub changes: Vec<Change>,
-    pub cursor: i64,
-    pub has_more: bool,
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("{0}")]
+    #[error(transparent)]
     Http(#[from] http::Error),
-    #[error("{0}")]
+    #[error(transparent)]
     Crypto(#[from] crypto::Error),
-    #[error("{0}")]
+    #[error(transparent)]
     Base64(#[from] b64::DecodeError),
-    #[error("{0}")]
+    #[error(transparent)]
     Io(#[from] std::io::Error),
-    #[error("{0}")]
+    #[error(transparent)]
     Collections(#[from] ente_collections::Error),
-    #[error("{0}")]
+    #[error(transparent)]
     Metadata(#[from] MetadataError),
-}
-
-pub async fn diff(session: &Session, collection: &Collection, since: i64) -> Result<Page, Error> {
-    let page = ente_collections::client::files_diff(session, collection.id, since).await?;
-    let changes = page
-        .files
-        .into_iter()
-        .map(|remote| {
-            Ok(Change {
-                id: remote.id,
-                file: if remote.is_deleted() {
-                    None
-                } else {
-                    {
-                        let (key, documents) = decrypt(&remote, &collection.key)?;
-                        Some(interpret(&remote, &key, &documents, session.user_id)?)
-                    }
-                },
-            })
-        })
-        .collect::<Result<_, Error>>()?;
-    Ok(Page {
-        changes,
-        cursor: page.cursor,
-        has_more: page.has_more,
-    })
 }
 
 #[cfg(not(target_arch = "wasm32"))]

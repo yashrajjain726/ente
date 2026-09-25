@@ -3,6 +3,31 @@ use super::*;
 use ente_core::crypto::{Nonce, hash, secretbox};
 use std::path::Path;
 
+#[path = "export_maintenance.rs"]
+mod maintenance;
+
+#[test]
+fn export_rejects_zero_jobs_before_creating_storage() {
+    let home = TestHome::new();
+    let unused = home.dir.path().join("unused");
+    let destination = home.dir.path().join("photos");
+    let output = home
+        .command(&[
+            "photos",
+            "export",
+            destination.to_str().unwrap(),
+            "--jobs",
+            "0",
+        ])
+        .env("ENTE_CLI_HOME", &unused)
+        .output()
+        .unwrap();
+    assert!(failure(&output).contains("invalid value '0'"));
+    assert!(output.stdout.is_empty());
+    assert!(!unused.exists());
+    assert!(!destination.exists());
+}
+
 #[test]
 fn export_rejects_wrong_accounts_and_unsupported_roots_before_refresh() {
     let mut server = mockito::Server::new();
@@ -105,32 +130,18 @@ fn export_preserves_failed_records_and_advances_the_page_atomically() {
         15
     );
     run(&home, &root, &[], false);
-    assert_eq!(record(&db, 1, 11)["attempt"], failed["attempt"]);
-    run(&home, &root, &["--album", "First", "--retry-failed"], false);
-    assert_ne!(record(&db, 1, 11)["attempt"], failed["attempt"]);
-    assert_eq!(record(&db, 2, 11)["attempt"], failed["attempt"]);
-    first.assert();
-    last.assert();
-
-    let before = record(&db, 1, 10);
-    let mut docs: Value = serde_json::from_slice(
-        &serde_json::from_value::<Vec<u8>>(before["documents"]["public"].clone()).unwrap(),
-    )
-    .unwrap();
-    docs["caption"] = json!("newly supported from saved metadata");
-    let mut updated = before;
-    updated["documents"]["public"] = json!(serde_json::to_vec(&docs).unwrap());
     db.execute(
-        "UPDATE photos_files SET record=?1 WHERE collection_id=1 AND id=10",
-        [updated.to_string()],
+        "UPDATE photos_files SET record=json_set(record,'$.failure','saved failure') WHERE id=11",
+        [],
     )
     .unwrap();
     run(&home, &root, &["--album", "First"], false);
-    assert_eq!(
-        read_json(&root.join("First/metadata/Good.jpg.json"))["description"],
-        "newly supported from saved metadata"
-    );
-    let previous_attempt = record(&db, 1, 11)["attempt"].clone();
+    assert_ne!(record(&db, 1, 11)["failure"], "saved failure");
+    assert_eq!(record(&db, 2, 11)["failure"], "saved failure");
+    first.assert();
+    last.assert();
+
+    let previous_input = record(&db, 1, 11)["input_hash"].clone();
     albums.remove();
     let mut changed = collection(1, "First", &key);
     changed["updationTime"] = json!(40);
@@ -143,7 +154,8 @@ fn export_preserves_failed_records_and_advances_the_page_atomically() {
     page(&mut server, 1, 15, json!([repaired]), false).create();
     let repaired_download = download(&mut server, 11, &broken_bytes, 1);
     run(&home, &root, &["--album", "First"], true);
-    assert_ne!(record(&db, 1, 11)["attempt"], previous_attempt);
+    assert_ne!(record(&db, 1, 11)["input_hash"], previous_input);
+    assert!(record(&db, 1, 11)["documents"].is_object());
     assert_eq!(fs::read(root.join("First/Broken.jpg")).unwrap(), b"broken");
     good_download.assert();
     later_download.assert();
@@ -174,9 +186,53 @@ fn export_preserves_failed_records_and_advances_the_page_atomically() {
     );
     assert!(!root.join("Second/Broken.jpg").exists());
     assert_eq!(
-        run(&home, &root, &["--album", "Second", "--retry-failed"], true)["failures"],
+        run(&home, &root, &["--album", "Second"], true)["failures"],
         0
     );
+}
+
+#[test]
+fn export_reevaluates_saved_metadata_without_an_upstream_change() {
+    let mut server = mockito::Server::new();
+    let home = TestHome::new();
+    home.seed(&server.url());
+    let key = Key::generate();
+    server
+        .mock("GET", "/collections/v2")
+        .match_query(mockito::Matcher::Any)
+        .with_body(json!({"collections":[collection(1,"First",&key)]}).to_string())
+        .create();
+    let (file, bytes) = source(10, &key, b"original", "Good.jpg");
+    let page = page(&mut server, 1, 0, json!([file]), false)
+        .expect(1)
+        .create();
+    let downloaded = download(&mut server, 10, &bytes, 1);
+    let destination = tempfile::tempdir().unwrap();
+    let root = destination.path().join("photos");
+    run(&home, &root, &[], true);
+    let db = database(&home);
+    let before = record(&db, 1, 10);
+    let mut docs: Value = serde_json::from_slice(
+        &ente_core::b64::decode(before["documents"]["public"].as_str().unwrap()).unwrap(),
+    )
+    .unwrap();
+    docs["caption"] = json!("reevaluated stored caption");
+    let mut updated = before;
+    updated["documents"]["public"] =
+        json!(ente_core::b64::encode(&serde_json::to_vec(&docs).unwrap()));
+    db.execute(
+        "UPDATE photos_files SET record=?1 WHERE collection_id=1 AND id=10",
+        [updated.to_string()],
+    )
+    .unwrap();
+    run(&home, &root, &["--album", "First"], true);
+    assert_eq!(
+        read_json(&root.join("First/metadata/Good.jpg.json"))["description"],
+        "reevaluated stored caption"
+    );
+
+    page.assert();
+    downloaded.assert();
 }
 
 #[test]
@@ -214,7 +270,8 @@ fn export_retries_saved_file_decryption_when_the_album_key_changes() {
         .create();
     let downloaded = download(&mut server, 10, &bytes, 1);
     run(&home, &root, &[], true);
-    assert_ne!(record(&db, 1, 10)["attempt"], failed["attempt"]);
+    assert_ne!(record(&db, 1, 10)["input_hash"], failed["input_hash"]);
+    assert!(record(&db, 1, 10)["documents"].is_object());
     assert_eq!(
         fs::read(root.join("First/Original.jpg")).unwrap(),
         b"original"
@@ -314,22 +371,14 @@ fn export_releases_a_deleted_album_reservation_before_its_first_association() {
     let db = export_database(&home);
     let reservation = || {
         db.query_row(
-            "SELECT record FROM allocations WHERE owner='active:1'",
+            "SELECT name1 FROM pending WHERE owner='active:1'",
             [],
             |r| r.get::<_, String>(0),
         )
         .unwrap()
     };
     let pending = reservation();
-    assert_eq!(
-        serde_json::from_str::<Value>(&pending).unwrap()["paths"],
-        json!(["Family"])
-    );
-    assert_eq!(
-        db.query_row("SELECT count(*) FROM albums", [], |r| r.get::<_, i64>(0))
-            .unwrap(),
-        0
-    );
+    assert_eq!(pending, "Family");
     assert_eq!(
         run(&home, &root, &["--album", "Family"], false)["conflicts"],
         1
@@ -363,17 +412,6 @@ fn export_releases_a_deleted_album_reservation_before_its_first_association() {
         assert_eq!(reservation(), pending);
     }
     run(&home, &root, &["--album", "1"], true);
-    assert_eq!(
-        db.query_row("SELECT count(*) FROM allocations", [], |r| r
-            .get::<_, i64>(0))
-            .unwrap(),
-        0
-    );
-    assert_eq!(
-        db.query_row("SELECT count(*) FROM albums", [], |r| r.get::<_, i64>(0))
-            .unwrap(),
-        0
-    );
     assert_eq!(fs::read(&unrelated).unwrap(), b"unrelated");
     assert!(!root.join("Family/metadata.json").exists());
     assert!(!root.join("Trash").exists());
@@ -425,7 +463,6 @@ fn export_clears_deleted_adopted_album_rename_reservations() {
             |r| r.get(0),
         )
         .unwrap();
-    uuid::Uuid::parse_str(&owner).unwrap();
     fs::create_dir(root.join("Blocked")).unwrap();
     let unrelated = root.join("Blocked/notes.txt");
     fs::write(&unrelated, b"unrelated rename target").unwrap();
@@ -439,18 +476,13 @@ fn export_clears_deleted_adopted_album_rename_reservations() {
         .create();
     assert_eq!(run(&fresh, &root, &[], false)["conflicts"], 2);
     let reservation = || {
-        db.query_row(
-            "SELECT record FROM allocations WHERE owner=?1",
-            [&owner],
-            |r| r.get::<_, String>(0),
-        )
+        db.query_row("SELECT name1 FROM pending WHERE owner=?1", [&owner], |r| {
+            r.get::<_, String>(0)
+        })
         .unwrap()
     };
     let pending = reservation();
-    assert_eq!(
-        serde_json::from_str::<Value>(&pending).unwrap()["paths"],
-        json!(["Blocked"])
-    );
+    assert_eq!(pending, "Blocked");
     assert_eq!(
         fs::read(root.join("First/Original.jpg")).unwrap(),
         b"original"
@@ -470,28 +502,17 @@ fn export_clears_deleted_adopted_album_rename_reservations() {
     let retained_blocker = root.join("Trash/First/notes.txt");
     fs::write(&retained_blocker, b"unrelated retention target").unwrap();
     run(&fresh, &root, &["--album", "1"], false);
-    assert_eq!(
-        db.query_row(
-            "SELECT count(*) FROM allocations WHERE owner=?1",
-            [&owner],
-            |r| r.get::<_, i64>(0)
-        )
-        .unwrap(),
-        0
-    );
     let retained = || {
         db.query_row(
-            "SELECT record FROM allocations WHERE owner='retained:1'",
+            "SELECT name1 FROM pending WHERE owner='retained:1'",
             [],
             |r| r.get::<_, String>(0),
         )
         .unwrap()
     };
     let pending_retention = retained();
-    assert_eq!(
-        serde_json::from_str::<Value>(&pending_retention).unwrap()["paths"],
-        json!(["First"])
-    );
+    assert!(root.join("First/metadata.json").exists());
+    assert_eq!(pending_retention, "First");
     run(&fresh, &root, &["--album", "1"], false);
     assert_eq!(retained(), pending_retention);
     assert!(!root.join("Trash/First-1").exists());
@@ -514,12 +535,6 @@ fn export_clears_deleted_adopted_album_rename_reservations() {
     assert_eq!(
         read_json(&root.join("Trash/First/metadata/Original.jpg.json"))["ente"]["fileID"],
         "10"
-    );
-    assert_eq!(
-        db.query_row("SELECT count(*) FROM allocations", [], |r| r
-            .get::<_, i64>(0))
-            .unwrap(),
-        0
     );
     deletion.remove();
     fs::remove_file(unrelated).unwrap();
@@ -568,7 +583,7 @@ fn export_rejects_offline_early_and_reports_path_conflicts() {
         .unwrap();
     let (good, encrypted) = source(10, &key, b"good", "Good.jpg");
     page(&mut server, 1, 0, json!([good]), false).create();
-    let downloaded = download(&mut server, 10, &encrypted, 1);
+    let downloaded = download(&mut server, 10, &encrypted, if cfg!(unix) { 6 } else { 4 });
     #[cfg(unix)]
     {
         let target = destination.path().join("outside.jpg");
@@ -607,15 +622,15 @@ fn export_rejects_offline_early_and_reports_path_conflicts() {
         );
         let record: String = db
             .query_row(
-                "SELECT record FROM allocations WHERE owner='file:1:10'",
+                "SELECT name1 FROM pending WHERE album=1 AND file=10",
                 [],
                 |r| r.get(0),
             )
             .unwrap();
-        serde_json::from_str::<Value>(&record).unwrap()
+        record
     };
     let allocated = reservation();
-    assert_eq!(allocated["paths"], json!(["Good.jpg"]));
+    assert_eq!(allocated, "Good.jpg");
     let unchanged = page(&mut server, 1, 10, json!([]), false).create();
     assert_eq!(run(&home, &root, &[], false)["conflicts"], 1);
     assert_eq!(reservation(), allocated);
@@ -655,14 +670,12 @@ fn export_rejects_offline_early_and_reports_path_conflicts() {
         0
     );
     let export_db = export_database(&home);
-    let pending: String = export_db
-        .query_row(
-            "SELECT path FROM temporaries WHERE json_extract(record,'$.file')=10 AND json_extract(record,'$.hash') IS NOT NULL",
-            [],
-            |r| r.get(0),
-        )
+    let pending: i64 = export_db
+        .query_row("SELECT count(*) FROM temporaries WHERE file=10", [], |r| {
+            r.get(0)
+        })
         .unwrap();
-    assert_eq!(fs::read(root.join(&pending)).unwrap(), b"good");
+    assert_eq!(pending, 0);
     drop(export_db);
     albums.remove();
     let mut renamed = collection(1, "Renamed", &key);
@@ -683,18 +696,27 @@ fn export_rejects_offline_early_and_reports_path_conflicts() {
     );
     assert_eq!(
         export_database(&home)
-            .query_row("SELECT count(*) FROM allocations", [], |r| r
-                .get::<_, i64>(0))
+            .query_row("SELECT count(*) FROM pending", [], |r| r.get::<_, i64>(0))
             .unwrap(),
         0
     );
-    assert!(!root.join(pending.replace("First/", "Renamed/")).exists());
     assert_eq!(
         fs::read(root.join("Renamed/.ente-11111111111111111111111111111111.part")).unwrap(),
         b"unrelated temporary"
     );
     downloaded.assert();
     contender_download.assert();
+}
+
+fn run_failure(home: &TestHome, root: &Path, options: &[&str], cause: &str) -> Value {
+    let mut args = vec!["photos", "export", root.to_str().unwrap(), "--json"];
+    args.extend_from_slice(options);
+    let output = home.run(&args);
+    let error = failure(&output);
+    assert!(error.contains(cause), "expected {cause:?}: {error}");
+    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["complete"], false);
+    result
 }
 
 fn run(home: &TestHome, root: &Path, options: &[&str], complete: bool) -> Value {
@@ -833,14 +855,15 @@ fn export_continues_when_failed_transfer_cleanup_becomes_unwritable() {
             encrypted.clone()
         })
         .create();
-    let healthy = server
-        .mock("GET", "/media/20")
-        .with_body_from_request(move |_| {
-            std::thread::sleep(std::time::Duration::from_millis(500));
-            original.clone()
-        })
-        .create();
-    let output = home.run(&["photos", "export", root.to_str().unwrap(), "--json"]);
+    let healthy = server.mock("GET", "/media/20").with_body(original).create();
+    let output = home.run(&[
+        "photos",
+        "export",
+        root.to_str().unwrap(),
+        "--json",
+        "--jobs",
+        "1",
+    ]);
     fs::set_permissions(&protected, fs::Permissions::from_mode(0o700)).unwrap();
     assert!(
         failure(&output)
@@ -854,7 +877,13 @@ fn export_continues_when_failed_transfer_cleanup_becomes_unwritable() {
     );
     assert_eq!(fs::read(root.join("Healthy/Good.jpg")).unwrap(), b"good");
     let db = export_database(&home);
-    let partial: String = db.query_row("SELECT path FROM temporaries WHERE json_extract(record,'$.album')=1 AND json_extract(record,'$.file')=10 AND json_extract(record,'$.hash') IS NULL", [], |r| r.get(0)).unwrap();
+    let partial: String = db
+        .query_row(
+            "SELECT a.path||'/'||t.name FROM temporaries t JOIN albums a ON a.key=t.folder WHERE t.album=1 AND t.file=10",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
     assert!(root.join(&partial).is_file());
     denied.remove();
     let retry = server
@@ -942,12 +971,15 @@ fn export_page_and_recognized_failures_roll_back_together_on_storage_failure() {
     run(&home, &root, &[], true);
     empty.remove();
     let db = database(&home);
-    db.execute_batch("UPDATE photos_collections SET files_synced_to=NULL; CREATE TRIGGER fail_second BEFORE INSERT ON photos_files WHEN new.id=11 BEGIN SELECT RAISE(ABORT,'fixture storage failure'); END;").unwrap();
+    db.execute_batch(
+        "UPDATE photos_collections SET files_synced_to=NULL; CREATE TRIGGER fail_second BEFORE INSERT ON photos_files WHEN new.id=11 BEGIN SELECT RAISE(ABORT,'fixture storage failure'); END;",
+    )
+    .unwrap();
     let (good, encrypted) = source(10, &key, b"good", "Good.jpg");
     let (mut broken, _) = source(11, &key, b"broken", "Broken.jpg");
     broken["metadata"]["encryptedData"] = json!("broken");
     page(&mut server, 1, 0, json!([good, broken]), false).create();
-    let result = run(&home, &root, &[], false);
+    let result = run_failure(&home, &root, &[], "fixture storage failure");
     assert!(result["files"].is_null());
     assert_eq!(
         db.query_row("SELECT count(*) FROM photos_files", [], |r| r
@@ -1026,15 +1058,19 @@ fn export_saves_interpretation_failures_and_omits_unknown_field_values_from_diag
     let db = database(&home);
     let failure = record(&db, 1, 11);
     assert!(!failure["documents"].is_null());
-    let original: Vec<u8> =
-        serde_json::from_value(record(&db, 1, 10)["documents"]["original"].clone()).unwrap();
+    let original: Vec<u8> = ente_core::b64::decode(
+        record(&db, 1, 10)["documents"]["original"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
     let future_reader: Value = serde_json::from_slice(&original).unwrap();
     assert_eq!(
         future_reader["newAdditiveField"]["opaque"],
         "kept in replica"
     );
-    run(&home, &root, &["--retry-failed"], false);
-    assert_eq!(record(&db, 1, 11)["attempt"], failure["attempt"]);
+    run(&home, &root, &[], false);
+    assert_eq!(record(&db, 1, 11), failure);
 }
 
 #[test]

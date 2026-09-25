@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{num::NonZeroUsize, path::PathBuf};
 
 use clap::{Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
@@ -144,8 +144,14 @@ pub struct ExportArgs {
         help = "Reconnect an existing export after moving it or losing local state"
     )]
     pub adopt: bool,
-    #[arg(long, help = "Attempt selected saved decryption failures once more")]
-    pub retry_failed: bool,
+    #[arg(
+        long,
+        short = 'j',
+        value_name = "N",
+        default_value = "16",
+        help = "Maximum number of files processed concurrently"
+    )]
+    pub jobs: NonZeroUsize,
     #[arg(value_name = "DESTINATION")]
     pub destination: PathBuf,
 }

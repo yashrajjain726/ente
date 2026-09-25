@@ -1,5 +1,4 @@
 mod adopt;
-mod allocation;
 mod fs;
 mod names;
 mod reconcile;
@@ -10,8 +9,8 @@ use std::{
     fs::{File, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
-    sync::Arc,
-    time::Instant,
+    sync::Mutex,
+    time::{Duration, Instant},
 };
 
 use anyhow::{Context, Result, bail, ensure};
@@ -26,7 +25,7 @@ use crate::{
     args::{ExportArgs, Options, Product},
     db, home, output,
     replica::{AlbumRecord, FileRecord, Replica, canonical_id},
-    vault::{DbKey, State},
+    vault::State,
 };
 use store::Store;
 
@@ -43,6 +42,16 @@ pub async fn run(args: ExportArgs, selected: Option<&str>, options: &Options) ->
         !options.offline,
         "export requires network access; remove --offline"
     );
+    let selected = selected.map(str::to_owned);
+    let as_json = options.json;
+    let runtime = tokio::runtime::Handle::current();
+    tokio::task::spawn_blocking(move || {
+        runtime.block_on(run_locked(args, selected.as_deref(), as_json))
+    })
+    .await?
+}
+
+async fn run_locked(args: ExportArgs, selected: Option<&str>, as_json: bool) -> Result<()> {
     let destination = destination(&args.destination)?;
     let mut state = State::load()?;
     let index = state.resolve(selected)?;
@@ -114,8 +123,27 @@ pub async fn run(args: ExportArgs, selected: Option<&str>, options: &Options) ->
             )?;
         }
     }
-    store.db.connection().execute("INSERT OR IGNORE INTO desired_albums(id,name) SELECT id,name FROM albums ORDER BY retained",[])?;
-    store.db.connection().execute("INSERT OR IGNORE INTO desired_albums(id,name) SELECT CAST(substr(owner,8) AS INTEGER),json_extract(record,'$.name') FROM allocations WHERE owner GLOB 'active:*'",[])?;
+    store
+        .db
+        .connection()
+        .execute(
+            "INSERT OR IGNORE INTO desired_albums(id,name) SELECT s.id,json_extract(s.record,'$.name') FROM album_sources s WHERE EXISTS(SELECT 1 FROM albums a WHERE a.id=s.id)",
+            [],
+        )?;
+    store
+        .db
+        .connection()
+        .execute(
+            "INSERT OR IGNORE INTO desired_albums(id,name) SELECT id,name FROM albums ORDER BY retained",
+            [],
+        )?;
+    store
+        .db
+        .connection()
+        .execute(
+            "INSERT OR IGNORE INTO desired_albums(id,name) SELECT album,name FROM pending WHERE file IS NULL AND retained=0",
+            [],
+        )?;
     select(&store, &args)?;
     if root_lock.is_none() {
         root_lock = Some(initialize(&destination, &expected_root)?);
@@ -123,46 +151,54 @@ pub async fn run(args: ExportArgs, selected: Option<&str>, options: &Options) ->
     store
         .db
         .connection()
-        .execute("UPDATE export SET bound=1 WHERE id=1", [])?;
+        .execute("UPDATE export SET bound=1 WHERE id=1 AND bound=0", [])?;
     let (cancel_send, mut cancel) = watch::channel(false);
+    let signal_send = cancel_send.clone();
     let signal = tokio::spawn(async move {
         if tokio::signal::ctrl_c().await.is_ok() {
-            cancel_send.send_replace(true);
+            signal_send.send_replace(true);
         }
     });
     let refresh_cancel = cancel.clone();
     let refreshed = tokio::select! {
-        result=refresh(&store,&mut replica,&session,args.retry_failed,&refresh_cancel)=>result,
+        result=refresh(&store,&mut replica,&session,&refresh_cancel)=>result,
         _=cancel.changed()=>Err(Cancelled.into()),
     };
     drop(replica);
     drop(source_db);
     drop(account_home);
-    let context = Arc::new(transfer::Context {
-        root: destination.clone(),
-        db_path,
-        db_key: DbKey(account.db_key.0),
-        session,
-    });
-    let result = async {
+    let shared = Mutex::new(store);
+    let run = reconcile::Run {
+        root: &destination,
+        store: &shared,
+        cancel: &cancel,
+    };
+    let result = (|| {
         refreshed?;
-        fs::recover(&destination, &store, &cancel)?;
-        allocation::seed(&store)?;
-        reconcile::albums(&destination, &store, context.session.user_id)?;
-        transfers(context.clone(), &store, cancel.clone()).await?;
-        if *cancel.borrow() {
-            bail!(Cancelled)
-        }
-        reconcile::retain_removed(&destination, &store)?;
-        Ok::<(), anyhow::Error>(())
-    }
-    .await;
+        run.recover()?;
+        run.albums()?;
+        transfers(
+            &destination,
+            &shared,
+            &session,
+            &cancel_send,
+            &cancel,
+            args.jobs.get(),
+        )?;
+        run.check_cancel()?;
+        run.retain_removed()
+    })();
     signal.abort();
     if let Err(error) = result {
-        report(&store, "run", &error)?;
+        run.report("run", &error)?;
     }
-    cleanup(&destination, &store)?;
-    let complete = summary(&store, &destination, options.json)?;
+    if let Err(error) = run.cleanup(None) {
+        run.report("run", &error)?;
+    }
+    let store = shared
+        .into_inner()
+        .map_err(|_| anyhow::anyhow!("export database mutex poisoned"))?;
+    let complete = summary(&store, &destination, as_json)?;
     drop(root_lock);
     ensure!(complete, "export is incomplete");
     Ok(())
@@ -231,7 +267,7 @@ fn open_root(destination: &Path, expected: &Root) -> Result<Option<File>> {
 }
 
 fn initialize(destination: &Path, root: &Root) -> Result<File> {
-    std::fs::create_dir_all(destination)?;
+    fs::create_directory(destination)?;
     let path = names::check(destination, "export.json")?;
     let mut file = OpenOptions::new()
         .read(true)
@@ -296,244 +332,374 @@ async fn refresh(
     store: &Store,
     replica: &mut Replica<'_>,
     session: &ente_core::Session,
-    retry: bool,
     cancel: &watch::Receiver<bool>,
 ) -> Result<()> {
     let need_favorites: bool = store.db.connection().query_row(
-        "SELECT EXISTS(SELECT 1 FROM desired_albums WHERE selected=1 AND record IS NOT NULL)",
+        "SELECT EXISTS(SELECT 1 FROM desired_albums WHERE selected=1 AND present=1)",
         [],
         |r| r.get(0),
     )?;
     let mut favorites_known = true;
     let mut after = 0;
+    eprintln!("Refreshing selected albums and Favorites.");
     loop {
-        let next:Option<(i64,String,bool)>=store.db.connection().query_row("SELECT id,record,selected FROM desired_albums WHERE id>?1 AND record IS NOT NULL ORDER BY id LIMIT 1",[after],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional()?;
-        let Some((id, record, selected)) = next else {
+        ensure!(!*cancel.borrow(), Cancelled);
+        let next: Option<(i64, bool, bool)> = store
+            .db
+            .connection()
+            .query_row(
+                "SELECT id,selected,favorites FROM desired_albums WHERE present=1 AND (selected=1 OR (favorites=1 AND ?1)) AND id>?2 ORDER BY id LIMIT 1",
+                params![need_favorites, after],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .optional()?;
+        let Some((id, selected, favorites)) = next else {
             break;
         };
         after = id;
-        let record: AlbumRecord = serde_json::from_str(&record)?;
-        if !need_favorites
-            || record.remote.kind != "favorites"
-            || record.remote.owner.id != session.user_id
-        {
-            continue;
-        }
-        if *cancel.borrow() {
-            bail!(Cancelled)
-        }
-        replica.retry_album(session, id, retry)?;
         let result = async {
-            let record = replica
-                .album_record(id)?
-                .context("missing favorites source")?;
+            replica.retry_album(session, id)?;
+            let record = replica.album_record(id)?.context("missing album source")?;
             let album = record.album(session.user_id)?;
-            replica.sync_album_files(session, &album, retry).await?;
+            replica.sync_album_files(session, &album).await?;
             store.desired_album(&record, session.user_id)?;
-            Ok::<_, anyhow::Error>(())
-        }
-        .await;
-        if let Err(error) = result {
-            favorites_known = false;
             if selected {
-                report(store, &format!("album:{id}"), &error)?;
+                store.snapshot_album(&album)?;
             }
-            if fatal(&error) {
-                return Err(error);
-            }
-        }
-    }
-    let selected: i64 = store.db.connection().query_row(
-        "SELECT count(*) FROM desired_albums WHERE selected=1",
-        [],
-        |r| r.get(0),
-    )?;
-    eprintln!("Refreshing files in {selected} selected albums.");
-    let mut progress = Instant::now();
-    let mut refreshed = 0;
-    after = 0;
-    loop {
-        let next:Option<(i64,Option<String>)>=store.db.connection().query_row("SELECT id,record FROM desired_albums WHERE selected=1 AND id>?1 ORDER BY id LIMIT 1",[after],|r|Ok((r.get(0)?,r.get(1)?))).optional()?;
-        let Some((id, record)) = next else { break };
-        after = id;
-        if *cancel.borrow() {
-            bail!(Cancelled)
-        }
-        let Some(_) = record else {
             store
                 .db
                 .connection()
                 .execute("UPDATE desired_albums SET ready=1 WHERE id=?1", [id])?;
-            continue;
-        };
-        let result=async {
-            replica.retry_album(session,id,retry)?;
-            let record=replica.album_record(id)?.context("missing album source")?;
-            let album=record.album(session.user_id)?;
-            replica.sync_album_files(session,&album,retry).await?;
-            store.desired_album(&record,session.user_id)?;
-            let mut after_file=0;
-            loop {
-                let records:Vec<FileRecord>=replica.db.read(|db| {
-                    let mut query=db.prepare("SELECT record FROM photos_files WHERE collection_id=?1 AND id>?2 ORDER BY id LIMIT 128")?;
-                    Ok(query.query_map(params![id,after_file],|r|crate::replica::read_json(r,0))?.collect::<rusqlite::Result<_>>()?)
-                })?;
-                if records.is_empty() {break;}
-                let transaction=store.db.connection().unchecked_transaction()?;
-                for record in records {
-                    after_file=record.remote.id;
-                    let favorited=if favorites_known {Some(replica.db.read(|db|Ok(db.query_row("SELECT EXISTS(SELECT 1 FROM photos_files f JOIN photos_collections c ON c.id=f.collection_id WHERE f.id=?1 AND json_extract(c.record,'$.remote.type')='favorites' AND json_extract(c.record,'$.remote.owner.id')=?2)",params![record.remote.id,session.user_id],|r|r.get::<_,bool>(0))?))?)} else {None};
-                    store.desired_file(id,&record,session.user_id,favorited)?;
-                    if !favorites_known {store.db.connection().execute("UPDATE desired_files SET failure='favorite state is incomplete' WHERE album=?1 AND file=?2",params![id,record.remote.id])?;}
-                }
-                transaction.commit()?;
-            }
-            store.db.connection().execute("UPDATE desired_albums SET ready=1 WHERE id=?1",[id])?;
-            Ok::<_,anyhow::Error>(())
-        }.await;
+            Ok::<_, anyhow::Error>(())
+        }
+        .await;
         if let Err(error) = result {
+            if favorites {
+                favorites_known = false;
+            }
             store.db.connection().execute(
                 "UPDATE desired_albums SET failure=?1 WHERE id=?2",
                 params![error.to_string(), id],
             )?;
-            report(store, &format!("album:{id}"), &error)?;
+            if selected {
+                record_outcome(store, &format!("album:{id}"), &error)?;
+                eprintln!("album:{id}: {error:#}");
+            }
             if fatal(&error) {
                 return Err(error);
             }
         }
-        refreshed += 1;
-        if progress.elapsed().as_secs() >= 2 {
-            eprintln!("Refreshed {refreshed}/{selected} albums.");
-            progress = Instant::now();
+    }
+    store.db.connection().execute(
+        "UPDATE desired_albums SET ready=1 WHERE selected=1 AND present=0",
+        [],
+    )?;
+    if need_favorites && favorites_known {
+        let mut after = 0;
+        loop {
+            let ids: Vec<i64> = replica.db.read(|db| {
+                let mut query = db.prepare(
+                    "SELECT DISTINCT f.id FROM photos_files f JOIN photos_collections c ON c.id=f.collection_id WHERE f.id>?1 AND json_extract(c.record,'$.remote.type')='favorites' AND json_extract(c.record,'$.remote.owner.id')=?2 ORDER BY f.id LIMIT 128",
+                )?;
+                Ok(query
+                    .query_map(params![after, session.user_id], |r| r.get(0))?
+                    .collect::<rusqlite::Result<_>>()?)
+            })?;
+            if ids.is_empty() {
+                break;
+            }
+            let transaction = store.db.connection().unchecked_transaction()?;
+            for id in ids {
+                after = id;
+                store
+                    .db
+                    .connection()
+                    .execute("INSERT INTO favorites VALUES(?1)", [id])?;
+            }
+            transaction.commit()?;
         }
     }
+    after = 0;
+    loop {
+        let id: Option<i64> = store
+            .db
+            .connection()
+            .query_row(
+                "SELECT id FROM desired_albums WHERE selected=1 AND ready=1 AND present=1 AND failure IS NULL AND id>?1 ORDER BY id LIMIT 1",
+                [after],
+                |r| r.get(0),
+            )
+            .optional()?;
+        let Some(id) = id else { break };
+        after = id;
+        let mut after_file = 0;
+        loop {
+            ensure!(!*cancel.borrow(), Cancelled);
+            let records: Vec<FileRecord> = replica.db.read(|db| {
+                let mut query = db.prepare(
+                    "SELECT record FROM photos_files WHERE collection_id=?1 AND id>?2 ORDER BY id LIMIT 128",
+                )?;
+                Ok(query
+                    .query_map(params![id, after_file], |r| crate::replica::read_json(r, 0))?
+                    .collect::<rusqlite::Result<_>>()?)
+            })?;
+            if records.is_empty() {
+                break;
+            }
+            let transaction = store.db.connection().unchecked_transaction()?;
+            for record in records {
+                after_file = record.remote.id;
+                let file = record.file(session.user_id);
+                let failure = if !favorites_known {
+                    Some("favorite state is incomplete".to_owned())
+                } else {
+                    file.as_ref().err().map(ToString::to_string)
+                };
+                store.db.connection().execute(
+                    "INSERT INTO desired_files(album,file,favorited,failure) VALUES(?1,?2,?3,?4)",
+                    params![
+                        id,
+                        record.remote.id,
+                        if favorites_known { Some(false) } else { None },
+                        failure
+                    ],
+                )?;
+                if failure.is_none() {
+                    let file = file?;
+                    store.db.connection().execute(
+                        "INSERT INTO chosen_files VALUES(?1,?2,?3) ON CONFLICT(file) DO UPDATE SET album=excluded.album,version=excluded.version WHERE excluded.version>chosen_files.version OR (excluded.version=chosen_files.version AND excluded.album<chosen_files.album)",
+                        params![file.id, id, file.updated_at_micros],
+                    )?;
+                }
+            }
+            transaction.commit()?;
+        }
+    }
+    store
+        .db
+        .connection()
+        .execute(
+            "UPDATE desired_files SET favorited=EXISTS(SELECT 1 FROM favorites WHERE favorites.file=desired_files.file) WHERE favorited IS NOT NULL",
+            [],
+        )?;
+    let mut after_file = 0;
+    loop {
+        ensure!(!*cancel.borrow(), Cancelled);
+        let mut query = store
+            .db
+            .connection()
+            .prepare("SELECT album,file FROM chosen_files WHERE file>?1 ORDER BY file LIMIT 128")?;
+        let chosen: Vec<(i64, i64)> = query
+            .query_map([after_file], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        drop(query);
+        if chosen.is_empty() {
+            break;
+        }
+        let transaction = store.db.connection().unchecked_transaction()?;
+        for (album, id) in chosen {
+            after_file = id;
+            let record = replica
+                .file_record(album, id)?
+                .context("missing chosen file source")?;
+            store.snapshot_file(&record.file(session.user_id)?)?;
+        }
+        transaction.commit()?;
+    }
+    let transaction = store.db.connection().unchecked_transaction()?;
+    store.db.connection().execute(
+        "DELETE FROM sources WHERE file NOT IN (SELECT file FROM chosen_files)",
+        [],
+    )?;
+    store
+        .db
+        .connection()
+        .execute(
+            "DELETE FROM album_sources WHERE id NOT IN (SELECT id FROM desired_albums WHERE selected=1 AND ready=1 AND present=1 AND failure IS NULL) AND NOT EXISTS(SELECT 1 FROM albums WHERE albums.id=album_sources.id) AND NOT EXISTS(SELECT 1 FROM pending WHERE album=album_sources.id)",
+            [],
+        )?;
+    transaction.commit()?;
     let mut query = store
         .db
         .connection()
         .prepare("SELECT album,file,failure FROM desired_files WHERE failure IS NOT NULL")?;
     let mut rows = query.query([])?;
     while let Some(row) = rows.next()? {
-        report(
-            store,
-            &format!("file:{}:{}", row.get::<_, i64>(0)?, row.get::<_, i64>(1)?),
-            &anyhow::anyhow!(row.get::<_, String>(2)?),
-        )?;
+        let unit = format!("file:{}:{}", row.get::<_, i64>(0)?, row.get::<_, i64>(1)?);
+        let error = anyhow::anyhow!(row.get::<_, String>(2)?);
+        record_outcome(store, &unit, &error)?;
+        eprintln!("{unit}: {error:#}");
     }
     Ok(())
 }
 
-async fn transfers(
-    context: Arc<transfer::Context>,
-    store: &Store,
-    cancel: watch::Receiver<bool>,
-) -> Result<()> {
-    let expected: i64 =
-        store
-            .db
-            .connection()
-            .query_row("SELECT count(*) FROM desired_files", [], |r| r.get(0))?;
-    eprintln!("Maintaining {expected} selected copies.");
-    let mut work = tokio::task::JoinSet::new();
-    let result=async {
-        let ceiling=(256*1024*1024/ente_core::crypto::stream::DECRYPTION_CHUNK_SIZE).max(1);
-        let mut admission=std::thread::available_parallelism().map(usize::from).unwrap_or(1).min(ceiling);
-        let mut measured=Instant::now();let mut completed_bytes=0u64;let mut previous_rate=0.0;
-        loop {
-            while work.len()<admission && !*cancel.borrow() {
-                let staged:i64=store.db.connection().query_row("SELECT count(DISTINCT json_extract(t.record,'$.file')) FROM temporaries t WHERE NOT EXISTS(SELECT 1 FROM desired_files f WHERE f.file=json_extract(t.record,'$.file') AND f.running=1)",[],|r|r.get(0))?;
-                let available=staged as usize+work.len()<ceiling;
-                let staged:Option<i64>=store.db.connection().query_row("SELECT json_extract(t.record,'$.file') FROM temporaries t WHERE EXISTS(SELECT 1 FROM desired_files f WHERE f.file=json_extract(t.record,'$.file') AND f.failure IS NULL AND f.attempted=0 AND f.running=0) ORDER BY json_extract(t.record,'$.file') LIMIT 1",[],|r|r.get(0)).optional()?;
-                let next=if let Some(id)=staged {Some((id,true))} else {
-                    store.db.connection().query_row("SELECT file FROM desired_files WHERE failure IS NULL AND attempted=0 AND running=0 AND deferred<=?1 ORDER BY deferred,file LIMIT 1",[available],|r|Ok((r.get(0)?,false))).optional()?
-                };
-                let Some((id,staged))=next else {break};
-                store.db.connection().execute("UPDATE desired_files SET running=1 WHERE file=?1",[id])?;
-                let context=context.clone();let cancel=cancel.clone();
-                work.spawn(async move {(id,transfer::prepare(context,id,cancel,available || staged).await)});
-            }
-            let Some(result)=work.join_next().await else {break};
-            let (id,result)=result?;
-            store.db.connection().execute("UPDATE desired_files SET running=0 WHERE file=?1",[id])?;
-            transfer::discard_incomplete(&context.root,store,id)?;
-            let result=match result {
-                Ok(transfer::Preparation::Ready(mut prepared))=>{
-                    completed_bytes+=prepared.components.iter().filter(|c|c.temporary).map(|c|c.size).sum::<u64>();
-                    if !*cancel.borrow() {reconcile::file(&context.root,store,&mut prepared,&cancel)?;}
-                    transfer::finish_source(&context.root,store,&prepared.components)
-                },
-                Ok(transfer::Preparation::AwaitingCapacity)=>{
-                    store.db.connection().execute("UPDATE desired_files SET deferred=1 WHERE file=?1",[id])?;
-                    Ok(())
-                },
-                Err(error)=>Err(error),
-            };
-            if let Err(error)=result {
-                let mut query=store.db.connection().prepare("SELECT album FROM desired_files WHERE file=?1 AND attempted=0 AND failure IS NULL")?;
-                let albums:Vec<i64>=query.query_map([id],|r|r.get(0))?.collect::<rusqlite::Result<_>>()?;drop(query);
-                for album in albums {report(store,&format!("file:{album}:{id}"),&error)?;}
-                store.db.connection().execute("UPDATE desired_files SET failure=?1 WHERE file=?2 AND attempted=0",params![error.to_string(),id])?;
-                if fatal(&error) {return Err(error)}
-            }
-            if measured.elapsed().as_secs_f64()>=2.0 {
-                let completed:i64=store.db.connection().query_row("SELECT count(*) FROM desired_files WHERE completed=1",[],|r|r.get(0))?;
-                eprintln!("Exporting: {completed}/{expected} copies complete.");
-                let rate=completed_bytes as f64/measured.elapsed().as_secs_f64();
-                if completed_bytes>0 && (previous_rate==0.0 || rate>previous_rate*1.1) {admission=(admission*2).min(ceiling);}
-                previous_rate=rate;measured=Instant::now();completed_bytes=0;
-            }
+struct CancelWorkers<'a>(&'a watch::Sender<bool>);
+
+impl Drop for CancelWorkers<'_> {
+    fn drop(&mut self) {
+        if std::thread::panicking() {
+            self.0.send_replace(true);
         }
-        let mut query=store.db.connection().prepare("SELECT album,file FROM desired_files WHERE deferred=1 AND attempted=0 AND failure IS NULL")?;
-        let mut rows=query.query([])?;
-        while let Some(row)=rows.next()? {
-            let album:i64=row.get(0)?;let file:i64=row.get(1)?;
-            report(store,&format!("file:{album}:{file}"),&anyhow::anyhow!("completed transfers have filled export staging; resolve the reported destination failures and retry"))?;
-        }
-        Ok(())
-    }.await;
-    work.abort_all();
-    while work.join_next().await.is_some() {}
-    result
+    }
 }
 
-pub fn report(store: &Store, unit: &str, error: &anyhow::Error) -> Result<()> {
+fn transfers(
+    root: &Path,
+    store: &Mutex<Store>,
+    session: &ente_core::Session,
+    cancel_send: &watch::Sender<bool>,
+    cancel: &watch::Receiver<bool>,
+    jobs: usize,
+) -> Result<()> {
+    let (expected, files): (i64, i64) = store::lock(store)?.db.connection().query_row(
+        "SELECT count(*),count(DISTINCT file) FROM desired_files WHERE failure IS NULL",
+        [],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    eprintln!("Maintaining {expected} selected copies.");
+    let runtime = tokio::runtime::Handle::current();
+    let last_report = Mutex::new(None::<Instant>);
+    std::thread::scope(|scope| {
+        let mut workers = Vec::new();
+        for _ in 0..jobs.min(files as usize) {
+            let runtime = &runtime;
+            let last_report = &last_report;
+            workers.push(scope.spawn(move || {
+                let _cancel_on_panic = CancelWorkers(cancel_send);
+                let run = reconcile::Run { root, store, cancel };
+                let result = (|| {
+                    loop {
+                        if *cancel.borrow() {
+                            break;
+                        }
+                        let file = {
+                            let store = store::lock(store)?;
+                            let transaction = store.db.connection().unchecked_transaction()?;
+                            let id: Option<i64> = store
+                                .db
+                                .connection()
+                                .query_row(
+                                    "SELECT file FROM desired_files WHERE failure IS NULL AND claimed=0 ORDER BY file LIMIT 1",
+                                    [],
+                                    |r| r.get(0),
+                                )
+                                .optional()?;
+                            let Some(id) = id else {
+                                break;
+                            };
+                            store
+                                .db
+                                .connection()
+                                .execute(
+                                    "UPDATE desired_files SET claimed=1 WHERE file=?1",
+                                    [id],
+                                )?;
+                            let file: ente_photos::files::File = store
+                                .json("SELECT record FROM sources WHERE file=?1", [id])?
+                                .context("missing file source snapshot")?;
+                            transaction.commit()?;
+                            file
+                        };
+                        let id = file.id;
+                        let result = runtime.block_on(run.file(session, file));
+                        if result.as_ref().err().is_some_and(fatal) {
+                            cancel_send.send_replace(true);
+                        }
+                        let reported = result.or_else(|error| run.block_file(id, error));
+                        let cleaned = run.cleanup(Some(id));
+                        reported?;
+                        cleaned?;
+                        let completed = {
+                            let mut last = last_report.lock().map_err(|_| anyhow::anyhow!("progress mutex poisoned"))?;
+                            if last.is_none_or(|time| time.elapsed() >= Duration::from_secs(2)) {
+                                *last = Some(Instant::now());
+                                Some(store::lock(store)?.db.connection().query_row(
+                                    "SELECT count(*) FROM desired_files WHERE completed=1",
+                                    [],
+                                    |r| r.get::<_, i64>(0),
+                                )?)
+                            } else {
+                                None
+                            }
+                        };
+                        if let Some(completed) = completed {
+                            eprintln!("Completed {completed}/{expected} selected copies.");
+                        }
+                    }
+                    Ok(())
+                })();
+                if result.is_err() {
+                    cancel_send.send_replace(true);
+                }
+                result
+            }));
+        }
+        let mut result = Ok(());
+        for worker in workers {
+            let completed = worker
+                .join()
+                .unwrap_or_else(|_| Err(anyhow::anyhow!("export worker panicked")));
+            if result.is_ok() {
+                result = completed;
+            }
+        }
+        result
+    })
+}
+
+pub fn record_outcome(store: &Store, unit: &str, error: &anyhow::Error) -> Result<()> {
     let conflict = error.downcast_ref::<Conflict>().is_some();
-    store.db.connection().execute("INSERT INTO outcomes VALUES(?1,?2) ON CONFLICT(unit) DO UPDATE SET conflict=max(conflict,excluded.conflict)",params![unit,conflict])?;
-    eprintln!("{unit}: {error:#}");
+    store
+        .db
+        .connection()
+        .execute(
+            "INSERT INTO outcomes VALUES(?1,?2) ON CONFLICT(unit) DO UPDATE SET conflict=max(conflict,excluded.conflict)",
+            params![unit, conflict],
+        )?;
     Ok(())
 }
 
 pub fn fatal(error: &anyhow::Error) -> bool {
-    error.chain().any(|cause| {
-        cause.downcast_ref::<rusqlite::Error>().is_some()
-            || cause.downcast_ref::<Cancelled>().is_some()
-            || cause
-                .downcast_ref::<std::io::Error>()
-                .is_some_and(|e| matches!(e.kind(), std::io::ErrorKind::StorageFull))
-            || cause
-                .downcast_ref::<ente_core::http::Error>()
-                .is_some_and(|e| e.status_code() == Some(401))
-    })
+    fatal_cause(error.as_ref())
 }
 
-fn cleanup(root: &Path, store: &Store) -> Result<()> {
-    let mut after = String::new();
-    loop {
-        let temporary:Option<store::Temporary>=store.json("SELECT record FROM temporaries WHERE path>?1 AND json_extract(record,'$.destination') IS NULL AND (json_extract(record,'$.hash') IS NULL OR (EXISTS(SELECT 1 FROM desired_files WHERE file=json_extract(temporaries.record,'$.file')) AND NOT EXISTS(SELECT 1 FROM desired_files WHERE file=json_extract(temporaries.record,'$.file') AND completed=0))) AND json_extract(record,'$.album') IN (SELECT id FROM desired_albums WHERE selected=1) ORDER BY path LIMIT 1",[&after])?;
-        let Some(temporary) = temporary else { break };
-        after = temporary.path.clone();
-        if let Err(error) = fs::discard(root, store, &temporary.path) {
-            let unit = if let Some(file) = temporary.file {
-                format!("file:{}:{file}", temporary.album)
-            } else {
-                format!("album:{}", temporary.album)
-            };
-            report(store, &unit, &error)?;
-            if fatal(&error) {
-                return Err(error);
-            }
+fn fatal_cause(cause: &(dyn std::error::Error + 'static)) -> bool {
+    if cause.is::<rusqlite::Error>()
+        || cause.is::<Cancelled>()
+        || matches!(
+            cause.downcast_ref::<crate::core_db::Error>(),
+            Some(crate::core_db::Error::Sqlite(_))
+        )
+        || cause
+            .downcast_ref::<ente_core::http::Error>()
+            .is_some_and(|error| error.status_code() == Some(401))
+    {
+        return true;
+    }
+    if let Some(error) = cause.downcast_ref::<std::io::Error>() {
+        return error.kind() == std::io::ErrorKind::StorageFull
+            || error.get_ref().is_some_and(|inner| fatal_cause(inner));
+    }
+    if let Some(error) = cause.downcast_ref::<ente_photos::files::Error>() {
+        use ente_photos::files::Error;
+        match error {
+            Error::Http(error) => return fatal_cause(error),
+            Error::Io(error) => return fatal_cause(error),
+            Error::Collections(error) => return fatal_cause(error),
+            _ => {}
         }
     }
-    Ok(())
+    if let Some(ente_collections::Error::Http(error)) = cause.downcast_ref() {
+        return fatal_cause(error);
+    }
+    if let Some(error) = cause.downcast_ref::<ente_photos::live_photo::Error>() {
+        match error {
+            ente_photos::live_photo::Error::Io(error) => return fatal_cause(error),
+            ente_photos::live_photo::Error::Zip(error) => return fatal_cause(error),
+            ente_photos::live_photo::Error::Components => {}
+        }
+    }
+    cause.source().is_some_and(fatal_cause)
 }
 
 fn summary(store: &Store, destination: &Path, as_json: bool) -> Result<bool> {
@@ -552,7 +718,14 @@ fn summary(store: &Store, destination: &Path, as_json: bool) -> Result<bool> {
         [],
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
-    let (exported,metadata_updated,renamed,retained):(i64,i64,i64,i64)=store.db.connection().query_row("SELECT coalesce(sum(exported),0),coalesce(sum(metadata_updated),0),coalesce(sum(renamed),0),coalesce(sum(retained),0) FROM events",[],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)))?;
+    let (exported, metadata_updated, renamed, retained): (i64, i64, i64, i64) = store
+        .db
+        .connection()
+        .query_row(
+            "SELECT coalesce(sum(exported),0),coalesce(sum(metadata_updated),0),coalesce(sum(renamed),0),coalesce(sum(retained),0) FROM events",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        )?;
     let complete = !unknown && failures == 0 && completed == expected;
     let result = json!({"destination":destination,"complete":complete,"files":if unknown {None}else{Some(files)},"copies":if unknown {None}else{Some(json!({"expected":expected,"completed":completed,"pending":expected-completed}))},"changes":{"exported":exported,"metadataUpdated":metadata_updated,"renamed":renamed,"retained":retained},"failures":failures,"conflicts":conflicts});
     output::action(
@@ -564,4 +737,39 @@ fn summary(store: &Store, destination: &Path, as_json: bool) -> Result<bool> {
         ),
     )?;
     Ok(complete)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn transparent_errors_preserve_fatal_classification() {
+        for status in [401, 404] {
+            let error = ente_core::http::Error::Http {
+                status,
+                path: "/files".into(),
+            };
+            let error =
+                ente_photos::files::Error::Collections(ente_collections::Error::Http(error));
+            let error = anyhow::Error::new(error).context("download failed");
+            assert_eq!(fatal(&error), status == 401);
+            assert_eq!(
+                format!("{error:#}"),
+                format!("download failed: HTTP {status} at /files")
+            );
+        }
+        let cancelled = ente_photos::live_photo::Error::Io(std::io::Error::other(Cancelled));
+        assert!(fatal(&anyhow::Error::new(cancelled)));
+        let full = ente_photos::live_photo::Error::Io(std::io::ErrorKind::StorageFull.into());
+        assert!(fatal(&anyhow::Error::new(full)));
+        let zip = ente_photos::live_photo::Error::Zip(zip::result::ZipError::Io(
+            std::io::ErrorKind::StorageFull.into(),
+        ));
+        assert!(fatal(&anyhow::Error::new(zip)));
+        let sqlite = crate::core_db::Error::Sqlite(rusqlite::Error::InvalidQuery);
+        assert!(fatal(&anyhow::Error::new(sqlite)));
+        let local = ente_photos::files::Error::Io(std::io::ErrorKind::PermissionDenied.into());
+        assert!(!fatal(&anyhow::Error::new(local)));
+    }
 }

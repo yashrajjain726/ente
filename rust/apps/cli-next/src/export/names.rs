@@ -122,24 +122,33 @@ fn numbered(stem: &str, suffix: &str) -> String {
     }
 }
 
-pub fn reserve(store: &Store, parent: &str, name: &str, owner: &str, kind: &str) -> Result<bool> {
-    Ok(store.db.connection().execute(
-        "INSERT INTO names VALUES(?1,?2,?3,?4,?5) ON CONFLICT(parent,folded) DO UPDATE SET kind=excluded.kind WHERE names.owner=excluded.owner",
-        params![parent, folded(name), owner, folded(split(name, kind == "album").0), kind],
-    )? > 0)
-}
-
 pub fn available(
     store: &Store,
-    parent: &str,
+    folder: &str,
     names: &[String],
     owner: &str,
     kind: &str,
 ) -> Result<bool> {
     for name in names {
-        let occupied: bool = store.db.connection().query_row(
-            "SELECT EXISTS(SELECT 1 FROM names WHERE parent=?1 AND owner<>?2 AND folded=?3) OR (?4<>'album' AND EXISTS(SELECT 1 FROM names WHERE parent=?1 AND owner<>?2 AND stem=?5 AND NOT(kind=?4 AND kind IN ('image','video'))))",
-            params![parent,owner,folded(name),kind,folded(split(name,false).0)], |r| r.get(0))?;
+        let occupied: bool = if kind == "album" {
+            store.db.connection().query_row(
+                "SELECT EXISTS(SELECT 1 FROM albums WHERE parent=?1 AND folded=?2 AND key<>?3 UNION ALL SELECT 1 FROM pending WHERE folder=?1 AND folded1=?2 AND kind='album' AND owner<>?3)",
+                params![folder, folded(name), owner],
+                |r| r.get(0),
+            )?
+        } else {
+            store.db.connection().query_row(
+                "SELECT EXISTS(SELECT 1 FROM components c JOIN placements p ON p.id=c.placement WHERE c.folder=?1 AND c.folded=?2 AND c.placement<>?3 UNION ALL SELECT 1 FROM components c JOIN placements p ON p.id=c.placement WHERE c.folder=?1 AND c.stem=?4 AND c.placement<>?3 AND NOT(p.kind=?5 AND p.kind IN ('image','video')) UNION ALL SELECT 1 FROM json_records j JOIN placements p ON p.id=j.owner WHERE j.folder=?1 AND j.folded=?2 AND j.owner<>?3 UNION ALL SELECT 1 FROM json_records j JOIN placements p ON p.id=j.owner WHERE j.folder=?1 AND j.stem=?4 AND j.owner<>?3 AND NOT(p.kind=?5 AND p.kind IN ('image','video')) UNION ALL SELECT 1 FROM pending WHERE folder=?1 AND folded1=?2 AND owner<>?3 UNION ALL SELECT 1 FROM pending WHERE folder=?1 AND folded2=?2 AND owner<>?3 UNION ALL SELECT 1 FROM pending WHERE folder=?1 AND stem1=?4 AND owner<>?3 AND NOT(kind=?5 AND kind IN ('image','video')) UNION ALL SELECT 1 FROM pending WHERE folder=?1 AND stem2=?4 AND owner<>?3 AND NOT(kind=?5 AND kind IN ('image','video')))",
+                params![
+                    folder,
+                    folded(name),
+                    owner,
+                    folded(split(name, false).0),
+                    kind
+                ],
+                |r| r.get(0),
+            )?
+        };
         if occupied {
             return Ok(false);
         }
@@ -149,7 +158,7 @@ pub fn available(
 
 pub fn allocate(
     store: &Store,
-    parent: &str,
+    folder: &str,
     name: &str,
     kind: &str,
     extensions: Option<(&str, &str)>,
@@ -159,13 +168,7 @@ pub fn allocate(
         let Some(candidates) = candidates(name, kind == "album", extensions, suffix)? else {
             continue;
         };
-        if available(store, parent, &candidates, owner, kind)? {
-            for candidate in &candidates {
-                ensure!(
-                    reserve(store, parent, candidate, owner, kind)?,
-                    "name allocation changed"
-                );
-            }
+        if available(store, folder, &candidates, owner, kind)? {
             return Ok(candidates);
         }
     }

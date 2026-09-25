@@ -528,7 +528,7 @@ fn photos_lists_limit_output_and_stream_complete_results() {
         .unwrap();
     let mut record: Value = serde_json::from_str(&encoded).unwrap();
     let public = serde_json::to_vec(&json!({"editedTime":i64::MAX})).unwrap();
-    record["documents"]["public"] = json!(public);
+    record["documents"]["public"] = json!(ente_core::b64::encode(&public));
     connection
         .execute(
             "UPDATE photos_files SET record=?1 WHERE id=150",

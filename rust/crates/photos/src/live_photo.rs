@@ -4,9 +4,9 @@ use crate::export::Role;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("{0}")]
+    #[error(transparent)]
     Zip(#[from] zip::result::ZipError),
-    #[error("{0}")]
+    #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error("Live Photo must contain one image and one video")]
     Components,

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use anyhow::{Context, Result};
 use ente_core::{
     Session, b64,
@@ -36,10 +38,9 @@ pub const SCHEMA: &str = "
 pub struct Record<R> {
     pub remote: R,
     pub documents: Option<Documents>,
-    pub key: Option<Vec<u8>>,
+    pub key: Option<String>,
     pub input_hash: String,
     pub failure: Option<String>,
-    pub attempt: String,
 }
 
 pub type AlbumRecord = Record<RemoteCollection>;
@@ -50,8 +51,7 @@ impl<R: Serialize> Record<R> {
         remote: R,
         previous: Option<Self>,
         parent_key: &[u8],
-        retry: bool,
-        attempt: &str,
+        failed_inputs: &mut HashSet<String>,
         decrypt: impl FnOnce(&R) -> std::result::Result<(Key, Documents), E>,
     ) -> Result<Self> {
         let mut input = serde_json::to_value(&remote)?;
@@ -94,14 +94,17 @@ impl<R: Serialize> Record<R> {
         )?);
         if let Some(mut previous) = previous
             && previous.input_hash == input_hash
-            && !(retry && previous.documents.is_none())
+            && (previous.documents.is_some() || failed_inputs.contains(&input_hash))
         {
             previous.remote = remote;
             return Ok(previous);
         }
         let (key, documents, failure) = match decrypt(&remote) {
-            Ok((key, documents)) => (Some(key.as_bytes().to_vec()), Some(documents), None),
-            Err(error) if error.is_record_failure() => (None, None, Some(error.to_string())),
+            Ok((key, documents)) => (Some(b64::encode(key.as_bytes())), Some(documents), None),
+            Err(error) if error.is_record_failure() => {
+                failed_inputs.insert(input_hash.clone());
+                (None, None, Some(error.to_string()))
+            }
             Err(error) => return Err(error.into()),
         };
         Ok(Self {
@@ -110,7 +113,6 @@ impl<R: Serialize> Record<R> {
             documents,
             input_hash,
             failure,
-            attempt: attempt.to_owned(),
         })
     }
 
@@ -120,7 +122,9 @@ impl<R: Serialize> Record<R> {
                 .clone()
                 .unwrap_or_else(|| "metadata is unavailable".into())
         })?;
-        let key = Key::try_from_slice(self.key.as_deref().context("decrypted record has no key")?)?;
+        let key = Key::try_from_slice(&b64::decode(
+            self.key.as_deref().context("decrypted record has no key")?,
+        )?)?;
         Ok((key, documents))
     }
 }
@@ -194,7 +198,7 @@ pub struct Entry {
 pub struct Replica<'a> {
     pub db: &'a mut Db,
     user_id: i64,
-    attempt: String,
+    failed_inputs: HashSet<String>,
 }
 
 impl<'a> Replica<'a> {
@@ -202,7 +206,7 @@ impl<'a> Replica<'a> {
         Self {
             db,
             user_id,
-            attempt: uuid::Uuid::new_v4().to_string(),
+            failed_inputs: HashSet::new(),
         }
     }
 
@@ -223,7 +227,7 @@ impl<'a> Replica<'a> {
                 session.secret_key.as_bytes().as_slice()
             };
             let record =
-                Record::receive(remote, previous, parent_key, false, &self.attempt, |r| {
+                Record::receive(remote, previous, parent_key, &mut self.failed_inputs, |r| {
                     collections::decrypt(r, session)
                 })?;
             changes.push((id, Some(record)));
@@ -236,13 +240,16 @@ impl<'a> Replica<'a> {
                     tx.execute("DELETE FROM photos_collections WHERE id=?1", [id])?;
                 }
             }
-            tx.execute("INSERT INTO photos_sync VALUES(1,?1) ON CONFLICT(id) DO UPDATE SET cursor=excluded.cursor", [page.cursor])?;
+            tx.execute(
+                "INSERT INTO photos_sync VALUES(1,?1) ON CONFLICT(id) DO UPDATE SET cursor=excluded.cursor",
+                [page.cursor],
+            )?;
             Ok(())
         })?;
         Ok(())
     }
 
-    pub fn retry_album(&mut self, session: &Session, id: i64, force: bool) -> Result<()> {
+    pub fn retry_album(&mut self, session: &Session, id: i64) -> Result<()> {
         let Some(previous) = self.album_record(id)? else {
             return Ok(());
         };
@@ -254,13 +261,11 @@ impl<'a> Replica<'a> {
         } else {
             session.secret_key.as_bytes().as_slice()
         };
-        let retry = force && previous.attempt != self.attempt;
         let record = Record::receive(
             previous.remote.clone(),
             Some(previous),
             parent_key,
-            retry,
-            &self.attempt,
+            &mut self.failed_inputs,
             |r| collections::decrypt(r, session),
         )?;
         self.db.write(|tx| save_album(tx, record, self.user_id))?;
@@ -273,17 +278,12 @@ impl<'a> Replica<'a> {
         collections: &[Collection],
     ) -> Result<()> {
         for collection in collections {
-            self.sync_album_files(session, collection, false).await?;
+            self.sync_album_files(session, collection).await?;
         }
         Ok(())
     }
 
-    pub async fn sync_album_files(
-        &mut self,
-        session: &Session,
-        album: &Collection,
-        retry_failed: bool,
-    ) -> Result<()> {
+    pub async fn sync_album_files(&mut self, session: &Session, album: &Collection) -> Result<()> {
         let (mut cursor, synced_to): (i64, Option<i64>) = self.db.read(|db| {
             Ok(db.query_row(
                 "SELECT files_cursor,files_synced_to FROM photos_collections WHERE id=?1",
@@ -306,18 +306,26 @@ impl<'a> Replica<'a> {
                         remote,
                         previous,
                         album.key.as_bytes(),
-                        false,
-                        &self.attempt,
+                        &mut self.failed_inputs,
                         |r| files::decrypt(r, &album.key),
                     )?;
                     changes.push((id, Some(record)));
                 }
                 self.db.write(|tx| {
                     for (id, record) in changes {
-                        if let Some(record) = record { save_file(tx, album.id, record, self.user_id)?; }
-                        else { tx.execute("DELETE FROM photos_files WHERE collection_id=?1 AND id=?2", params![album.id,id])?; }
+                        if let Some(record) = record {
+                            save_file(tx, album.id, record, self.user_id)?;
+                        } else {
+                            tx.execute(
+                                "DELETE FROM photos_files WHERE collection_id=?1 AND id=?2",
+                                params![album.id, id],
+                            )?;
+                        }
                     }
-                    tx.execute("UPDATE photos_collections SET files_cursor=?1,files_synced_to=CASE WHEN ?2 THEN files_synced_to ELSE ?3 END WHERE id=?4", params![page.cursor,page.has_more,album.updated_at_micros,album.id])?;
+                    tx.execute(
+                        "UPDATE photos_collections SET files_cursor=?1,files_synced_to=CASE WHEN ?2 THEN files_synced_to ELSE ?3 END WHERE id=?4",
+                        params![page.cursor, page.has_more, album.updated_at_micros, album.id],
+                    )?;
                     Ok(())
                 })?;
                 cursor = page.cursor;
@@ -337,13 +345,11 @@ impl<'a> Replica<'a> {
             }
             for previous in records {
                 after = previous.remote.id;
-                let retry = retry_failed && previous.attempt != self.attempt;
                 let record = Record::receive(
                     previous.remote.clone(),
                     Some(previous),
                     album.key.as_bytes(),
-                    retry,
-                    &self.attempt,
+                    &mut self.failed_inputs,
                     |r| files::decrypt(r, &album.key),
                 )?;
                 self.db
@@ -481,7 +487,10 @@ fn save_album(
         }
     };
     let json = encode(&record)?;
-    tx.execute("INSERT INTO photos_collections(id,name,updated_at,record) VALUES(?1,?2,?3,?4) ON CONFLICT(id) DO UPDATE SET name=coalesce(excluded.name,photos_collections.name),updated_at=excluded.updated_at,record=excluded.record", params![record.remote.id,name,record.remote.updation_time,json])?;
+    tx.execute(
+        "INSERT INTO photos_collections(id,name,updated_at,record) VALUES(?1,?2,?3,?4) ON CONFLICT(id) DO UPDATE SET name=coalesce(excluded.name,photos_collections.name),updated_at=excluded.updated_at,record=excluded.record",
+        params![record.remote.id, name, record.remote.updation_time, json],
+    )?;
     Ok(())
 }
 
@@ -502,7 +511,17 @@ fn save_file(
         }
     };
     let json = encode(&record)?;
-    tx.execute("INSERT INTO photos_files VALUES(?1,?2,?3,?4,?5,?6) ON CONFLICT(collection_id,id) DO UPDATE SET name=coalesce(excluded.name,photos_files.name),updated_at=excluded.updated_at,record=excluded.record,decrypt_failed=excluded.decrypt_failed WHERE excluded.updated_at>=photos_files.updated_at", params![album,record.remote.id,name,record.remote.updation_time,json,record.documents.is_none()])?;
+    tx.execute(
+        "INSERT INTO photos_files VALUES(?1,?2,?3,?4,?5,?6) ON CONFLICT(collection_id,id) DO UPDATE SET name=coalesce(excluded.name,photos_files.name),updated_at=excluded.updated_at,record=excluded.record,decrypt_failed=excluded.decrypt_failed WHERE excluded.updated_at>=photos_files.updated_at",
+        params![
+            album,
+            record.remote.id,
+            name,
+            record.remote.updation_time,
+            json,
+            record.documents.is_none()
+        ],
+    )?;
     Ok(())
 }
 

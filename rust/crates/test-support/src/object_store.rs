@@ -4,8 +4,8 @@ use std::{
     net::{TcpListener, TcpStream},
     path::{Path, PathBuf},
     sync::{
-        Arc,
-        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        Arc, Condvar, Mutex, PoisonError,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread::{self, JoinHandle},
     time::Duration,
@@ -22,10 +22,59 @@ pub struct ObjectStoreControl {
     active: AtomicUsize,
     peak: AtomicUsize,
     interrupted: AtomicUsize,
-    delay_millis: AtomicU64,
+    held: Mutex<Option<Arc<ReadGate>>>,
+}
+
+struct ReadGate {
+    minimum_size: u64,
+    state: Mutex<(usize, bool)>,
+    changed: Condvar,
+}
+
+pub struct HeldReads(Arc<ReadGate>);
+
+impl HeldReads {
+    pub fn wait_for(&self, count: usize) {
+        let (state, _) = self
+            .0
+            .changed
+            .wait_timeout_while(
+                self.0.state.lock().unwrap_or_else(PoisonError::into_inner),
+                Duration::from_secs(60),
+                |(started, _)| *started < count,
+            )
+            .unwrap_or_else(PoisonError::into_inner);
+        let started = state.0;
+        drop(state);
+        assert!(
+            started >= count,
+            "expected {count} held downloads, got {started}"
+        );
+    }
+}
+
+impl Drop for HeldReads {
+    fn drop(&mut self) {
+        self.0
+            .state
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .1 = true;
+        self.0.changed.notify_all();
+    }
 }
 
 impl ObjectStoreControl {
+    pub fn hold_reads(&self, minimum_size: u64) -> HeldReads {
+        let gate = Arc::new(ReadGate {
+            minimum_size,
+            state: Mutex::new((0, false)),
+            changed: Condvar::new(),
+        });
+        *self.held.lock().unwrap_or_else(PoisonError::into_inner) = Some(gate.clone());
+        HeldReads(gate)
+    }
+
     pub fn reads(&self) -> usize {
         self.reads.load(Ordering::SeqCst)
     }
@@ -34,10 +83,6 @@ impl ObjectStoreControl {
     }
     pub fn interrupt_reads(&self, count: usize) {
         self.interrupted.store(count, Ordering::SeqCst);
-    }
-    pub fn delay_chunks(&self, delay: Duration) {
-        self.delay_millis
-            .store(delay.as_millis() as u64, Ordering::SeqCst);
     }
 }
 
@@ -174,15 +219,29 @@ fn handle(stream: TcpStream, root: &Path, control: &ObjectStoreControl) -> TestR
             control.peak.fetch_max(active, Ordering::SeqCst);
             let result = (|| {
                 respond(input.get_mut(), "200 OK", file.metadata()?.len())?;
+                let gate = control
+                    .held
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .clone();
+                if let Some(gate) = gate
+                    && file.metadata()?.len() >= gate.minimum_size
+                {
+                    let mut state = gate.state.lock().unwrap_or_else(PoisonError::into_inner);
+                    state.0 += 1;
+                    gate.changed.notify_all();
+                    while !state.1 {
+                        state = gate
+                            .changed
+                            .wait(state)
+                            .unwrap_or_else(PoisonError::into_inner);
+                    }
+                }
                 let mut buffer = vec![0; 64 * 1024];
                 loop {
                     let read = file.read(&mut buffer)?;
                     if read == 0 {
                         break;
-                    }
-                    let delay = control.delay_millis.load(Ordering::SeqCst);
-                    if delay > 0 {
-                        thread::sleep(Duration::from_millis(delay));
                     }
                     input.get_mut().write_all(&buffer[..read])?;
                 }

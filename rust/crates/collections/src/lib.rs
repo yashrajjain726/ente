@@ -33,11 +33,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("{0}")]
+    #[error(transparent)]
     Http(#[from] ente_core::http::Error),
-    #[error("{0}")]
+    #[error(transparent)]
     Decode(#[from] b64::DecodeError),
-    #[error("{0}")]
+    #[error(transparent)]
     Crypto(#[from] crypto::Error),
     #[error("Owned collection is missing its key decryption nonce")]
     MissingKeyDecryptionNonce,

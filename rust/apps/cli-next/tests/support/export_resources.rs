@@ -224,9 +224,12 @@ fn repeat_hash(byte: u8, size: u64) -> String {
 
 fn measure(home: &TestHome, root: &Path, label: &str) -> TestResult<Value> {
     let started = Instant::now();
-    let mut child = home
-        .command(&["photos", "export", root.to_str().unwrap(), "--json"])
-        .spawn()?;
+    let mut child = ExportChild::spawn(&mut home.command(&[
+        "photos",
+        "export",
+        root.to_str().unwrap(),
+        "--json",
+    ]))?;
     let output_readers = [
         child
             .stdout

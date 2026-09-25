@@ -3,7 +3,7 @@ use ente_core::{
     crypto::{Header, Key, Nonce, blob, secretbox},
     http,
 };
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize};
 
 use crate::{Error, Result, open_collection_key};
 
@@ -131,13 +131,6 @@ impl Collection {
         )
     }
 
-    pub fn open_name(&self, key: &Key) -> Result<String> {
-        String::from_utf8(self.open_name_bytes(key)?).map_err(|_| Error::InvalidCollection {
-            id: self.id,
-            reason: "name is not UTF-8",
-        })
-    }
-
     pub fn open_name_bytes(&self, key: &Key) -> Result<Vec<u8>> {
         if let Some(name) = self.name.as_ref().filter(|name| !name.is_empty()) {
             return Ok(name.as_bytes().to_vec());
@@ -226,16 +219,6 @@ impl EncryptedMetadata {
         Ok(blob::decrypt(
             &b64::decode(&self.data)?,
             &Header::try_from_slice(&b64::decode(&self.header)?)?,
-            key,
-        )?)
-    }
-
-    pub fn open<T: DeserializeOwned>(&self, key: &Key) -> Result<T> {
-        Ok(blob::decrypt_json(
-            &blob::EncryptedBlob {
-                encrypted_data: b64::decode(&self.data)?,
-                decryption_header: Header::try_from_slice(&b64::decode(&self.header)?)?,
-            },
             key,
         )?)
     }

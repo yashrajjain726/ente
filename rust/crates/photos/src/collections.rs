@@ -1,5 +1,5 @@
 use ente_core::{Session, crypto::Key};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::source::{self, Documents, MetadataError};
 
@@ -46,7 +46,7 @@ impl Kind {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Visibility {
     Visible,
     Archived,
@@ -70,57 +70,6 @@ impl Visibility {
             _ => Err(MetadataError("unsupported visibility")),
         }
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error(transparent)]
-    Collections(#[from] ente_collections::Error),
-    #[error(transparent)]
-    Metadata(#[from] MetadataError),
-}
-
-pub struct Change {
-    pub id: i64,
-    pub collection: Option<Collection>,
-}
-
-pub struct Page {
-    pub changes: Vec<Change>,
-    pub cursor: i64,
-}
-
-pub async fn diff(session: &Session, since: i64) -> Result<Page, Error> {
-    let page = ente_collections::client::diff(session, since).await?;
-    let changes = page
-        .collections
-        .into_iter()
-        .map(|remote| {
-            let collection = if remote.is_deleted == Some(true) {
-                None
-            } else {
-                let (key, documents) = decrypt(&remote, session)?;
-                Some(interpret(&remote, &key, &documents, session.user_id)?)
-            };
-            Ok(Change {
-                id: remote.id,
-                collection,
-            })
-        })
-        .collect::<Result<_, Error>>()?;
-    Ok(Page {
-        changes,
-        cursor: page.cursor,
-    })
-}
-
-pub async fn list(session: &Session) -> Result<Vec<Collection>, Error> {
-    Ok(diff(session, 0)
-        .await?
-        .changes
-        .into_iter()
-        .filter_map(|c| c.collection)
-        .collect())
 }
 
 pub fn decrypt(
