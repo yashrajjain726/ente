@@ -413,6 +413,13 @@
       "slug": "butterflymx"
     },
     {
+      "title": "BuyUcoin",
+      "hex": "28ABE3",
+      "altNames": [
+        "buyucoin.com"
+      ]
+    },
+    {
       "title": "Bybit",
       "hex": "F6A500"
     },
@@ -659,6 +666,14 @@
       "title": "DCS",
       "altNames": [
         "Digital Combat Simulator"
+      ]
+    },
+    {
+      "title": "Deel",
+      "hex": "1B1B1B",
+      "altNames": [
+        "deel.com",
+        "app.deel.com"
       ]
     },
     {
@@ -2100,6 +2115,15 @@
       "hex": "000000"
     },
     {
+      "title": "Remote HR",
+      "slug": "remote",
+      "altNames": [
+        "Remote",
+        "remote.com",
+        "employ.remote.com"
+      ]
+    },
+    {
       "title": "Reolink",
       "slug": "reolink"
     },
@@ -2798,6 +2822,15 @@
       "title": "YNAB",
       "altNames": [
         "You Need A Budget"
+      ]
+    },
+    {
+      "title": "Yoti",
+      "altNames": [
+        "Yoti Hub",
+        "Yoti Portal",
+        "hub.yoti.com",
+        "identity.yoti.com"
       ]
     },
     {
