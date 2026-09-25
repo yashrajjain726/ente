@@ -367,17 +367,25 @@ Future<void> _runMinimally(
     final locale = await getLocale();
     await initializeDateFormatting(locale?.languageCode ?? "en");
     _logger.info("[BG TASK] home widget sync");
-    if (!isLocalGalleryMode &&
-        hasGrantedMLConsent &&
-        localSettings.isMLLocalIndexingEnabled) {
-      PersonService.init(entityService, MLDataDB.instance, prefs);
-      _logger.info(
-        "[BG TASK] person service initialized for memories recompute",
-      );
-      // The DiffSyncCompleteEvent fired during _sync predates PersonService
-      // init in this isolate, so sync explicitly before consuming person data.
+    if (!isLocalGalleryMode && hasGrantedMLConsent) {
       try {
-        await PersonService.instance.sync();
+        final userID = Configuration.instance.getUserID();
+        if (localSettings.isMLLocalIndexingEnabled ||
+            (await smartAlbumsService.getSmartConfigs()).values.any(
+              (config) =>
+                  config.personIDs.isNotEmpty &&
+                  userID != null &&
+                  (CollectionsService.instance
+                          .getCollectionByID(config.collectionId)
+                          ?.canAutoAdd(userID) ??
+                      false),
+            )) {
+          PersonService.init(entityService, MLDataDB.instance, prefs);
+          _logger.info(
+            "[BG TASK] person service initialized for background sync",
+          );
+          await PersonService.instance.sync();
+        }
       } catch (e, s) {
         _logger.warning("[BG TASK] person sync failed", e, s);
       }
