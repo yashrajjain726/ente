@@ -136,7 +136,7 @@ class BackgroundTasks {
                     ? const Duration(hours: 2)
                     : null,
                 requiresNetwork: true,
-                requiresCharging: !Platform.isIOS,
+                requiresCharging: Platform.isAndroid,
                 requiresDeviceIdle: Platform.isAndroid,
                 runBudget: Platform.isIOS
                     ? BgTaskUtils.taskTimeoutFor(

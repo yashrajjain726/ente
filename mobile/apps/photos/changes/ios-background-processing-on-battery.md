@@ -1,1 +1,0 @@
-- Internal users on iOS can now run background sync and ML processing without connecting their device to power.
