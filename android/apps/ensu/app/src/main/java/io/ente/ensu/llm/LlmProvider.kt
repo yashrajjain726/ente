@@ -96,7 +96,8 @@ class LlmProvider(
     ): Unit = withModelContext {
         modelLoadMutex.withLock {
             currentCoroutineContext().ensureActive()
-            if (loadedModel != null || !isChatModelReady(selection)) return@withLock
+            if (loadedContextLength(selection) != null || !isChatModelReady(selection))
+                return@withLock
             try {
                 ensureModelReadyLocked(selection, {}, allowRecovery = false, shouldDownload = false)
                 currentCoroutineContext().ensureActive()
@@ -203,7 +204,7 @@ class LlmProvider(
             model
                 .newContext(
                     LlmContextParams(
-                        contextSize = 2048,
+                        contextSize = minOf(2048, checkNotNull(currentContextLength)),
                         nThreads = max(1, Runtime.getRuntime().availableProcessors() - 1),
                         nBatch = 128,
                     )
@@ -213,7 +214,7 @@ class LlmProvider(
                     val titleMessages =
                         context.truncateTextChatMessages(
                             messages.map { NativeChatMessage(it.roleString(), it.text) },
-                            2000u,
+                            (context.contextSize().toInt() - 48).coerceIn(0, 2000).toUInt(),
                         )
                     coroutine.ensureActive()
                     generateStreamWithCallback(

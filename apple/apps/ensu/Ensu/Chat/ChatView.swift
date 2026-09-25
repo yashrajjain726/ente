@@ -325,12 +325,6 @@ struct ChatView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .id(viewState.sessionTransitionId)
                 .transition(sessionTransition)
-                .onAppear {
-                    viewModel.autoStartModelDownloadIfNeeded()
-                }
-                .onChange(of: viewModel.messages.count) { _ in
-                    viewModel.autoStartModelDownloadIfNeeded()
-                }
                 .zIndex(0)
 
                 if viewModel.isChatUnsupported {

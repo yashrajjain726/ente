@@ -3,10 +3,8 @@
 package io.ente.ensu
 
 import android.annotation.SuppressLint
-import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
@@ -43,6 +41,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.core.content.OnTrimMemoryProvider
+import androidx.core.util.Consumer
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -205,6 +205,8 @@ fun HomeView(
                     latestStore.notesStore.setForeground(true)
                     latestStore.refreshModelDownloadInfo()
                     latestStore.setChatActive(isChatRoute)
+                } else if (event == Lifecycle.Event.ON_PAUSE) {
+                    latestStore.setChatActive(false)
                 } else if (event == Lifecycle.Event.ON_STOP) {
                     latestStore.notesStore.setForeground(false)
                     latestStore.setChatActive(false)
@@ -224,22 +226,11 @@ fun HomeView(
             }
         }
 
-        DisposableEffect(context) {
-            @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
-            val callbacks =
-                object : ComponentCallbacks2 {
-                    override fun onConfigurationChanged(config: Configuration) = Unit
-
-                    override fun onLowMemory() = latestStore.suppressChatWarmup()
-
-                    override fun onTrimMemory(level: Int) {
-                        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
-                            latestStore.suppressChatWarmup()
-                        }
-                    }
-                }
-            context.applicationContext.registerComponentCallbacks(callbacks)
-            onDispose { context.applicationContext.unregisterComponentCallbacks(callbacks) }
+        DisposableEffect(lifecycleOwner) {
+            val callbacks = lifecycleOwner as? OnTrimMemoryProvider
+            val listener = Consumer<Int> { latestStore.suppressChatWarmup() }
+            callbacks?.addOnTrimMemoryListener(listener)
+            onDispose { callbacks?.removeOnTrimMemoryListener(listener) }
         }
 
         LaunchedEffect(whatsNewService) {

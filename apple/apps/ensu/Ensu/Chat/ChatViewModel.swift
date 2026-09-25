@@ -993,42 +993,6 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
-    func autoStartModelDownloadIfNeeded() {
-        guard !isDownloading && !isGenerating else { return }
-        guard !isChatUnsupported else {
-            isDownloading = false
-            downloadToast = nil
-            return
-        }
-        let selection = modelSettings.currentSelection()
-        isModelDownloaded = provider.isModelDownloaded(selection)
-        if !isModelDownloaded {
-            return
-        }
-        modelDownloadSizeBytes = nil
-        modelDownloadTask?.cancel()
-        modelDownloadTask = Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await self.ensureRequiredModelsReadyShared(selection)
-            } catch {
-                if self.isCancellation(error) {
-                    return
-                }
-                await MainActor.run {
-                    self.downloadToast = DownloadToastState(
-                        phase: .errorLoad,
-                        percent: nil,
-                        status: self.userFacingModelReadyError(error, wasDownloaded: true),
-                        offerRetryDownload: true
-                    )
-                    self.isDownloading = false
-                    self.isModelDownloaded = false
-                }
-            }
-        }
-    }
-
     func cancelDownload() {
         resetGenerationState(stopRequested: true)
         modelDownloadTask?.cancel()

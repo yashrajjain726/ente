@@ -250,7 +250,7 @@ actor LlmProvider {
         _ selection: LlmModelSelection, owner: UUID
     ) async throws {
         try await withModelLock {
-            guard loadedModel == nil, isChatModelReady(selection) else { return }
+            guard loadedContextLength(selection) == nil, isChatModelReady(selection) else { return }
             do {
                 try await ensureModelReadyLocked(
                     selection, onProgress: { _ in }, allowRecovery: false, shouldDownload: false)
@@ -366,25 +366,27 @@ actor LlmProvider {
                     selection, onProgress: { _ in }, allowRecovery: true)
                 try control.checkCancellation()
                 unloadTranscriptionModelIfLoaded()
-                guard let model = loadedModel else { throw CancellationError() }
+                guard let model = loadedModel, let loadedContext else { throw CancellationError() }
                 generationControl.withLock { $0 = control }
                 defer { generationControl.withLock { $0 = nil } }
                 let context = try model.newContext(
                     params: LlmContextParams(
-                        contextSize: 2048,
+                        contextSize: Int32(min(2048, loadedContext.contextSize())),
                         nThreads: Int32(max(1, ProcessInfo.processInfo.activeProcessorCount - 1)),
                         nBatch: 128
                     ))
+                let outputTokens = 48
+                let inputTokens = max(0, min(2000, Int(context.contextSize()) - outputTokens))
                 let titleMessages = try context.truncateTextChatMessages(
                     messages: messages.map {
                         LlmChatMessage(role: $0.role.roleString, content: $0.text)
                     },
-                    maxTokens: 2000
+                    maxTokens: UInt32(inputTokens)
                 )
                 _ = try await generateChatLocked(
                     selection,
                     messages: titleMessages,
-                    imageFiles: [], temperature: 0.2, maxTokens: 48,
+                    imageFiles: [], temperature: 0.2, maxTokens: outputTokens,
                     contextOverride: context, control: control, onToken: onToken
                 )
             }
