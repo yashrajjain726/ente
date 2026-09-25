@@ -1,1 +1,0 @@
-- Fixed the Suggest Features link so it shows Auth suggestions (@fosszil).
