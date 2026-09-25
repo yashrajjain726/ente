@@ -43,9 +43,9 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
 
   CameraController? _camera;
   _CameraStatus _status = _CameraStatus.starting;
-  ScanCaptureRegion? _stableRegion;
+  ScanCaptureRegion? _captureRegion;
   Size? _liveFrameSize;
-  ScanQuad? get _stableQuad => _stableRegion?.quad;
+  ScanQuad? _displayQuad;
   bool _analysisInFlight = false;
   Duration? _analysisObservedAt;
   bool _takingPicture = false;
@@ -141,7 +141,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     _resetLiveTracking();
     setState(() {
       _status = _CameraStatus.starting;
-      _stableRegion = null;
+      _captureRegion = null;
     });
     _autoCapture.reset();
     try {
@@ -203,7 +203,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     if (camera == null) return;
     setState(() {
       _camera = null;
-      _stableRegion = null;
+      _captureRegion = null;
     });
     _autoCapture.reset();
     await camera.dispose();
@@ -293,8 +293,9 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
         );
       }
       setState(() {
-        final quad = sample.displayQuad;
-        _stableRegion = quad == null
+        _displayQuad = sample.displayQuad;
+        final quad = sample.quad;
+        _captureRegion = quad == null
             ? null
             : ScanCaptureRegion(quad: quad, frameSize: frameSize);
       });
@@ -323,7 +324,8 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       }
     }
     setState(() {
-      _stableRegion = null;
+      _captureRegion = null;
+      _displayQuad = null;
     });
   }
 
@@ -331,7 +333,8 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     _analysisGeneration++;
     _quadExpiry?.cancel();
     _stabilizer.reset(observedBefore: _frameClock.elapsed);
-    _stableRegion = null;
+    _captureRegion = null;
+    _displayQuad = null;
     _liveFrameSize = null;
   }
 
@@ -341,13 +344,13 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       return;
     }
     final retakePageId = _retakePageId;
-    final region = _stableRegion;
+    final region = _captureRegion;
     final quad = region?.quad ?? ScanQuad.fullFrame();
     _autoCapture.notifyCaptureStarted();
     unawaited(HapticFeedback.mediumImpact());
     setState(() {
       _takingPicture = true;
-      _stableRegion = null;
+      _captureRegion = null;
       _snapQuad = quad;
       _snapId++;
     });
@@ -803,7 +806,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
                   ScanQuadOverlay(
                     quad: _takingPicture || _flights.isNotEmpty
                         ? null
-                        : _stableQuad,
+                        : _displayQuad,
                     color: colors.primary,
                     armingProgress: _autoMode ? _autoCapture.progress : 0,
                   ),
