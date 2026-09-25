@@ -494,8 +494,14 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   }
 
   void _purgeResolved() {
+    _PendingCapture? newestSnapshot;
     for (final capture in _pending) {
-      if (capture.landed && capture.resolved) {
+      if (capture.landed && !capture.resolved && capture.spec != null) {
+        newestSnapshot = capture;
+      }
+    }
+    for (final capture in _pending) {
+      if (capture.landed && (capture.resolved || capture != newestSnapshot)) {
         _releaseSnapshot(capture);
       }
     }
