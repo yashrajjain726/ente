@@ -15,6 +15,7 @@ import io.ente.ensu.notes.NotesStore
 import io.ente.ensu.settings.IS_ENSU_PACKS_ENABLED
 import io.ente.ensu.settings.SessionPreferencesDataStore
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -36,6 +37,7 @@ internal class ModelSettingsActions(
     private var scope: CoroutineScope? = null
     private var modelDownloadJob: Job? = null
     private var chatActive = false
+    private val activeVoiceJobs = AtomicInteger()
     private var warmupSuppressed = false
     private var warmupJob: Job? = null
     private var warmupOwner: String? = null
@@ -332,6 +334,14 @@ internal class ModelSettingsActions(
         cancelChatWarmup()
     }
 
+    fun trackVoiceInput(job: Job) {
+        activeVoiceJobs.incrementAndGet()
+        suppressChatWarmup()
+        job.invokeOnCompletion {
+            if (activeVoiceJobs.decrementAndGet() == 0) scope?.launch { refreshChatWarmup() }
+        }
+    }
+
     private fun cancelChatWarmup() {
         warmupJob?.cancel()
         warmupJob = null
@@ -347,6 +357,7 @@ internal class ModelSettingsActions(
         val eligible =
             chatActive &&
                 !warmupSuppressed &&
+                activeVoiceJobs.get() == 0 &&
                 current.chat.deviceCapability.isChatSupported() &&
                 current.knowledge.packs.values.none { it.enabled } &&
                 notesStore.state.value.collections.isEmpty()
@@ -373,7 +384,8 @@ internal class ModelSettingsActions(
                 coroutineContext.ensureActive()
                 val latest = state.value
                 if (
-                    latest.chat.isGenerating ||
+                    activeVoiceJobs.get() > 0 ||
+                        latest.chat.isGenerating ||
                         latest.chat.isDownloading ||
                         latest.knowledge.packs.values.any { it.enabled } ||
                         notesStore.state.value.collections.isNotEmpty()

@@ -23,6 +23,7 @@ import io.ente.ensu.notes.NotesStore
 import io.ente.ensu.settings.DeveloperSettingsState
 import io.ente.ensu.settings.SessionPreferencesDataStore
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -97,6 +98,8 @@ class AppStore(
     fun setChatActive(active: Boolean) = modelSettingsActions.setChatActive(active)
 
     fun suppressChatWarmup() = modelSettingsActions.suppressChatWarmup()
+
+    fun trackVoiceInput(job: Job) = modelSettingsActions.trackVoiceInput(job)
 
     fun refreshDeviceCapability(scope: CoroutineScope? = null) {
         val capability = deviceCapabilityProvider.chatCapability()

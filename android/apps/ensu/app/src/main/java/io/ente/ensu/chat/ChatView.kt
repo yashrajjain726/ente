@@ -51,6 +51,7 @@ import io.ente.ensu.bindings.Transcriber
 import io.ente.ensu.designsystem.EnsuColor
 import io.ente.ensu.designsystem.EnsuSpacing
 import io.ente.ensu.device.ChatDeviceCapability
+import kotlinx.coroutines.Job
 
 @Composable
 fun ChatView(
@@ -73,7 +74,7 @@ fun ChatView(
     onDismissUnsupportedDeviceDialog: () -> Unit,
     onOverflowTrim: () -> Unit,
     onOverflowCancel: () -> Unit,
-    onVoiceInputStarted: () -> Unit,
+    onVoiceInputJob: (Job) -> Unit,
 ) {
     val density = LocalDensity.current
     val context = LocalContext.current
@@ -90,6 +91,7 @@ fun ChatView(
         rememberVoiceTranscriptionController(
             assetStore = assetStore,
             transcriber = transcriber,
+            onVoiceInputJob = onVoiceInputJob,
             onTranscript = { transcript ->
                 latestOnMessageChange(appendVoiceTranscript(latestMessageText, transcript))
             },
@@ -118,7 +120,6 @@ fun ChatView(
             pendingVoiceSessionKey = null
             if (granted) {
                 if (requestedSessionKey != null) {
-                    onVoiceInputStarted()
                     voiceController.startRecording {
                         latestSessionKey == requestedSessionKey && latestCanStartVoiceInput
                     }
@@ -298,7 +299,6 @@ fun ChatView(
                                 ) == PackageManager.PERMISSION_GRANTED
                             if (canStartVoiceInput && hasMicrophonePermission) {
                                 val requestedSessionKey = sessionKey
-                                onVoiceInputStarted()
                                 voiceController.startRecording {
                                     latestSessionKey == requestedSessionKey &&
                                         latestCanStartVoiceInput

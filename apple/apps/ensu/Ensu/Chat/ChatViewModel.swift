@@ -223,6 +223,14 @@ final class ChatViewModel: ObservableObject {
             loadMessagesFromDb(for: current)
         }
 
+        voiceTranscriber.onTaskActivityChanged = { [weak self] active in
+            guard let self else { return }
+            if active {
+                self.suppressChatWarmup()
+            } else {
+                self.refreshChatWarmup()
+            }
+        }
         refreshDeviceCapability()
         refreshModelDownloadInfo()
         warmupObservation = Publishers.CombineLatest(knowledgeStore.$packs, notesStore.$collections)
@@ -263,7 +271,7 @@ final class ChatViewModel: ObservableObject {
         let key = modelReadyKey(for: selection)
         let eligible =
             chatActive && !warmupSuppressed && !isChatUnsupported
-            && !voiceInputState.isWorking
+            && !voiceInputState.isWorking && !voiceTranscriber.hasActiveTasks
             && knowledgeStore.packs.allSatisfy { !$0.enabled } && notesStore.collections.isEmpty
         guard eligible else {
             cancelChatWarmup()
@@ -283,11 +291,23 @@ final class ChatViewModel: ObservableObject {
                 await notesStore.bootstrap()
                 try Task.checkCancellation()
                 guard !isGenerating, !isDownloading, !voiceInputState.isWorking,
+                    !voiceTranscriber.hasActiveTasks,
                     knowledgeStore.packs.allSatisfy({ !$0.enabled }), notesStore.collections.isEmpty
                 else { return }
                 try await provider.prewarmChatModelIfDownloaded(selection, owner: owner)
             } catch {
-                if !isCancellation(error) { logger.info("Chat warm-up skipped") }
+                guard !Task.isCancelled, !isCancellation(error), warmupAttempt?.owner == owner,
+                    modelReadyKey(for: modelSettings.currentSelection()) == key,
+                    !isGenerating, !isDownloading
+                else { return }
+                logger.error("Model load failed", error)
+                downloadToast = DownloadToastState(
+                    phase: .errorLoad,
+                    percent: nil,
+                    status: userFacingModelReadyError(error, wasDownloaded: true),
+                    offerRetryDownload: true
+                )
+                isModelDownloaded = false
             }
         }
     }
@@ -500,13 +520,12 @@ final class ChatViewModel: ObservableObject {
     }
 
     func cancelVoiceInput() {
-        voiceTransientErrorTask?.cancel()
-        voiceTransientErrorTask = nil
         voiceTranscriber.cancel()
-        voiceInputState = .idle
+        setVoiceInputState(.idle)
     }
 
     private func setVoiceInputState(_ state: VoiceInputState) {
+        defer { refreshChatWarmup() }
         voiceTransientErrorTask?.cancel()
         voiceTransientErrorTask = nil
         voiceInputState = state
@@ -885,7 +904,9 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
-    private func ensureRequiredModelsReadyShared(_ selection: LlmModelSelection) async throws {
+    private func ensureRequiredModelsReadyShared(
+        _ selection: LlmModelSelection, recoverDownloadedModel: Bool
+    ) async throws {
         if isChatUnsupported {
             throw UnsupportedDeviceMemoryError(capability: deviceCapability)
         }
@@ -902,6 +923,10 @@ final class ChatViewModel: ObservableObject {
 
         let taskId = UUID()
         let task = Task {
+            if recoverDownloadedModel {
+                try await self.ensureChatModelReady(selection)
+                return
+            }
             var retryCount = 0
             while true {
                 do {
@@ -953,21 +978,25 @@ final class ChatViewModel: ObservableObject {
         }
 
         let selection = modelSettings.currentSelection()
-        if provider.isModelDownloaded(selection) {
-            isModelDownloaded = true
+        let wasDownloaded = provider.isModelDownloaded(selection)
+        if wasDownloaded && isModelDownloaded {
             modelDownloadSizeBytes = nil
             return
         }
 
+        cancelChatWarmup()
         isDownloading = true
         seedDownloadProgressMemory()
-        modelDownloadLoggedStart = true
-        logger.info("Model download started", details: "model=\(selection.id)")
+        modelDownloadLoggedStart = !wasDownloaded
+        if modelDownloadLoggedStart {
+            logger.info("Model download started", details: "model=\(selection.id)")
+        }
 
         modelDownloadTask?.cancel()
         modelDownloadTask = Task {
             do {
-                try await self.ensureRequiredModelsReadyShared(selection)
+                try await self.ensureRequiredModelsReadyShared(
+                    selection, recoverDownloadedModel: wasDownloaded)
                 self.handleProgress(DownloadProgress(percent: 100, status: "Ready", phase: .ready))
             } catch {
                 if isCancellation(error) {
@@ -981,9 +1010,9 @@ final class ChatViewModel: ObservableObject {
                 }
                 await MainActor.run {
                     self.downloadToast = DownloadToastState(
-                        phase: .errorDownload,
+                        phase: wasDownloaded ? .errorLoad : .errorDownload,
                         percent: nil,
-                        status: self.userFacingModelReadyError(error, wasDownloaded: false),
+                        status: self.userFacingModelReadyError(error, wasDownloaded: wasDownloaded),
                         offerRetryDownload: true
                     )
                     self.isDownloading = false
