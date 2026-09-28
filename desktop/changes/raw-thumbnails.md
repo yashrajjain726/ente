@@ -1,1 +1,1 @@
-- Improved thumbnails for camera RAW photos imported from local files on Windows and Linux.
+- Improved thumbnail support for camera RAW photos on Windows and Linux.
