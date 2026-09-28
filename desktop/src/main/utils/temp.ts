@@ -20,8 +20,10 @@ const randomPrefix = () => {
     return Array(10).fill("").map(randomChar).join("");
 };
 
+const isValidExtension = (extension: string) => /^[a-z0-9]+$/i.test(extension);
+
 export const makeTempFilePath = async (extension?: string) => {
-    if (extension && !/^[a-z0-9]+$/i.test(extension))
+    if (extension && !isValidExtension(extension))
         throw new Error("Invalid temporary file extension");
     const tempDir = await enteTempDirPath();
     const suffix = extension ? "." + extension : "";
@@ -71,7 +73,7 @@ export const makeFileForStreamOrPathOrZipItem = async (
             Array.isArray(item) && detectedExtension === "tif"
                 ? path.extname(item[1]).slice(1)
                 : "";
-        const extension = /^[a-z0-9]+$/i.test(fileNameExtension)
+        const extension = isValidExtension(fileNameExtension)
             ? fileNameExtension
             : detectedExtension;
         filePath = await makeTempFilePath(extension);
