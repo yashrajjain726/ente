@@ -67,11 +67,13 @@ export const makeFileForStreamOrPathOrZipItem = async (
         filePath = item;
         isFileTemporary = false;
     } else {
-        const extension =
-            Array.isArray(item) &&
-            (!detectedExtension || detectedExtension === "tif")
-                ? path.extname(item[1]).slice(1) || detectedExtension
-                : detectedExtension;
+        const fileNameExtension =
+            Array.isArray(item) && detectedExtension === "tif"
+                ? path.extname(item[1]).slice(1)
+                : "";
+        const extension = /^[a-z0-9]+$/i.test(fileNameExtension)
+            ? fileNameExtension
+            : detectedExtension;
         filePath = await makeTempFilePath(extension);
         isFileTemporary = true;
         if (item instanceof ReadableStream) {

@@ -27,9 +27,12 @@ export const renderableImageBlobWeb = async (
 
             if (opts?.convertToJPEG) {
                 try {
+                    const fileNameExtension =
+                        lowercaseExtension(fileName) ?? "";
                     const inputExtension =
-                        extension === "tif"
-                            ? lowercaseExtension(fileName) || extension
+                        extension === "tif" &&
+                        /^[a-z0-9]+$/.test(fileNameExtension)
+                            ? fileNameExtension
                             : extension;
                     return await opts.convertToJPEG(imageBlob, inputExtension);
                 } catch (e) {
