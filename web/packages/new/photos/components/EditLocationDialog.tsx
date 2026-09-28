@@ -435,7 +435,13 @@ const EditableMap: React.FC<EditableMapProps> = ({
         const map = leaflet
             .map(mapContainer, { zoomControl: false })
             .setView(center, zoom);
-        leaflet.tileLayer(urlTemplate, { attribution }).addTo(map);
+        leaflet
+            .tileLayer(urlTemplate, {
+                attribution,
+                // OSM blocks tile requests without a Referer.
+                referrerPolicy: "strict-origin-when-cross-origin",
+            })
+            .addTo(map);
         mapRef.current = map;
 
         if (hasInitialLocation) {
