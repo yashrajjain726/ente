@@ -1,6 +1,6 @@
 use std::io::{Read, Seek, Write};
 
-use crate::export::Role;
+use crate::metadata::Role;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

@@ -92,6 +92,52 @@ fn export_retries_transient_collection_and_file_refresh_failures() {
 }
 
 #[test]
+fn export_local_inventory_failure_preserves_output_and_reports_unknown_totals() {
+    let mut server = mockito::Server::new();
+    let home = TestHome::new();
+    home.seed(&server.url());
+    let key = Key::generate();
+    listing(&mut server, json!([collection(1, "First", &key)]));
+    let (file, bytes) = source(10, &key, b"original", "Photo.jpg");
+    page(&mut server, 1, 0, json!([file]), false).create();
+    let downloaded = download(&mut server, 10, &bytes, 1);
+    let destination = tempfile::tempdir().unwrap();
+    let root = destination.path().join("photos");
+    assert_eq!(run(&home, &root, &[], true)["copies"]["completed"], 1);
+    let published = [
+        "export.json",
+        "First/metadata.json",
+        "First/Photo.jpg",
+        "First/metadata/Photo.jpg.json",
+    ]
+    .map(|path| (path, fs::read(root.join(path)).unwrap()));
+    database(&home)
+        .execute_batch(
+            "UPDATE photos_files SET record='{}' WHERE collection_id=1 AND id=10; UPDATE photos_collections SET files_synced_to=NULL WHERE id=1;",
+        )
+        .unwrap();
+    let refreshed = page(&mut server, 1, 10, json!([]), false)
+        .expect(1)
+        .create();
+    let result = run_failure(&home, &root, &[], "missing field `remote`");
+    assert!(result["files"].is_null());
+    assert!(result["copies"].is_null());
+    assert_eq!(result["failures"], 1);
+    let output = home.run(&["photos", "export", root.to_str().unwrap()]);
+    assert!(failure(&output).contains("missing field `remote`"));
+    assert!(
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .contains("inventory incomplete")
+    );
+    for (path, bytes) in published {
+        assert_eq!(fs::read(root.join(path)).unwrap(), bytes);
+    }
+    refreshed.assert();
+    downloaded.assert();
+}
+
+#[test]
 fn export_snapshot_uses_current_healthy_memberships_and_preserves_raw_bytes() {
     let mut server = mockito::Server::new();
     let home = TestHome::new();
@@ -148,6 +194,27 @@ fn export_snapshot_uses_current_healthy_memberships_and_preserves_raw_bytes() {
         let record = read_json(&root.join(format!("{folder}/metadata/Photo.jpg.json")));
         assert_eq!(record["description"], "winner");
         assert_eq!(record["favorited"], true);
+    }
+    let state = export_database(&home);
+    for table in ["sources", "album_sources"] {
+        for action in ["INSERT", "UPDATE", "DELETE"] {
+            state.execute_batch(&format!(
+                "CREATE TRIGGER unchanged_{table}_{action} AFTER {action} ON {table} BEGIN SELECT RAISE(ABORT,'unchanged snapshot write'); END;",
+            )).unwrap();
+        }
+    }
+    let unchanged = run(&home, &root, &[], false);
+    assert_eq!(unchanged["copies"], result["copies"]);
+    assert_eq!(
+        unchanged["changes"],
+        json!({"exported":0,"metadataUpdated":0,"renamed":0,"retained":0})
+    );
+    for table in ["sources", "album_sources"] {
+        for action in ["INSERT", "UPDATE", "DELETE"] {
+            state
+                .execute_batch(&format!("DROP TRIGGER unchanged_{table}_{action};"))
+                .unwrap();
+        }
     }
     let untouched = root.join("Second/metadata/Photo.jpg.json");
     let before = (
@@ -2204,4 +2271,140 @@ fn export_reports_completion_progress_before_the_command_finishes() {
     fetched.assert();
     url.assert();
     slow.assert();
+}
+
+#[test]
+fn export_only_file_metadata_does_not_break_common_commands() {
+    let mut server = mockito::Server::new();
+    let home = TestHome::new();
+    home.seed(&server.url());
+    let key = Key::generate();
+    listing(
+        &mut server,
+        json!([
+            collection(1, "Affected", &key),
+            collection(2, "Healthy", &key)
+        ]),
+    );
+    let (file, _) = source(10, &key, b"unused", "Original.jpg");
+    let file = public(
+        file,
+        &key,
+        json!({
+            "editedName":"Export metadata.jpg", "cameraMake":17, "cameraModel":17,
+            "uploaderName":17, "mediaType":"broken", "mvi":"broken"
+        }),
+        10,
+    );
+    let (healthy, bytes) = source(20, &key, b"healthy", "Healthy.jpg");
+    page(&mut server, 1, 0, json!([file]), false).create();
+    page(&mut server, 2, 0, json!([healthy]), false).create();
+    let no_download = server
+        .mock("GET", "/files/download/v3/10")
+        .expect(0)
+        .create();
+    let downloaded = download(&mut server, 20, &bytes, 1);
+    let listed = home.json(&["photos", "file", "list"]);
+    assert_eq!(listed.as_array().unwrap().len(), 2);
+    let viewed = home.json(&["photos", "file", "view", "Export metadata.jpg", "--offline"]);
+    assert_eq!(viewed["id"], "10");
+    assert_eq!(viewed["name"], "Export metadata.jpg");
+    let destination = tempfile::tempdir().unwrap();
+    let root = destination.path().join("photos");
+    let output = home.run(&["photos", "export", root.to_str().unwrap(), "--json"]);
+    let error = failure(&output);
+    assert!(
+        error.contains("file:1:10: invalid public file metadata"),
+        "{error}"
+    );
+    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["complete"], false);
+    assert_eq!(
+        result["copies"],
+        json!({"expected":2,"completed":1,"pending":1})
+    );
+    assert_eq!(result["failures"], 1);
+    assert_component(&root, "Healthy", "Healthy.jpg", b"healthy");
+    assert!(!root.join("Affected/Export metadata.jpg").exists());
+    no_download.assert();
+    downloaded.assert();
+}
+
+#[test]
+fn export_only_album_metadata_preserves_common_commands_and_favorites() {
+    for (document, value, cause) in [
+        (
+            "magicMetadata",
+            json!({"order":"broken"}),
+            "invalid album private metadata",
+        ),
+        (
+            "sharedMagicMetadata",
+            json!({"order":"broken","mute":"broken"}),
+            "invalid album sharee metadata",
+        ),
+        (
+            "pubMagicMetadata",
+            json!({"asc":"broken","coverID":"broken","layout":17,"caption":17}),
+            "invalid album public metadata",
+        ),
+    ] {
+        let mut server = mockito::Server::new();
+        let home = TestHome::new();
+        home.seed(&server.url());
+        let key = Key::generate();
+        let mut favorites = collection(5, "Favorites", &key);
+        favorites["type"] = json!("favorites");
+        let encrypted = blob::encrypt_json(&value, &key).unwrap();
+        favorites[document] = json!({"data":b64::encode(&encrypted.encrypted_data),"header":b64::encode(encrypted.decryption_header.as_bytes())});
+        listing(
+            &mut server,
+            json!([collection(1, "Healthy", &key), favorites]),
+        );
+        let (file, bytes) = source(10, &key, b"original", "Photo.jpg");
+        page(&mut server, 1, 0, json!([file]), false).create();
+        let memberships = page(&mut server, 5, 0, json!([file]), false)
+            .expect(1)
+            .create();
+        let downloaded = download(&mut server, 10, &bytes, 1);
+        let albums = home.json(&["photos", "album", "list"]);
+        assert_eq!(albums.as_array().unwrap().len(), 2);
+        let viewed = home.json(&["photos", "album", "view", "Favorites", "--offline"]);
+        assert_eq!(viewed["id"], "5");
+        assert_eq!(viewed["name"], "Favorites");
+        let destination = tempfile::tempdir().unwrap();
+        let root = destination.path().join("photos");
+        let output = home.run(&[
+            "photos",
+            "export",
+            root.to_str().unwrap(),
+            "--album",
+            "Healthy",
+            "--json",
+        ]);
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!String::from_utf8_lossy(&output.stderr).contains("album:5"));
+        let sidecar = root.join("Healthy/metadata/Photo.jpg.json");
+        let mut metadata = read_json(&sidecar);
+        assert_eq!(metadata["favorited"], true);
+        metadata["favorited"] = json!(false);
+        fs::write(&sidecar, serde_json::to_vec(&metadata).unwrap()).unwrap();
+        let output = home.run(&["photos", "export", root.to_str().unwrap(), "--json"]);
+        let error = failure(&output);
+        assert!(error.contains(&format!("album:5: {cause}")), "{error}");
+        assert!(!error.contains("favorite state is incomplete"), "{error}");
+        let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(result["complete"], false);
+        assert_eq!(result["failures"], 1);
+        assert_eq!(result["changes"]["metadataUpdated"], 1);
+        assert_eq!(read_json(&sidecar)["favorited"], true);
+        assert_component(&root, "Healthy", "Photo.jpg", b"original");
+        assert!(!root.join("Favorites").exists());
+        memberships.assert();
+        downloaded.assert();
+    }
 }

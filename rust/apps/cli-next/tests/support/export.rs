@@ -132,6 +132,7 @@ fn export_metadata_updates_and_repairs_preserve_source_values() -> TestResult {
             let record=read_json(&sidecar);
             assert_eq!(record["ente"]["creationTime"],"2023-11-14T22:13:20.123456Z");
             assert_eq!(record["photoTakenTime"]["timestamp"],"1700000000");
+            assert_eq!(record["photoTakenTime"]["formatted"],"Nov 14, 2023, 10:13:20 PM UTC");
             assert_eq!(record["ente"]["components"][0]["size"],original.len());
             assert_eq!(record["ente"]["modificationTime"],"2023-11-14T22:13:21.123456Z");
             assert_eq!(record["modificationTime"]["timestamp"],"1700000001");
@@ -884,10 +885,23 @@ fn export_live_pairs_retry_and_reuse_without_rewriting_unchanged_output() -> Tes
                 })
                 .collect();
             let db = export_database(&home);
-            for table in ["albums", "placements", "components", "json_records", "pending"] {
+            for table in [
+                "albums",
+                "placements",
+                "components",
+                "json_records",
+                "pending",
+                "sources",
+                "album_sources",
+            ] {
                 for action in ["INSERT", "UPDATE", "DELETE"] {
+                    let timing = if ["sources", "album_sources"].contains(&table) {
+                        "AFTER"
+                    } else {
+                        "BEFORE"
+                    };
                     db.execute_batch(&format!(
-                        "CREATE TRIGGER unchanged_{table}_{action} BEFORE {action} ON {table} BEGIN SELECT RAISE(ABORT,'unchanged association write'); END;",
+                        "CREATE TRIGGER unchanged_{table}_{action} {timing} {action} ON {table} BEGIN SELECT RAISE(ABORT,'unchanged association write'); END;",
                     ))?;
                 }
             }
@@ -911,7 +925,15 @@ fn export_live_pairs_retry_and_reuse_without_rewriting_unchanged_output() -> Tes
                 let path = root.join(path);
                 assert_eq!((fs::read(&path)?, fs::metadata(&path)?.modified()?), before);
             }
-            for table in ["albums", "placements", "components", "json_records", "pending"] {
+            for table in [
+                "albums",
+                "placements",
+                "components",
+                "json_records",
+                "pending",
+                "sources",
+                "album_sources",
+            ] {
                 for action in ["INSERT", "UPDATE", "DELETE"] {
                     db.execute_batch(&format!("DROP TRIGGER unchanged_{table}_{action};"))?;
                 }
@@ -946,7 +968,8 @@ fn export_excludes_another_writer_while_downloads_are_running() -> TestResult {
             let other = TestHome::new();
             login(&other, "photos", &email, &["--host", origin]);
             let (album, key) = create_album(origin, &account, "Album", "album").await;
-            for name in ["First.jpg", "Second.jpg"] {
+            let names = ["First.jpg", "Second.jpg", "Third.jpg", "Fourth.jpg"];
+            for name in names {
                 upload_fixture(
                     origin,
                     &account,
@@ -960,6 +983,7 @@ fn export_excludes_another_writer_while_downloads_are_running() -> TestResult {
             let destination = tempfile::tempdir()?;
             let root = destination.path().join("photos");
             let held = objects.hold_reads(0);
+            let reads = objects.reads();
             let child = ExportChild::spawn(&mut home.command(&[
                 "photos",
                 "export",
@@ -969,6 +993,8 @@ fn export_excludes_another_writer_while_downloads_are_running() -> TestResult {
                 "--json",
             ]))?;
             held.wait_for(2);
+            std::thread::sleep(Duration::from_millis(500));
+            assert_eq!(objects.reads() - reads, 2);
             let second = ExportChild::spawn(&mut other.command(&[
                 "photos",
                 "export",
@@ -978,8 +1004,10 @@ fn export_excludes_another_writer_while_downloads_are_running() -> TestResult {
             assert!(failure(&second.wait_with_output()?).contains("another writer"));
             drop(held);
             let result: Value = serde_json::from_slice(&success(child.wait_with_output()?).stdout)?;
-            assert_eq!(result["copies"]["completed"], 2);
-            assert_eq!(objects.peak_reads(), 2);
+            assert_eq!(result["copies"]["completed"], 4);
+            for name in names {
+                assert_eq!(fs::read(root.join("Album").join(name))?, name.as_bytes());
+            }
             Ok(())
         })
     })

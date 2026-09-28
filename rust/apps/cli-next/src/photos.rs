@@ -162,12 +162,18 @@ async fn file(
                 .filter(|p| !p.as_os_str().is_empty())
                 .unwrap_or(Path::new("."));
             let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
-            files::download(session, &entry.file, || {
-                let file = temporary.as_file_mut();
-                file.set_len(0)?;
-                file.rewind()?;
-                file.try_clone()
-            })
+            files::download(
+                session,
+                entry.file.id,
+                &entry.file.key,
+                &entry.file.header,
+                || {
+                    let file = temporary.as_file_mut();
+                    file.set_len(0)?;
+                    file.rewind()?;
+                    file.try_clone()
+                },
+            )
             .await?;
             temporary.as_file().sync_all()?;
             let bytes = temporary.as_file().metadata()?.len();

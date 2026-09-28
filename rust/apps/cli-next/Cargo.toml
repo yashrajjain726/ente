@@ -17,7 +17,7 @@ ente-accounts.workspace = true
 ente-collections.workspace = true
 ente-core.workspace = true
 ente-photos.workspace = true
-icu_casemap.workspace = true
+ente-photos-export.workspace = true
 keyring = { workspace = true, features = ["apple-native", "windows-native", "linux-native-sync-persistent", "crypto-rust"] }
 reqwest.workspace = true
 rusqlite = { workspace = true, features = ["bundled-sqlcipher"] }
@@ -26,7 +26,6 @@ serde_json.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
-unicode-normalization.workspace = true
 url.workspace = true
 uuid = { workspace = true, features = ["serde", "v4"] }
 zeroize.workspace = true

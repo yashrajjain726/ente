@@ -112,9 +112,9 @@ pub fn set_time(path: &Path, micros: i64) -> Result<Properties> {
     Properties::read(path)
 }
 
-pub fn sync_parent(path: &Path) -> Result<()> {
+pub fn sync_parent(_path: &Path) -> Result<()> {
     #[cfg(unix)]
-    if let Some(parent) = path.parent() {
+    if let Some(parent) = _path.parent() {
         File::open(parent)?.sync_all()?;
     }
     Ok(())

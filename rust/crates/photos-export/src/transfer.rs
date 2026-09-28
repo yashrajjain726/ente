@@ -3,12 +3,10 @@ use std::{
     io::{Seek, SeekFrom},
 };
 
+use crate::{metadata::Role, snapshot::FileSnapshot};
 use anyhow::{Context, Result, ensure};
 use ente_core::{Session, b64, crypto::hash};
-use ente_photos::{
-    export::Role,
-    files::{self, Kind},
-};
+use ente_photos::files;
 use rusqlite::{OptionalExtension, params};
 
 use super::{
@@ -33,8 +31,8 @@ pub struct Prepared {
     pub observed: Vec<(i64, Vec<(Role, Properties)>)>,
 }
 
-pub fn roles(file: &files::File) -> Vec<Role> {
-    if file.kind == Kind::LivePhoto {
+pub fn roles(file: &FileSnapshot) -> Vec<Role> {
+    if file.kind == "livephoto" {
         vec![Role::Image, Role::Video]
     } else {
         vec![Role::Original]
@@ -44,7 +42,7 @@ pub fn roles(file: &files::File) -> Vec<Role> {
 pub fn verify(
     run: &Run<'_>,
     component: &Component,
-    file: &files::File,
+    file: &FileSnapshot,
     signature: &str,
 ) -> Result<Option<Properties>> {
     let path = run.path(&component.location)?;
@@ -68,7 +66,7 @@ pub fn verify(
     Ok(Some(properties))
 }
 
-pub async fn prepare(run: &Run<'_>, session: &Session, file: &files::File) -> Result<Prepared> {
+pub async fn prepare(run: &Run<'_>, session: &Session, file: &FileSnapshot) -> Result<Prepared> {
     let signature = signature(file)?;
     let roles = roles(file);
     let mut observed = Vec::new();
@@ -78,7 +76,6 @@ pub async fn prepare(run: &Run<'_>, session: &Session, file: &files::File) -> Re
         run.check_cancel()?;
         let album: Option<i64> = store::lock(run.store)?
             .db
-            .connection()
             .query_row(
                 "SELECT album FROM desired_files WHERE file=?1 AND album>?2 AND failure IS NULL ORDER BY album LIMIT 1",
                 params![file.id, after],
@@ -139,7 +136,6 @@ pub async fn prepare(run: &Run<'_>, session: &Session, file: &files::File) -> Re
         }
         let next: Option<(i64, String)> = store::lock(run.store)?
             .db
-            .connection()
             .query_row(
                 "SELECT rowid,id FROM placements WHERE file=?1 AND rowid<?2 ORDER BY rowid DESC LIMIT 1",
                 params![file.id, before],
@@ -197,7 +193,6 @@ pub async fn prepare(run: &Run<'_>, session: &Session, file: &files::File) -> Re
     let (folder, album, temporary, output) = loop {
         let album: Option<i64> = store::lock(run.store)?
             .db
-            .connection()
             .query_row(
                 "SELECT album FROM desired_files WHERE file=?1 AND album>?2 AND failure IS NULL ORDER BY album LIMIT 1",
                 params![file.id, after],
@@ -224,7 +219,7 @@ pub async fn prepare(run: &Run<'_>, session: &Session, file: &files::File) -> Re
     drop(output);
     let path = run.path(&temporary)?;
     let mut cancel = run.cancel.clone();
-    let download = files::download(session, file, || {
+    let download = files::download(session, file.id, &file.key, &file.header, || {
         let mut output = File::options().read(true).write(true).open(&path)?;
         output.set_len(0)?;
         output.seek(SeekFrom::Start(0))?;
@@ -232,9 +227,9 @@ pub async fn prepare(run: &Run<'_>, session: &Session, file: &files::File) -> Re
     });
     let writer = tokio::select! { result=download => result?, _=cancel.changed() => return Err(super::Cancelled.into()) };
     let (archive, size, hash) = writer.finish()?;
-    let components = if file.kind == Kind::LivePhoto {
+    let components = if file.kind == "livephoto" {
         let mut temporaries = Vec::new();
-        let extracted = ente_photos::live_photo::extract(archive, |role, extension| {
+        let extracted = crate::live_photo::extract(archive, |role, extension| {
             let (temporary, file) = run
                 .temporary(&folder, album, Some(file.id))
                 .map_err(std::io::Error::other)?;
@@ -287,7 +282,7 @@ pub async fn prepare(run: &Run<'_>, session: &Session, file: &files::File) -> Re
         observed,
     })
 }
-pub fn signature(file: &files::File) -> Result<String> {
+pub fn signature(file: &FileSnapshot) -> Result<String> {
     let mut bytes = file.header.as_bytes().to_vec();
     bytes.extend_from_slice(file.hash.as_deref().unwrap_or_default().as_bytes());
     Ok(b64::encode(&hash::hash(
@@ -297,7 +292,7 @@ pub fn signature(file: &files::File) -> Result<String> {
     )?))
 }
 
-pub fn expected_hash<'a>(file: &'a files::File, role: &Role) -> Option<&'a str> {
+pub fn expected_hash<'a>(file: &'a FileSnapshot, role: &Role) -> Option<&'a str> {
     let hash = file.hash.as_deref()?;
     match role {
         Role::Original => Some(hash),

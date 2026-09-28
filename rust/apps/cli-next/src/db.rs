@@ -10,6 +10,9 @@ const MIGRATIONS: &[&str] = &[replica::SCHEMA];
 
 pub fn open(account_dir: &Path, key: &DbKey, create: bool) -> Result<Db> {
     let connection = connect(&account_dir.join("data.db"), key, create)?;
+    connection.execute_batch(
+        "PRAGMA foreign_keys = ON; PRAGMA temp_store = MEMORY; PRAGMA journal_mode = WAL;",
+    )?;
     let mut db = Db::new(connection);
     db.migrate(MIGRATIONS)?;
     Ok(db)
@@ -37,8 +40,5 @@ pub fn connect(path: &Path, key: &DbKey, create: bool) -> Result<Connection> {
             row.get::<_, i64>(0)
         })
         .context("cannot open the encrypted database")?;
-    connection.execute_batch(
-        "PRAGMA foreign_keys = ON; PRAGMA temp_store = MEMORY; PRAGMA journal_mode = WAL;",
-    )?;
     Ok(connection)
 }

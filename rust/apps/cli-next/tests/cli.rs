@@ -231,7 +231,12 @@ fn vault_schema_version_is_checked_after_decryption() {
     home.seed("http://localhost:8080");
     home.write_vault_document(&json!({"schema_version": 2, "state": Value::Null}));
     let original = fs::read(home.dir.path().join("vault.json")).unwrap();
-    assert!(failure(&home.run(&["account", "list"])).contains("unsupported CLI vault schema"));
+    let error = failure(&home.run(&["account", "list"]));
+    assert!(error.contains("unsupported CLI vault schema 2; this build supports 1."));
+    assert!(error.contains(&format!(
+        "To start fresh, move {} aside, then log in again.",
+        home.dir.path().canonicalize().unwrap().join("vault.json").display(),
+    )));
     let output = home
         .command(&["account", "list"])
         .env(

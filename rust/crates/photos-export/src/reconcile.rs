@@ -6,8 +6,8 @@ use std::{
     sync::Mutex,
 };
 
+use crate::{metadata::Role, snapshot::FileSnapshot};
 use anyhow::{Context, Result, ensure};
-use ente_photos::{export::Role, files};
 use rusqlite::{OptionalExtension, params};
 use serde_json::Value;
 use tokio::sync::watch;
@@ -26,6 +26,7 @@ pub struct Run<'a> {
     pub root: &'a Path,
     pub store: &'a Mutex<Store>,
     pub cancel: &'a watch::Receiver<bool>,
+    pub report: &'a (dyn Fn(&str) + Sync),
 }
 
 impl Run<'_> {
@@ -80,7 +81,6 @@ impl Run<'_> {
         fs::remove(&self.path(location)?)?;
         store::lock(self.store)?
             .db
-            .connection()
             .execute("DELETE FROM temporaries WHERE name=?1", [&location.name])?;
         Ok(())
     }
@@ -90,7 +90,7 @@ impl Run<'_> {
             let store = store::lock(self.store)?;
             super::record_outcome(&store, unit, error)?;
         }
-        eprintln!("{unit}: {error:#}");
+        (self.report)(&format!("{unit}: {error:#}"));
         Ok(())
     }
 
@@ -101,7 +101,7 @@ impl Run<'_> {
         );
         self.report(&unit, &error)?;
         if file.is_none() {
-            store::lock(self.store)?.db.connection().execute(
+            store::lock(self.store)?.db.execute(
                 "UPDATE desired_albums SET failure=?1 WHERE id=?2",
                 params![error.to_string(), album],
             )?;
@@ -109,7 +109,6 @@ impl Run<'_> {
             loop {
                 let next: Option<i64> = store::lock(self.store)?
                     .db
-                    .connection()
                     .query_row(
                         "SELECT file FROM desired_files WHERE album=?1 AND file>?2 ORDER BY file LIMIT 1",
                         params![album, after],
@@ -121,7 +120,7 @@ impl Run<'_> {
                 self.report(&format!("file:{album}:{file}"), &error)?;
             }
         }
-        store::lock(self.store)?.db.connection().execute(
+        store::lock(self.store)?.db.execute(
             "UPDATE desired_files SET failure=?1 WHERE album=?2 AND (?3 IS NULL OR file=?3)",
             params![error.to_string(), album, file],
         )?;
@@ -136,7 +135,6 @@ impl Run<'_> {
         loop {
             let next: Option<i64> = store::lock(self.store)?
                 .db
-                .connection()
                 .query_row(
                     "SELECT album FROM desired_files WHERE file=?1 AND album>?2 ORDER BY album LIMIT 1",
                     params![file, after],
@@ -147,7 +145,7 @@ impl Run<'_> {
             after = album;
             self.report(&format!("file:{album}:{file}"), &error)?;
         }
-        store::lock(self.store)?.db.connection().execute(
+        store::lock(self.store)?.db.execute(
             "UPDATE desired_files SET failure=?1 WHERE file=?2",
             params![error.to_string(), file],
         )?;
@@ -165,7 +163,7 @@ impl Run<'_> {
     ) -> Result<()> {
         self.check_cancel()?;
         let store = store::lock(self.store)?;
-        let transaction = store.db.connection().unchecked_transaction()?;
+        let transaction = store.db.unchecked_transaction()?;
         let published = !store.components(&target.owner)?.is_empty();
         for (role, value) in snapshots {
             let previous = store.json_record(&target.owner, role.as_ref())?;
@@ -227,7 +225,7 @@ impl Run<'_> {
             None
         };
         let store = store::lock(self.store)?;
-        let transaction = store.db.connection().unchecked_transaction()?;
+        let transaction = store.db.unchecked_transaction()?;
         match output {
             Output::Media {
                 role,
@@ -272,7 +270,6 @@ impl Run<'_> {
         if let Some(Action::Publish { temporary, .. }) = &target.action {
             store
                 .db
-                .connection()
                 .execute("DELETE FROM temporaries WHERE name=?1", [&temporary.name])?;
         }
         target.action = None;
@@ -302,7 +299,6 @@ impl Run<'_> {
                     } else if !directory_exists(&destination)? {
                         let unrepairable: bool = store::lock(self.store)?
                             .db
-                            .connection()
                             .query_row(
                                 "SELECT EXISTS(SELECT 1 FROM placements p WHERE p.album=?1 AND p.retained=0 AND NOT EXISTS(SELECT 1 FROM desired_files f WHERE f.album=p.album AND f.file=p.file AND f.failure IS NULL))",
                                 [target.album],
@@ -334,7 +330,7 @@ impl Run<'_> {
                     }
                 }
                 let store = store::lock(self.store)?;
-                let transaction = store.db.connection().unchecked_transaction()?;
+                let transaction = store.db.unchecked_transaction()?;
                 store.save_album(&Album {
                     key: target.owner.clone(),
                     id: target.album,
@@ -410,7 +406,7 @@ impl Run<'_> {
                 }
                 fs::sync_move(&from, &to)?;
                 let store = store::lock(self.store)?;
-                let transaction = store.db.connection().unchecked_transaction()?;
+                let transaction = store.db.unchecked_transaction()?;
                 let mut component = store
                     .components(&target.owner)?
                     .into_iter()
@@ -427,7 +423,7 @@ impl Run<'_> {
             Action::Remove { location, role } => {
                 fs::remove(&self.path(&location)?)?;
                 let store = store::lock(self.store)?;
-                let transaction = store.db.connection().unchecked_transaction()?;
+                let transaction = store.db.unchecked_transaction()?;
                 let mut record = store
                     .json_record(&target.owner, role.as_ref())?
                     .context("missing removed JSON record")?;
@@ -618,7 +614,6 @@ impl Run<'_> {
                     let store = store::lock(self.store)?;
                     store
                         .db
-                        .connection()
                         .query_row(
                             "SELECT p.owner,p.album,p.file FROM pending p JOIN desired_albums a ON a.id=p.album WHERE p.owner>?1 AND (p.file IS NULL)=?2 AND a.selected=1 AND a.ready=1 AND a.failure IS NULL AND NOT EXISTS(SELECT 1 FROM desired_files f WHERE f.album=p.album AND f.file=p.file AND f.failure IS NOT NULL) ORDER BY p.owner LIMIT 1",
                             params![after, albums],
@@ -646,17 +641,15 @@ impl Run<'_> {
         }
         {
             let store = store::lock(self.store)?;
-            let transaction = store.db.connection().unchecked_transaction()?;
+            let transaction = store.db.unchecked_transaction()?;
             store
                 .db
-                .connection()
                 .execute(
                     "DELETE FROM pending WHERE file IS NULL AND action='null' AND album IN (SELECT id FROM desired_albums WHERE selected=1 AND ready=1 AND failure IS NULL) AND ((retained=0 AND album IN (SELECT id FROM desired_albums WHERE present=0)) OR (retained=1 AND NOT EXISTS(SELECT 1 FROM albums WHERE key=pending.owner) AND NOT EXISTS(SELECT 1 FROM placements p WHERE p.album=pending.album AND p.retained=0 AND NOT EXISTS(SELECT 1 FROM desired_files f WHERE f.album=p.album AND f.file=p.file))))",
                     [],
                 )?;
             store
                 .db
-                .connection()
                 .execute(
                     "DELETE FROM json_records WHERE folder IS NULL AND NOT EXISTS(SELECT 1 FROM albums WHERE key=json_records.owner) AND NOT EXISTS(SELECT 1 FROM components WHERE placement=json_records.owner) AND NOT EXISTS(SELECT 1 FROM pending WHERE owner=json_records.owner)",
                     [],
@@ -673,7 +666,6 @@ impl Run<'_> {
                 let store = store::lock(self.store)?;
                 store
                     .db
-                    .connection()
                     .query_row(
                         "SELECT t.name,t.folder,t.album,t.file FROM temporaries t JOIN desired_albums a ON a.id=t.album WHERE t.name>?1 AND (?2 IS NULL OR t.file=?2) AND a.selected=1 ORDER BY t.name LIMIT 1",
                         params![after, file],
@@ -699,7 +691,6 @@ impl Run<'_> {
                     let store = store::lock(self.store)?;
                     let owner: Option<String> = store
                         .db
-                        .connection()
                         .query_row(
                             "SELECT owner FROM pending WHERE json_extract(action,'$.Publish.temporary.name')=?1",
                             [&temporary.location.name],
@@ -712,7 +703,7 @@ impl Run<'_> {
                         .flatten()
                 };
                 if let Some(mut pending) = pending {
-                    let selected: bool = store::lock(self.store)?.db.connection().query_row(
+                    let selected: bool = store::lock(self.store)?.db.query_row(
                         "SELECT selected FROM desired_albums WHERE id=?1",
                         [pending.album],
                         |r| r.get(0),
@@ -728,7 +719,7 @@ impl Run<'_> {
             })();
             if let Err(error) = result {
                 if let Some(file) = temporary.file {
-                    let selected: bool = store::lock(self.store)?.db.connection().query_row(
+                    let selected: bool = store::lock(self.store)?.db.query_row(
                         "SELECT EXISTS(SELECT 1 FROM desired_files WHERE file=?1)",
                         [file],
                         |r| r.get(0),
@@ -757,7 +748,7 @@ impl Run<'_> {
                 return Ok(pending);
             }
         }
-        let transaction = store.db.connection().unchecked_transaction()?;
+        let transaction = store.db.unchecked_transaction()?;
         let parent = if retained { "Trash" } else { "" };
         let names = if let Some(existing) = &existing
             && (retained || existing.name == name)
@@ -846,7 +837,6 @@ impl Run<'_> {
                 let store = store::lock(self.store)?;
                 store
                     .db
-                    .connection()
                     .execute(
                         "INSERT INTO events(placement,renamed) SELECT id,1 FROM placements WHERE album=?1 AND retained=0 ON CONFLICT(placement) DO UPDATE SET renamed=1",
                         [album],
@@ -873,7 +863,6 @@ impl Run<'_> {
         loop {
             let source: Option<(i64, String)> = store::lock(self.store)?
                 .db
-                .connection()
                 .query_row(
                     "SELECT a.id,s.record FROM desired_albums a JOIN album_sources s ON s.id=a.id WHERE a.id>?1 AND a.selected=1 AND a.ready=1 AND a.failure IS NULL AND a.present=1 ORDER BY a.id LIMIT 1",
                     [after],
@@ -886,9 +875,9 @@ impl Run<'_> {
             after = id;
             let source: AlbumSource = serde_json::from_str(&source)?;
             for field in &source.warnings {
-                eprintln!(
+                (self.report)(&format!(
                     "album {id}: unfamiliar metadata field {field:?}; exporting supported fields"
-                );
+                ));
             }
             if let Err(error) = self.maintain_album(id, &source.name, false, source.metadata) {
                 self.block(id, None, error)?;
@@ -902,7 +891,7 @@ impl Run<'_> {
     fn file_target(
         &self,
         album: &Album,
-        file: &files::File,
+        file: &FileSnapshot,
         prepared: &transfer::Prepared,
     ) -> Result<Pending> {
         let store = store::lock(self.store)?;
@@ -949,7 +938,7 @@ impl Run<'_> {
             let same_folder = previous.folder == album.key;
             if same_folder
                 && previous.name == file.name
-                && previous.kind == file.kind.name()
+                && previous.kind == file.kind.as_str()
                 && compatible(&previous.names)
             {
                 return Ok(previous);
@@ -960,12 +949,12 @@ impl Run<'_> {
             .map(|component| component.location.name.clone())
             .collect();
         let unchanged = existing.as_ref().is_some_and(|placement| {
-            placement.name == file.name && placement.kind == file.kind.name()
+            placement.name == file.name && placement.kind == file.kind.as_str()
         }) && components
             .iter()
             .all(|component| component.location.folder == album.key)
             && compatible(&existing_names);
-        let transaction = store.db.connection().unchecked_transaction()?;
+        let transaction = store.db.unchecked_transaction()?;
         let names = if unchanged {
             existing_names
         } else {
@@ -973,7 +962,7 @@ impl Run<'_> {
                 &store,
                 &album.key,
                 &file.name,
-                file.kind.name(),
+                file.kind.as_str(),
                 if roles.len() == 2 {
                     Some((&extensions[0], &extensions[1]))
                 } else {
@@ -988,7 +977,7 @@ impl Run<'_> {
             file: Some(file.id),
             retained: false,
             name: file.name.clone(),
-            kind: file.kind.name().into(),
+            kind: file.kind.clone(),
             folder: album.key.clone(),
             names,
             action: None,
@@ -1002,13 +991,12 @@ impl Run<'_> {
         Ok(target)
     }
 
-    pub async fn file(&self, session: &ente_core::Session, file: files::File) -> Result<()> {
+    pub async fn file(&self, session: &ente_core::Session, file: FileSnapshot) -> Result<()> {
         let mut prepared = transfer::prepare(self, session, &file).await?;
         let mut after = 0;
         loop {
             let album: Option<i64> = store::lock(self.store)?
                 .db
-                .connection()
                 .query_row(
                     "SELECT album FROM desired_files WHERE file=?1 AND album>?2 AND failure IS NULL ORDER BY album LIMIT 1",
                     params![file.id, after],
@@ -1039,17 +1027,16 @@ impl Run<'_> {
             }
         }
         for field in &file.warnings {
-            eprintln!(
+            (self.report)(&format!(
                 "file {}: unfamiliar metadata field {field:?}; exporting supported fields",
                 file.id
-            );
+            ));
         }
         after = 0;
         loop {
             self.check_cancel()?;
             let next: Option<(i64, bool)> = store::lock(self.store)?
                 .db
-                .connection()
                 .query_row(
                     "SELECT album,favorited FROM desired_files WHERE file=?1 AND album>?2 AND failure IS NULL ORDER BY album LIMIT 1",
                     params![file.id, after],
@@ -1089,7 +1076,7 @@ impl Run<'_> {
 
     fn placement(
         &self,
-        file: &files::File,
+        file: &FileSnapshot,
         prepared: &mut transfer::Prepared,
         album_id: i64,
         favorited: bool,
@@ -1128,7 +1115,7 @@ impl Run<'_> {
                         .context("missing completed original")?;
                     (component.size, component.hash.clone())
                 };
-                Ok(ente_photos::export::Component {
+                Ok(crate::metadata::Component {
                     role,
                     path: name.clone(),
                     size,
@@ -1142,7 +1129,7 @@ impl Run<'_> {
             .map(|(index, component)| {
                 Ok((
                     Some(component.role.clone()),
-                    ente_photos::export::file(file, &intended, index, favorited)?,
+                    crate::metadata::publish(&file.metadata, &intended, index, favorited)?,
                 ))
             })
             .collect::<Result<_>>()?;
@@ -1185,7 +1172,7 @@ impl Run<'_> {
             let changed = self.json_changed(previous.as_ref(), &location, &json)?;
             sidecars.push((location, json, changed, previous));
         }
-        let intended_time = file.modified_at_micros.unwrap_or(file.created_at_micros);
+        let intended_time = file.intended_time;
         let mut wrote_media = false;
         let mut renamed = false;
         for component in &intended {
@@ -1288,7 +1275,7 @@ impl Run<'_> {
             }
         }
         let store = store::lock(self.store)?;
-        let transaction = store.db.connection().unchecked_transaction()?;
+        let transaction = store.db.unchecked_transaction()?;
         if existing
             .as_ref()
             .is_some_and(|previous| previous.name != target.name || previous.kind != target.kind)
@@ -1296,7 +1283,7 @@ impl Run<'_> {
             store.save_placement(&target.placement()?)?;
         }
         store.clear_pending(&target.owner)?;
-        store.db.connection().execute(
+        store.db.execute(
             "UPDATE desired_files SET completed=1 WHERE album=?1 AND file=?2",
             params![album_id, file.id],
         )?;
@@ -1317,7 +1304,6 @@ impl Run<'_> {
 fn event(store: &Store, placement: &str, name: &str) -> Result<()> {
     store
         .db
-        .connection()
         .execute(
             &format!(
                 "INSERT INTO events(placement,{name}) VALUES(?1,1) ON CONFLICT(placement) DO UPDATE SET {name}=1",
@@ -1367,7 +1353,7 @@ impl Run<'_> {
         let metadata = store::lock(self.store)?
             .json_record(&placement.id, Some(&template.role))?
             .context("missing retained metadata snapshot")?;
-        let layout: Vec<ente_photos::export::Component> =
+        let layout: Vec<crate::metadata::Component> =
             serde_json::from_value(metadata.value["ente"]["components"].clone())?;
         let extensions = if placement.kind == "livephoto" {
             Some((
@@ -1395,7 +1381,7 @@ impl Run<'_> {
         };
         let mut target = {
             let store = store::lock(self.store)?;
-            let transaction = store.db.connection().unchecked_transaction()?;
+            let transaction = store.db.unchecked_transaction()?;
             let names = names::allocate(
                 &store,
                 &album.key,
@@ -1445,7 +1431,7 @@ impl Run<'_> {
             };
             let mut value = previous.value;
             value["title"] = Value::String(component.location.name.clone());
-            let mut layout: Vec<ente_photos::export::Component> =
+            let mut layout: Vec<crate::metadata::Component> =
                 serde_json::from_value(value["ente"]["components"].clone())?;
             for identity in &mut layout {
                 identity.path = target_component(target, &identity.role)?.into();
@@ -1466,7 +1452,7 @@ impl Run<'_> {
             )?;
         }
         let store = store::lock(self.store)?;
-        let transaction = store.db.connection().unchecked_transaction()?;
+        let transaction = store.db.unchecked_transaction()?;
         store.save_placement(&target.placement()?)?;
         store.clear_pending(&target.owner)?;
         event(&store, &target.owner, "retained")?;
@@ -1482,7 +1468,6 @@ impl Run<'_> {
                 let store = store::lock(self.store)?;
                 store
                     .db
-                    .connection()
                     .query_row(
                         "SELECT p.id,p.album,p.file,p.retained,p.name,p.kind FROM placements p JOIN desired_albums a ON a.id=p.album WHERE p.id>?1 AND p.retained=0 AND a.selected=1 AND a.ready=1 AND a.failure IS NULL AND NOT EXISTS(SELECT 1 FROM desired_files f WHERE f.album=p.album AND f.file=p.file) AND NOT EXISTS(SELECT 1 FROM outcomes WHERE unit='file:'||p.album||':'||p.file) ORDER BY p.id LIMIT 1",
                         [&after],
@@ -1501,17 +1486,15 @@ impl Run<'_> {
         }
         {
             let store = store::lock(self.store)?;
-            let transaction = store.db.connection().unchecked_transaction()?;
+            let transaction = store.db.unchecked_transaction()?;
             store
                 .db
-                .connection()
                 .execute(
                     "DELETE FROM pending WHERE file IS NOT NULL AND action='null' AND album IN (SELECT id FROM desired_albums WHERE selected=1 AND ready=1 AND failure IS NULL) AND NOT EXISTS(SELECT 1 FROM placements WHERE id=pending.owner) AND NOT EXISTS(SELECT 1 FROM desired_files WHERE album=pending.album AND file=pending.file)",
                     [],
                 )?;
             store
                 .db
-                .connection()
                 .execute(
                     "DELETE FROM json_records WHERE folder IS NULL AND NOT EXISTS(SELECT 1 FROM albums WHERE key=json_records.owner) AND NOT EXISTS(SELECT 1 FROM components WHERE placement=json_records.owner) AND NOT EXISTS(SELECT 1 FROM pending WHERE owner=json_records.owner)",
                     [],
@@ -1523,7 +1506,6 @@ impl Run<'_> {
             self.check_cancel()?;
             let id: Option<i64> = store::lock(self.store)?
                 .db
-                .connection()
                 .query_row(
                     "SELECT id FROM desired_albums WHERE id>?1 AND selected=1 AND ready=1 AND failure IS NULL AND present=0 ORDER BY id LIMIT 1",
                     [after],
@@ -1548,7 +1530,7 @@ impl Run<'_> {
             store.clear_pending(&format!("active:{id}"))?;
             return Ok(());
         };
-        let incomplete: bool = store::lock(self.store)?.db.connection().query_row(
+        let incomplete: bool = store::lock(self.store)?.db.query_row(
             "SELECT EXISTS(SELECT 1 FROM placements WHERE album=?1 AND retained=0) OR EXISTS(SELECT 1 FROM pending WHERE album=?1 AND file IS NOT NULL)",
             [id],
             |r| r.get(0),
@@ -1578,10 +1560,9 @@ impl Run<'_> {
             }
         }
         let store = store::lock(self.store)?;
-        let transaction = store.db.connection().unchecked_transaction()?;
+        let transaction = store.db.unchecked_transaction()?;
         store
             .db
-            .connection()
             .execute(
                 "DELETE FROM albums WHERE key=?1 AND NOT EXISTS(SELECT 1 FROM temporaries WHERE folder=?1)",
                 [&active.key],

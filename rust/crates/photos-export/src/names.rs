@@ -131,13 +131,13 @@ pub fn available(
 ) -> Result<bool> {
     for name in names {
         let occupied: bool = if kind == "album" {
-            store.db.connection().query_row(
+            store.db.query_row(
                 "SELECT EXISTS(SELECT 1 FROM albums WHERE parent=?1 AND folded=?2 AND key<>?3 UNION ALL SELECT 1 FROM pending WHERE folder=?1 AND folded1=?2 AND kind='album' AND owner<>?3)",
                 params![folder, folded(name), owner],
                 |r| r.get(0),
             )?
         } else {
-            store.db.connection().query_row(
+            store.db.query_row(
                 "SELECT EXISTS(SELECT 1 FROM components c JOIN placements p ON p.id=c.placement WHERE c.folder=?1 AND c.folded=?2 AND c.placement<>?3 UNION ALL SELECT 1 FROM components c JOIN placements p ON p.id=c.placement WHERE c.folder=?1 AND c.stem=?4 AND c.placement<>?3 AND NOT(p.kind=?5 AND p.kind IN ('image','video')) UNION ALL SELECT 1 FROM json_records j JOIN placements p ON p.id=j.owner WHERE j.folder=?1 AND j.folded=?2 AND j.owner<>?3 UNION ALL SELECT 1 FROM json_records j JOIN placements p ON p.id=j.owner WHERE j.folder=?1 AND j.stem=?4 AND j.owner<>?3 AND NOT(p.kind=?5 AND p.kind IN ('image','video')) UNION ALL SELECT 1 FROM pending WHERE folder=?1 AND folded1=?2 AND owner<>?3 UNION ALL SELECT 1 FROM pending WHERE folder=?1 AND folded2=?2 AND owner<>?3 UNION ALL SELECT 1 FROM pending WHERE folder=?1 AND stem1=?4 AND owner<>?3 AND NOT(kind=?5 AND kind IN ('image','video')) UNION ALL SELECT 1 FROM pending WHERE folder=?1 AND stem2=?4 AND owner<>?3 AND NOT(kind=?5 AND kind IN ('image','video')))",
                 params![
                     folder,

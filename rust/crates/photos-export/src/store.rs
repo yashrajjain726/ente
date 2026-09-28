@@ -1,25 +1,20 @@
 use std::{
-    path::{Path, PathBuf},
+    path::Path,
     sync::{Mutex, MutexGuard},
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use anyhow::{Context, Result, ensure};
-use ente_core::crypto::hash;
-use ente_photos::{collections::Collection, export::Role, files::File};
-use rusqlite::{OptionalExtension, Row, params};
+use ente_photos::{collections::Collection, source::Documents};
+use rusqlite::{Connection, OptionalExtension, Row, TransactionBehavior, params};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
 use super::names;
-use crate::{
-    db, home,
-    replica::{AlbumRecord, read_json},
-    vault::DbKey,
-};
+use crate::{AdoptionRequired, CollectionEntry, metadata::Role, snapshot::FileSnapshot};
 
 pub struct Store {
-    pub db: crate::core_db::Db,
+    pub db: Connection,
 }
 
 pub fn lock(store: &Mutex<Store>) -> Result<MutexGuard<'_, Store>> {
@@ -107,8 +102,8 @@ impl Component {
         })
     }
 
-    pub fn portable(&self) -> ente_photos::export::Component {
-        ente_photos::export::Component {
+    pub fn portable(&self) -> crate::metadata::Component {
+        crate::metadata::Component {
             role: self.role.clone(),
             path: self.location.name.clone(),
             size: self.size,
@@ -311,24 +306,26 @@ pub enum Action {
 }
 
 impl Store {
-    pub fn path(account_home: &Path, destination: &Path) -> Result<PathBuf> {
-        let bytes = destination.as_os_str().as_encoded_bytes();
-        let name: String = hash::hash(bytes, Some(32), None)?
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect();
-        Ok(account_home.join("exports").join(format!("{name}.db")))
-    }
-
-    pub fn open(path: &Path, key: &DbKey, destination: &Path, create: bool) -> Result<Self> {
-        if create {
-            home::create(path.parent().context("export DB has no parent")?)?;
+    pub fn open(mut db: Connection, destination: &Path) -> Result<Self> {
+        db.busy_timeout(std::time::Duration::from_secs(5))?;
+        db.execute_batch(
+            "PRAGMA foreign_keys = ON; PRAGMA temp_store = MEMORY; PRAGMA journal_mode = WAL;",
+        )?;
+        let transaction = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let current: i64 =
+            transaction.pragma_query_value(None, "user_version", |row| row.get(0))?;
+        ensure!(
+            current <= 1,
+            "database version {current} is newer than this build supports (1)"
+        );
+        if current == 0 {
+            transaction.execute_batch(SCHEMA)?;
+            transaction.pragma_update(None, "user_version", 1)?;
+            transaction.commit()?;
+        } else {
+            drop(transaction);
         }
-        let mut db = crate::core_db::Db::new(db::connect(path, key, create)?);
-        if create {
-            db.migrate(&[SCHEMA])?;
-        }
-        let connection = db.connection();
+        let connection = &db;
         let existing: Option<Vec<u8>> = connection
             .query_row("SELECT destination FROM export WHERE id=1", [], |r| {
                 r.get(0)
@@ -337,7 +334,7 @@ impl Store {
         if let Some(existing) = existing {
             ensure!(
                 existing == destination.as_os_str().as_encoded_bytes(),
-                "destination association does not match; use --adopt"
+                AdoptionRequired("destination association does not match")
             );
         } else {
             connection.execute(
@@ -351,7 +348,6 @@ impl Store {
     pub fn album(&self, id: i64, retained: bool) -> Result<Option<Album>> {
         Ok(self
             .db
-            .connection()
             .query_row(
                 "SELECT key,id,retained,name,path FROM albums WHERE id=?1 AND retained=?2 ORDER BY rowid LIMIT 1",
                 params![id, retained],
@@ -361,7 +357,7 @@ impl Store {
     }
 
     pub fn folder(&self, key: &str) -> Result<Album> {
-        Ok(self.db.connection().query_row(
+        Ok(self.db.query_row(
             "SELECT key,id,retained,name,path FROM albums WHERE key=?1",
             [key],
             Album::read,
@@ -378,7 +374,7 @@ impl Store {
 
     pub fn save_album(&self, album: &Album) -> Result<()> {
         let (parent, name) = album.path.rsplit_once('/').unwrap_or(("", &album.path));
-        self.db.connection().execute(
+        self.db.execute(
             "INSERT INTO albums VALUES(?1,?2,?3,?4,?5,?6,?7) ON CONFLICT(key) DO UPDATE SET name=excluded.name,path=excluded.path,parent=excluded.parent,folded=excluded.folded WHERE albums.name<>excluded.name OR albums.path<>excluded.path",
             params![
                 album.key,
@@ -396,7 +392,6 @@ impl Store {
     pub fn placement(&self, album: i64, file: i64) -> Result<Option<Placement>> {
         Ok(self
             .db
-            .connection()
             .query_row(
                 "SELECT id,album,file,retained,name,kind FROM placements WHERE album=?1 AND file=?2 AND retained=0",
                 params![album, file],
@@ -406,7 +401,7 @@ impl Store {
     }
 
     pub fn save_placement(&self, placement: &Placement) -> Result<()> {
-        self.db.connection().execute(
+        self.db.execute(
             "INSERT INTO placements VALUES(?1,?2,?3,?4,?5,?6) ON CONFLICT(id) DO UPDATE SET retained=excluded.retained,name=excluded.name,kind=excluded.kind WHERE placements.retained<>excluded.retained OR placements.name<>excluded.name OR placements.kind<>excluded.kind",
             params![
                 placement.id,
@@ -421,7 +416,7 @@ impl Store {
     }
 
     pub fn components(&self, owner: &str) -> Result<Vec<Component>> {
-        let mut query = self.db.connection().prepare(
+        let mut query = self.db.prepare(
             "SELECT placement,role,folder,name,size,hash,signature,properties,intended_time FROM components WHERE placement=?1 ORDER BY role",
         )?;
         Ok(query
@@ -430,7 +425,7 @@ impl Store {
     }
 
     pub fn save_component(&self, component: &Component) -> Result<()> {
-        self.db.connection().execute(
+        self.db.execute(
             "INSERT INTO components VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11) ON CONFLICT(placement,role) DO UPDATE SET folder=excluded.folder,name=excluded.name,folded=excluded.folded,stem=excluded.stem,size=excluded.size,hash=excluded.hash,signature=excluded.signature,properties=excluded.properties,intended_time=excluded.intended_time WHERE components.folder<>excluded.folder OR components.name<>excluded.name OR components.size<>excluded.size OR components.hash<>excluded.hash OR components.signature IS NOT excluded.signature OR components.properties<>excluded.properties OR components.intended_time IS NOT excluded.intended_time",
             params![
                 component.placement,
@@ -452,7 +447,6 @@ impl Store {
     pub fn json_record(&self, owner: &str, role: Option<&Role>) -> Result<Option<JsonRecord>> {
         Ok(self
             .db
-            .connection()
             .query_row(
                 "SELECT owner,role,folder,name,value,hash,properties FROM json_records WHERE owner=?1 AND role=?2",
                 params![owner, role.map_or("", Role::name)],
@@ -466,7 +460,7 @@ impl Store {
         let media = location
             .and_then(|location| location.name.strip_prefix("metadata/"))
             .and_then(|name| name.strip_suffix(".json"));
-        self.db.connection().execute(
+        self.db.execute(
             "INSERT INTO json_records VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9) ON CONFLICT(owner,role) DO UPDATE SET folder=excluded.folder,name=excluded.name,folded=excluded.folded,stem=excluded.stem,value=excluded.value,hash=excluded.hash,properties=excluded.properties WHERE json_records.folder IS NOT excluded.folder OR json_records.name IS NOT excluded.name OR json_records.value<>excluded.value OR json_records.hash IS NOT excluded.hash OR json_records.properties<>excluded.properties",
             params![
                 record.owner,
@@ -486,7 +480,6 @@ impl Store {
     pub fn pending(&self, owner: &str) -> Result<Option<Pending>> {
         Ok(self
             .db
-            .connection()
             .query_row(
                 "SELECT owner,album,file,retained,name,kind,folder,name1,name2,action FROM pending WHERE owner=?1",
                 [owner],
@@ -498,7 +491,6 @@ impl Store {
     pub fn pending_file(&self, album: i64, file: i64) -> Result<Option<Pending>> {
         Ok(self
             .db
-            .connection()
             .query_row(
                 "SELECT owner,album,file,retained,name,kind,folder,name1,name2,action FROM pending WHERE album=?1 AND file=?2 ORDER BY retained DESC LIMIT 1",
                 params![album, file],
@@ -510,7 +502,7 @@ impl Store {
     pub fn save_pending(&self, pending: &Pending) -> Result<()> {
         let first = &pending.names[0];
         let second = pending.names.get(1);
-        self.db.connection().execute(
+        self.db.execute(
             "INSERT INTO pending VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14) ON CONFLICT(owner) DO UPDATE SET retained=excluded.retained,name=excluded.name,kind=excluded.kind,folder=excluded.folder,name1=excluded.name1,name2=excluded.name2,folded1=excluded.folded1,folded2=excluded.folded2,stem1=excluded.stem1,stem2=excluded.stem2,action=excluded.action",
             params![
                 pending.owner,
@@ -534,10 +526,8 @@ impl Store {
 
     pub fn clear_pending(&self, owner: &str) -> Result<()> {
         self.db
-            .connection()
             .execute("DELETE FROM pending WHERE owner=?1", [owner])?;
         self.db
-            .connection()
             .execute(
                 "DELETE FROM json_records WHERE owner=?1 AND folder IS NULL AND NOT EXISTS(SELECT 1 FROM components WHERE placement=?1)",
                 [owner],
@@ -552,7 +542,6 @@ impl Store {
     ) -> Result<Option<T>> {
         let text: Option<String> = self
             .db
-            .connection()
             .query_row(sql, parameters, |r| r.get(0))
             .optional()?;
         text.map(|text| serde_json::from_str(&text).map_err(Into::into))
@@ -560,7 +549,7 @@ impl Store {
     }
 
     pub fn temporary(&self, temporary: &Temporary) -> Result<()> {
-        self.db.connection().execute(
+        self.db.execute(
             "INSERT INTO temporaries VALUES(?1,?2,?3,?4)",
             params![
                 temporary.location.name,
@@ -572,35 +561,39 @@ impl Store {
         Ok(())
     }
     pub fn reset_desired(&self) -> Result<()> {
-        self.db.connection().execute_batch(RUN_SCHEMA)?;
+        self.db.execute_batch(RUN_SCHEMA)?;
         Ok(())
     }
 
-    pub fn desired_album(&self, record: &AlbumRecord, user_id: i64) -> Result<()> {
-        let name = record.album(user_id).ok().map(|a| a.name);
-        let favorites = record.remote.kind == "favorites" && record.remote.owner.id == user_id;
-        self.db.connection().execute(
+    pub fn desired_album(&self, entry: &CollectionEntry) -> Result<()> {
+        self.db.execute(
             "INSERT INTO desired_albums(id,name,present,favorites) VALUES(?1,?2,1,?3) ON CONFLICT(id) DO UPDATE SET name=excluded.name,present=1,favorites=excluded.favorites",
-            params![record.remote.id, name, favorites],
+            params![entry.id, entry.name, entry.favorites],
         )?;
         Ok(())
     }
 
-    pub fn snapshot_album(&self, album: &Collection) -> Result<()> {
+    pub fn snapshot_album(
+        &self,
+        album: &Collection,
+        documents: &Documents,
+        user_id: i64,
+    ) -> Result<()> {
+        let (metadata, warnings) = crate::metadata::album(album, documents, user_id)?;
         let source = AlbumSource {
             name: album.name.clone(),
-            metadata: ente_photos::export::album(album),
-            warnings: album.warnings.clone(),
+            metadata,
+            warnings,
         };
-        self.db.connection().execute(
+        self.db.execute(
             "INSERT INTO album_sources VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET record=excluded.record WHERE album_sources.record<>excluded.record",
             params![album.id, serde_json::to_string(&source)?],
         )?;
         Ok(())
     }
 
-    pub fn snapshot_file(&self, file: &File) -> Result<()> {
-        self.db.connection().execute(
+    pub fn snapshot_file(&self, file: &FileSnapshot) -> Result<()> {
+        self.db.execute(
             "INSERT INTO sources VALUES(?1,?2) ON CONFLICT(file) DO UPDATE SET record=excluded.record WHERE sources.record<>excluded.record",
             params![file.id, serde_json::to_string(file)?],
         )?;
@@ -646,3 +639,10 @@ CREATE TEMP TABLE favorites (file INTEGER PRIMARY KEY);
 CREATE TEMP TABLE outcomes (unit TEXT PRIMARY KEY, conflict INTEGER NOT NULL);
 CREATE TEMP TABLE events (placement TEXT PRIMARY KEY, exported INTEGER NOT NULL DEFAULT 0, metadata_updated INTEGER NOT NULL DEFAULT 0, renamed INTEGER NOT NULL DEFAULT 0, retained INTEGER NOT NULL DEFAULT 0);
 ";
+
+fn read_json<T: DeserializeOwned>(row: &Row<'_>, column: usize) -> rusqlite::Result<T> {
+    let text: String = row.get(column)?;
+    serde_json::from_str(&text).map_err(|e| {
+        rusqlite::Error::FromSqlConversionFailure(column, rusqlite::types::Type::Text, Box::new(e))
+    })
+}

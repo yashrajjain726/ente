@@ -19,8 +19,6 @@ use crate::{TestResult, net::LOCAL_HOST};
 #[derive(Default)]
 pub struct ObjectStoreControl {
     reads: AtomicUsize,
-    active: AtomicUsize,
-    peak: AtomicUsize,
     interrupted: AtomicUsize,
     held: Mutex<Option<Arc<ReadGate>>>,
 }
@@ -77,9 +75,6 @@ impl ObjectStoreControl {
 
     pub fn reads(&self) -> usize {
         self.reads.load(Ordering::SeqCst)
-    }
-    pub fn peak_reads(&self) -> usize {
-        self.peak.load(Ordering::SeqCst)
     }
     pub fn interrupt_reads(&self, count: usize) {
         self.interrupted.store(count, Ordering::SeqCst);
@@ -215,40 +210,33 @@ fn handle(stream: TcpStream, root: &Path, control: &ObjectStoreControl) -> TestR
             {
                 return Ok(());
             }
-            let active = control.active.fetch_add(1, Ordering::SeqCst) + 1;
-            control.peak.fetch_max(active, Ordering::SeqCst);
-            let result = (|| {
-                respond(input.get_mut(), "200 OK", file.metadata()?.len())?;
-                let gate = control
-                    .held
-                    .lock()
-                    .unwrap_or_else(PoisonError::into_inner)
-                    .clone();
-                if let Some(gate) = gate
-                    && file.metadata()?.len() >= gate.minimum_size
-                {
-                    let mut state = gate.state.lock().unwrap_or_else(PoisonError::into_inner);
-                    state.0 += 1;
-                    gate.changed.notify_all();
-                    while !state.1 {
-                        state = gate
-                            .changed
-                            .wait(state)
-                            .unwrap_or_else(PoisonError::into_inner);
-                    }
+            respond(input.get_mut(), "200 OK", file.metadata()?.len())?;
+            let gate = control
+                .held
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .clone();
+            if let Some(gate) = gate
+                && file.metadata()?.len() >= gate.minimum_size
+            {
+                let mut state = gate.state.lock().unwrap_or_else(PoisonError::into_inner);
+                state.0 += 1;
+                gate.changed.notify_all();
+                while !state.1 {
+                    state = gate
+                        .changed
+                        .wait(state)
+                        .unwrap_or_else(PoisonError::into_inner);
                 }
-                let mut buffer = vec![0; 64 * 1024];
-                loop {
-                    let read = file.read(&mut buffer)?;
-                    if read == 0 {
-                        break;
-                    }
-                    input.get_mut().write_all(&buffer[..read])?;
+            }
+            let mut buffer = vec![0; 64 * 1024];
+            loop {
+                let read = file.read(&mut buffer)?;
+                if read == 0 {
+                    break;
                 }
-                Ok::<_, io::Error>(())
-            })();
-            control.active.fetch_sub(1, Ordering::SeqCst);
-            result?;
+                input.get_mut().write_all(&buffer[..read])?;
+            }
         }
         _ => respond(input.get_mut(), "405 Method Not Allowed", 0)?,
     }

@@ -1,7 +1,7 @@
 use std::{fs, path::Path};
 
+use crate::metadata::{Component, Role};
 use anyhow::{Context, Result, ensure};
-use ente_photos::export::{Component, Role};
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -13,7 +13,6 @@ use super::{
 pub fn scan(root: &Path, store: &Store) -> Result<()> {
     store
         .db
-        .connection()
         .execute_batch(
             "DELETE FROM components; DELETE FROM json_records; DELETE FROM placements; DELETE FROM albums; DELETE FROM pending; DELETE FROM temporaries;",
         )?;
@@ -208,7 +207,6 @@ fn album(root: &Path, store: &Store, directory: &Path, retained: bool) -> Result
         let existing = if retained {
             let mut query = store
                 .db
-                .connection()
                 .prepare(
                     "SELECT DISTINCT p.id,p.album,p.file,p.retained,p.name,p.kind FROM placements p JOIN components c ON c.placement=p.id WHERE p.album=?1 AND p.file=?2 AND p.retained=1 AND c.folder=?3",
                 )?;

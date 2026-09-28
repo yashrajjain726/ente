@@ -980,6 +980,7 @@ fn export_page_and_recognized_failures_roll_back_together_on_storage_failure() {
     broken["metadata"]["encryptedData"] = json!("broken");
     page(&mut server, 1, 0, json!([good, broken]), false).create();
     let result = run_failure(&home, &root, &[], "fixture storage failure");
+    assert_eq!(result["failures"], 2);
     assert!(result["files"].is_null());
     assert_eq!(
         db.query_row("SELECT count(*) FROM photos_files", [], |r| r

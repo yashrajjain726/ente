@@ -2450,9 +2450,9 @@ dependencies = [
  "ente-collections",
  "ente-core",
  "ente-photos",
+ "ente-photos-export",
  "ente-test-support",
  "futures-util",
- "icu_casemap",
  "keyring",
  "mockito",
  "reqwest 0.12.28",
@@ -2462,7 +2462,6 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
- "unicode-normalization",
  "url",
  "uuid",
  "zeroize",
@@ -2777,7 +2776,6 @@ dependencies = [
 name = "ente-photos"
 version = "0.0.0"
 dependencies = [
- "chrono",
  "ente-assets",
  "ente-collections",
  "ente-core",
@@ -2792,6 +2790,25 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "ente-photos-export"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "ente-collections",
+ "ente-core",
+ "ente-photos",
+ "icu_casemap",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "unicode-normalization",
+ "uuid",
  "zip 8.6.0",
 ]
 

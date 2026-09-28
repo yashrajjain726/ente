@@ -3,7 +3,7 @@ use ente_core::{
     crypto::{self, Header, Key, blob},
     http,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::{
     collections::Visibility,
@@ -12,7 +12,7 @@ use crate::{
 
 pub use ente_collections::client::File as RemoteFile;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct File {
     pub id: i64,
     pub owner_id: i64,
@@ -30,19 +30,11 @@ pub struct File {
     pub width: Option<u32>,
     pub height: Option<u32>,
     pub visibility: Option<Visibility>,
-    pub camera_make: Option<String>,
-    pub camera_model: Option<String>,
-    pub uploader_name: Option<String>,
-    pub panorama: Option<bool>,
-    pub motion_video_offset: Option<u64>,
-    pub warnings: Vec<String>,
-    #[serde(with = "source::key")]
     pub key: Key,
-    #[serde(with = "source::header")]
     pub header: Header,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     Image,
     Video,
@@ -61,7 +53,7 @@ impl Kind {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Location {
     pub latitude: f64,
     pub longitude: f64,
@@ -86,7 +78,9 @@ pub enum Error {
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn download<W: std::io::Write>(
     session: &Session,
-    file: &File,
+    id: i64,
+    key: &Key,
+    header: &Header,
     mut output: impl FnMut() -> std::io::Result<W>,
 ) -> Result<W, Error> {
     use ente_core::crypto::stream::DecryptingWriter;
@@ -99,7 +93,7 @@ pub async fn download<W: std::io::Write>(
                 let output = output?;
                 let signed: DownloadUrl = session
                     .api
-                    .get(&format!("/files/download/v3/{}", file.id))
+                    .get(&format!("/files/download/v3/{id}"))
                     .send()
                     .await?
                     .error_for_code()
@@ -114,7 +108,7 @@ pub async fn download<W: std::io::Write>(
                     .await?
                     .error_for_status()?;
                 let mut body = std::pin::pin!(response.bytes_stream());
-                let mut decryptor = DecryptingWriter::new(&file.header, &file.key, output);
+                let mut decryptor = DecryptingWriter::new(header, key, output);
                 while let Some(chunk) = body.next().await {
                     decryptor.write(&chunk?)?;
                 }
@@ -193,52 +187,6 @@ pub fn interpret(
             latitude,
             longitude,
         });
-    let mut warnings = Vec::new();
-    source::unfamiliar(
-        Some(&documents.original),
-        &[
-            "title",
-            "fileType",
-            "creationTime",
-            "modificationTime",
-            "latitude",
-            "longitude",
-            "hash",
-            "imageHash",
-            "videoHash",
-            "duration",
-            "hasStaticThumbnail",
-            "localID",
-            "deviceFolder",
-            "subType",
-            "version",
-            "exif",
-        ],
-        &mut warnings,
-    );
-    source::unfamiliar(
-        documents.public.as_deref(),
-        &[
-            "editedName",
-            "editedTime",
-            "dateTime",
-            "offsetTime",
-            "caption",
-            "lat",
-            "long",
-            "w",
-            "h",
-            "sv",
-            "cameraMake",
-            "cameraModel",
-            "uploaderName",
-            "mediaType",
-            "mvi",
-            "noThumb",
-        ],
-        &mut warnings,
-    );
-    source::unfamiliar(documents.private.as_deref(), &["visibility"], &mut warnings);
     Ok(File {
         id: remote.id,
         owner_id: remote.owner_id,
@@ -263,16 +211,6 @@ pub fn interpret(
         } else {
             None
         },
-        camera_make: public.camera_make,
-        camera_model: public.camera_model,
-        uploader_name: public.uploader_name,
-        panorama: if kind == Kind::Image {
-            public.media_type.map(|value| value & 1 != 0)
-        } else {
-            None
-        },
-        motion_video_offset: public.mvi,
-        warnings,
         key: Key::from_bytes(*key.as_bytes()),
         header: Header::try_from_slice(&b64::decode(&remote.file.decryption_header)?)?,
     })
@@ -305,11 +243,6 @@ struct PublicMetadata {
     long: Option<f64>,
     w: Option<u32>,
     h: Option<u32>,
-    camera_make: Option<String>,
-    camera_model: Option<String>,
-    uploader_name: Option<String>,
-    media_type: Option<u64>,
-    mvi: Option<u64>,
 }
 
 #[derive(Deserialize)]

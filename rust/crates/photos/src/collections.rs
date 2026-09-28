@@ -1,5 +1,5 @@
 use ente_core::{Session, crypto::Key};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::source::{self, Documents, MetadataError};
 
@@ -14,13 +14,6 @@ pub struct Collection {
     pub visibility: Visibility,
     pub owner_id: i64,
     pub updated_at_micros: i64,
-    pub display_order: Option<i64>,
-    pub muted: Option<bool>,
-    pub ascending: Option<bool>,
-    pub description: Option<String>,
-    pub cover_file_id: Option<i64>,
-    pub layout: Option<String>,
-    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,7 +39,7 @@ impl Kind {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy)]
 pub enum Visibility {
     Visible,
     Archived,
@@ -112,8 +105,6 @@ pub fn interpret(
     )?;
     let shared: ShareeMetadata =
         source::optional(documents.shared.as_deref(), "invalid album sharee metadata")?;
-    let public: PublicMetadata =
-        source::optional(documents.public.as_deref(), "invalid album public metadata")?;
     let kind = match (
         owned.then_some(private.sub_type).flatten().unwrap_or(0),
         remote.kind.as_str(),
@@ -136,22 +127,6 @@ pub fn interpret(
             shared.visibility
         })?
     };
-    let mut warnings = Vec::new();
-    source::unfamiliar(
-        documents.private.as_deref(),
-        &["visibility", "subType", "order"],
-        &mut warnings,
-    );
-    source::unfamiliar(
-        documents.shared.as_deref(),
-        &["visibility", "mute", "order"],
-        &mut warnings,
-    );
-    source::unfamiliar(
-        documents.public.as_deref(),
-        &["asc", "coverID", "layout", "caption"],
-        &mut warnings,
-    );
     Ok(Collection {
         id: remote.id,
         key: Key::from_bytes(*key.as_bytes()),
@@ -165,13 +140,6 @@ pub fn interpret(
         visibility,
         owner_id: remote.owner.id,
         updated_at_micros: remote.updation_time,
-        display_order: if owned { private.order } else { shared.order },
-        muted: (!owned).then_some(shared.mute).flatten(),
-        ascending: public.asc,
-        description: public.caption,
-        cover_file_id: public.cover_id,
-        layout: public.layout,
-        warnings,
     })
 }
 
@@ -180,21 +148,9 @@ pub fn interpret(
 struct PrivateMetadata {
     visibility: Option<u8>,
     sub_type: Option<u8>,
-    order: Option<i64>,
 }
 
 #[derive(Default, Deserialize)]
 struct ShareeMetadata {
     visibility: Option<u8>,
-    order: Option<i64>,
-    mute: Option<bool>,
-}
-
-#[derive(Default, Deserialize)]
-struct PublicMetadata {
-    asc: Option<bool>,
-    #[serde(rename = "coverID")]
-    cover_id: Option<i64>,
-    layout: Option<String>,
-    caption: Option<String>,
 }

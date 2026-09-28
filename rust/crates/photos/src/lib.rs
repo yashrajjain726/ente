@@ -1,6 +1,5 @@
 pub mod collections;
 pub mod db;
-pub mod export;
 pub mod files;
 pub mod location;
 pub mod metadata;
@@ -13,6 +12,3 @@ pub use motion_photo::{
     MotionPhotoError, VideoIndex, extract_motion_video_file_from_path,
     extract_motion_video_from_path, extract_xmp_from_path, get_motion_video_index_from_path,
 };
-
-#[cfg(not(target_arch = "wasm32"))]
-pub mod live_photo;

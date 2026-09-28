@@ -38,6 +38,7 @@ members = [
     "crates/ml",
     "crates/paste",
     "crates/photos",
+    "crates/photos-export",
     "crates/space",
     "crates/test-support",
     "crates/vecdb",
@@ -72,6 +73,7 @@ ente-locker = { path = "crates/locker" }
 ente-ml = { path = "crates/ml" }
 ente-paste = { path = "crates/paste" }
 ente-photos = { path = "crates/photos" }
+ente-photos-export = { path = "crates/photos-export" }
 ente-space = { path = "crates/space" }
 ente-test-support = { path = "crates/test-support" }
 ente-uniffi-log = { path = "bindings/uniffi/log" }

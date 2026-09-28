@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use serde_json::Value;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Documents {
@@ -47,32 +46,6 @@ mod optional_bytes {
     }
 }
 
-pub(crate) mod key {
-    use ente_core::crypto::Key;
-    use serde::{Deserializer, Serializer, de::Error};
-
-    pub fn serialize<S: Serializer>(key: &Key, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&ente_core::b64::encode(key.as_bytes()))
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Key, D::Error> {
-        Key::try_from_slice(&super::bytes::deserialize(deserializer)?).map_err(D::Error::custom)
-    }
-}
-
-pub(crate) mod header {
-    use ente_core::crypto::Header;
-    use serde::{Deserializer, Serializer, de::Error};
-
-    pub fn serialize<S: Serializer>(header: &Header, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&ente_core::b64::encode(header.as_bytes()))
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Header, D::Error> {
-        Header::try_from_slice(&super::bytes::deserialize(deserializer)?).map_err(D::Error::custom)
-    }
-}
-
 #[derive(Debug, thiserror::Error)]
 #[error("{0}")]
 pub struct MetadataError(pub &'static str);
@@ -89,16 +62,4 @@ pub fn optional<T: DeserializeOwned + Default>(
         .map(|bytes| parse(bytes, context))
         .transpose()
         .map(Option::unwrap_or_default)
-}
-
-pub fn unfamiliar(bytes: Option<&[u8]>, known: &[&str], warnings: &mut Vec<String>) {
-    if let Some(bytes) = bytes
-        && let Ok(Value::Object(fields)) = serde_json::from_slice(bytes)
-    {
-        for key in fields.keys() {
-            if !known.contains(&key.as_str()) {
-                warnings.push(key.clone());
-            }
-        }
-    }
 }
