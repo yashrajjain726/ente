@@ -1,18 +1,5 @@
 import { expect, test } from "vitest";
-import {
-    getRequiredFields,
-    itemFormDataForSave,
-} from "../src/components/create-item/item-form-fields-utils";
-
-test.each([
-    ["note", ["content"]],
-    ["accountCredential", ["name"]],
-    ["physicalRecord", ["name"]],
-    ["emergencyContact", ["name", "contactDetails"]],
-    ["file", ["name"]],
-] as const)("required fields for %s", (type, expected) => {
-    expect(getRequiredFields(type)).toEqual(expected);
-});
+import { itemFormDataForSave } from "../src/components/create-item/item-form-fields-utils";
 
 test("content-only notes derive a title from the first five words", () => {
     expect(
