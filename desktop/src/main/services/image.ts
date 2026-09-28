@@ -10,8 +10,9 @@ import {
 
 export const convertToJPEG = async (
     imageData: Uint8Array,
+    extension: string,
 ): Promise<Uint8Array<ArrayBuffer>> => {
-    const inputFilePath = await makeTempFilePath();
+    const inputFilePath = await makeTempFilePath(extension);
     const outputFilePath = await makeTempFilePath("jpeg");
 
     const command = convertToJPEGCommand(inputFilePath, outputFilePath);

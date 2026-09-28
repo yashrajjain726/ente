@@ -74,7 +74,10 @@ export interface Electron {
         findFiles: (folderPath: string) => Promise<string[]>;
     };
 
-    convertToJPEG: (imageData: Uint8Array) => Promise<Uint8Array<ArrayBuffer>>;
+    convertToJPEG: (
+        imageData: Uint8Array,
+        extension: string,
+    ) => Promise<Uint8Array<ArrayBuffer>>;
     generateImageThumbnail: (
         pathOrZipItem: string | ZipItem,
         maxDimension: number,
