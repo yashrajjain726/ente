@@ -55,6 +55,7 @@ interface FileForStreamOrPathOrZipItem {
 
 export const makeFileForStreamOrPathOrZipItem = async (
     item: ReadableStream | string | ZipItem,
+    detectedExtension?: string,
 ): Promise<FileForStreamOrPathOrZipItem> => {
     let filePath: string;
     let isFileTemporary: boolean;
@@ -66,9 +67,11 @@ export const makeFileForStreamOrPathOrZipItem = async (
         filePath = item;
         isFileTemporary = false;
     } else {
-        const extension = Array.isArray(item)
-            ? path.extname(item[1]).slice(1)
-            : undefined;
+        const extension =
+            Array.isArray(item) &&
+            (!detectedExtension || detectedExtension === "tif")
+                ? path.extname(item[1]).slice(1) || detectedExtension
+                : detectedExtension;
         filePath = await makeTempFilePath(extension);
         isFileTemporary = true;
         if (item instanceof ReadableStream) {

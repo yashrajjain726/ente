@@ -229,7 +229,14 @@ export const attachIPCHandlers = () => {
             pathOrZipItem: string | ZipItem,
             maxDimension: number,
             maxSize: number,
-        ) => generateImageThumbnail(pathOrZipItem, maxDimension, maxSize),
+            extension: string,
+        ) =>
+            generateImageThumbnail(
+                pathOrZipItem,
+                maxDimension,
+                maxSize,
+                extension,
+            ),
     );
 
     handle(

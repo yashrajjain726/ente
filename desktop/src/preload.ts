@@ -169,12 +169,14 @@ const generateImageThumbnail = (
     pathOrZipItem: string | ZipItem,
     maxDimension: number,
     maxSize: number,
+    extension: string,
 ): Promise<Uint8Array<ArrayBuffer>> =>
     ipcRenderer.invoke(
         "generateImageThumbnail",
         pathOrZipItem,
         maxDimension,
         maxSize,
+        extension,
     );
 
 const ffmpegExec = (

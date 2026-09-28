@@ -82,6 +82,7 @@ export interface Electron {
         pathOrZipItem: string | ZipItem,
         maxDimension: number,
         maxSize: number,
+        extension: string,
     ) => Promise<Uint8Array<ArrayBuffer>>;
     ffmpegExec: (
         command: FFmpegCommand,

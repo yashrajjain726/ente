@@ -62,12 +62,13 @@ export const generateImageThumbnail = async (
     pathOrZipItem: string | ZipItem,
     maxDimension: number,
     maxSize: number,
+    extension: string,
 ): Promise<Uint8Array<ArrayBuffer>> => {
     const {
         path: inputFilePath,
         isFileTemporary: isInputFileTemporary,
         writeToTemporaryFile: writeToTemporaryInputFile,
-    } = await makeFileForStreamOrPathOrZipItem(pathOrZipItem);
+    } = await makeFileForStreamOrPathOrZipItem(pathOrZipItem, extension);
 
     const outputFilePath = await makeTempFilePath("jpeg");
 
