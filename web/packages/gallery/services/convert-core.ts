@@ -31,7 +31,7 @@ export const renderableImageBlobWeb = async (
                         lowercaseExtension(fileName) ?? "";
                     const inputExtension =
                         extension === "tif" &&
-                        /^[a-z0-9]+$/.test(fileNameExtension)
+                        /^[a-z0-9]{1,244}$/.test(fileNameExtension)
                             ? fileNameExtension
                             : extension;
                     return await opts.convertToJPEG(imageBlob, inputExtension);

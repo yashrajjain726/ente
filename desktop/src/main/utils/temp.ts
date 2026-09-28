@@ -20,7 +20,8 @@ const randomPrefix = () => {
     return Array(10).fill("").map(randomChar).join("");
 };
 
-const isValidExtension = (extension: string) => /^[a-z0-9]+$/i.test(extension);
+const isValidExtension = (extension: string) =>
+    /^[a-z0-9]{1,244}$/i.test(extension);
 
 export const makeTempFilePath = async (extension?: string) => {
     if (extension && !isValidExtension(extension))
