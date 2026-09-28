@@ -179,6 +179,14 @@ mod tests {
     }
 
     #[test]
+    fn model_namespaces_are_unique() {
+        let mut namespaces = HashSet::new();
+        for model in Model::ALL {
+            assert!(namespaces.insert(model.namespace()));
+        }
+    }
+
+    #[test]
     fn model_paths_are_addressable_by_model() {
         let mut paths = ModelPaths {
             face_detection: "face-detection.onnx".to_string(),
