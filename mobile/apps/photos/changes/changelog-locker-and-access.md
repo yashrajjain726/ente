@@ -1,0 +1,1 @@
+- Open What's new from About or the app version, and discover Ente Locker from the changelog.
