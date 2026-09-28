@@ -198,9 +198,8 @@ final class NotesStore: ObservableObject, ModelMaintenance {
         return hits
     }
 
-    func reload(_ locator: PassageLocator) async throws -> GroundedExcerpt? {
-        guard case .localNote(let collectionId, _, _, _, _) = locator,
-            collections.contains(where: { $0.id == collectionId && $0.eligible })
+    func reload(_ locator: NotePassageLocator) async throws -> GroundedExcerpt? {
+        guard collections.contains(where: { $0.id == locator.collectionId && $0.eligible })
         else { return nil }
         do {
             guard let hit = try await provider.reload(locator) else { return nil }
@@ -208,7 +207,7 @@ final class NotesStore: ObservableObject, ModelMaintenance {
                 selectMixedGroundingCandidates(packHits: [], notesHits: [hit], notesLimit: 1)
             ).first
         } catch NotesError.RebuildRequired {
-            requestRebuild(collectionId)
+            requestRebuild(locator.collectionId)
             return nil
         }
     }

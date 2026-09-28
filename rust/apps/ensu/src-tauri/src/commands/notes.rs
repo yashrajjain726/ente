@@ -682,12 +682,11 @@ impl RetrievalHandle {
 
     pub(crate) fn reload_passage(
         &self,
-        locator: &ente_ensu::retrieval::PassageLocator,
+        locator: &ente_ensu::notes::NotePassageLocator,
     ) -> Result<Option<ente_ensu::notes::NotesSearchHit>, NotesError> {
-        let ente_ensu::retrieval::PassageLocator::LocalNote { collection_id, .. } = locator else {
-            return Ok(None);
-        };
-        self.with_index(collection_id, |index| index.reload_passage(locator))
+        self.with_index(&locator.collection_id, |index| {
+            index.reload_passage(locator)
+        })
     }
 
     fn with_index<T>(

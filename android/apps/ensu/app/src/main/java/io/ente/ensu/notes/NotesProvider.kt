@@ -7,13 +7,13 @@ import android.provider.DocumentsContract
 import android.util.AtomicFile
 import androidx.core.content.FileProvider
 import io.ente.ensu.bindings.LlmContext
+import io.ente.ensu.bindings.NotePassageLocator
 import io.ente.ensu.bindings.NoteSourceReference
 import io.ente.ensu.bindings.NotesCancellation
 import io.ente.ensu.bindings.NotesCollection
 import io.ente.ensu.bindings.NotesException
 import io.ente.ensu.bindings.NotesIndexOptions
 import io.ente.ensu.bindings.NotesProgressCallback
-import io.ente.ensu.bindings.PassageLocator
 import io.ente.ensu.bindings.notesContentRevision
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -132,7 +132,7 @@ class NotesProvider(private val context: Context) {
         handle(id).use { it.search(query) }
     }
 
-    internal suspend fun reload(locator: PassageLocator.LocalNote) = withAccess {
+    internal suspend fun reload(locator: NotePassageLocator) = withAccess {
         registration(locator.collectionId)
         handle(locator.collectionId).use { it.reloadPassage(locator) }
     }

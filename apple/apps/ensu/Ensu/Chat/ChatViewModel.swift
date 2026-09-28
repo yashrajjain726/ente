@@ -1172,20 +1172,14 @@ final class ChatViewModel: ObservableObject {
 
             do {
                 if let turn = followup {
-                    let searched = knowledgeHits
-                    let locators = try await Task.detached {
+                    let locators = try await Task.detached { [searched = knowledgeHits] in
                         try turn.searchWithHistory(searched: searched)
                     }.value
                     try Task.checkCancellation()
                     guard activeGenerationId == generationId else { return }
                     for locator in locators {
-                        do {
-                            if let hit = try await reloadPassage(locator) {
-                                reloaded.append(hit)
-                            }
-                        } catch {
-                            if isCancellation(error) { throw error }
-                            logger.warning("Source reload failed", details: "\(error)")
+                        if let hit = try await reloadPassage(locator) {
+                            reloaded.append(hit)
                         }
                     }
                 }
@@ -1510,12 +1504,18 @@ final class ChatViewModel: ObservableObject {
     }
 
     private func reloadPassage(_ locator: PassageLocator) async throws -> GroundedExcerpt? {
-        switch locator {
-        case .ensuPack:
-            return try await knowledgeProvider.reload(
-                locator, datasets: knowledgeStore.enabledReadyDatasets)
-        case .localNote:
-            return try await notesStore.reload(locator)
+        do {
+            switch locator {
+            case .ensuPack:
+                return try await knowledgeProvider.reload(
+                    locator, datasets: knowledgeStore.enabledReadyDatasets)
+            case .localNote(let note):
+                return try await notesStore.reload(note)
+            }
+        } catch {
+            if isCancellation(error) { throw error }
+            logger.warning("Source reload failed", details: "\(error)")
+            return nil
         }
     }
 

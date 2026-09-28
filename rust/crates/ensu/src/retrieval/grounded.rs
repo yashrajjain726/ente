@@ -21,6 +21,25 @@ pub enum GroundedSource {
     LocalNote { reference: NoteSourceReference },
 }
 
+impl GroundedSource {
+    pub(crate) fn document_key(&self) -> (u8, &str, &str) {
+        match self {
+            Self::LocalNote { reference } => (0, &reference.collection_id, &reference.document_id),
+            Self::EnsuPack { citation } => {
+                let article_url = citation
+                    .source_url
+                    .split_once('#')
+                    .map_or(citation.source_url.as_str(), |(article, _)| article);
+                (1, &citation.dataset_id, article_url)
+            }
+        }
+    }
+
+    pub(crate) fn same_document(&self, other: &Self) -> bool {
+        self.document_key() == other.document_key()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GroundedExcerpt {
     pub locator: super::PassageLocator,
@@ -123,7 +142,7 @@ pub fn select_mixed_grounding_candidates(
             .validate()
             .map_err(|error| RetrievalError::InvalidInput(error.to_string()))?;
         selected.push(GroundedExcerpt {
-            locator: hit.locator.clone(),
+            locator: super::PassageLocator::LocalNote(hit.locator.clone()),
             score: hit.score,
             source: GroundedSource::LocalNote { reference },
             text: hit.text.clone(),
@@ -156,15 +175,20 @@ pub fn build_grounded_prompt_context(
     let footer = format!("\n{END_CONTEXT_SENTINEL}");
     let mut text = header;
     let mut sources = Vec::new();
-    let mut included_passages = Vec::new();
+    let mut included_passages: Vec<super::IncludedPassage> = Vec::new();
     for excerpt in excerpts {
+        if included_passages
+            .iter()
+            .any(|reference| reference.locator == excerpt.locator)
+        {
+            continue;
+        }
         if !excerpt.locator.matches_source(&excerpt.source) {
             return Err(RetrievalError::InvalidInput(
                 "passage locator does not match its source".to_string(),
             ));
         }
-        let label = grounded_label(&excerpt.source)?;
-        let prefix = format!("\n\n# {label}\n");
+        let prefix = grounded_prefix(&excerpt.source)?;
         let reserved = text
             .len()
             .checked_add(prefix.len())
@@ -225,21 +249,22 @@ fn source_sort_key(source: &GroundedSource) -> (u8, &str, &str, &str) {
     }
 }
 
-fn grounded_label(source: &GroundedSource) -> Result<String, RetrievalError> {
-    match source {
-        GroundedSource::EnsuPack { citation } => Ok(format!(
+fn grounded_prefix(source: &GroundedSource) -> Result<String, RetrievalError> {
+    let label = match source {
+        GroundedSource::EnsuPack { citation } => format!(
             "{} (Ensu Pack · {})",
             normalize_required(&citation.title, "Pack title")?,
             normalize_required(&citation.dataset_label, "Pack label")?
-        )),
+        ),
         GroundedSource::LocalNote { reference } => {
             reference
                 .validate()
                 .map_err(|error| RetrievalError::InvalidInput(error.to_string()))?;
             let title = display_title(&reference.title, reference.section.as_deref())?;
-            Ok(format!("{title} (Your Notes · {})", reference.document_id))
+            format!("{title} (Your Notes · {})", reference.document_id)
         }
-    }
+    };
+    Ok(format!("\n\n# {label}\n"))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -268,13 +293,10 @@ pub(crate) fn build_followup_prompt_context(
     let mut sections = Vec::new();
     let mut used_bytes = text.len() + footer.len();
     let mut sources = Vec::new();
-    let mut included_passages = Vec::new();
+    let mut included_passages: Vec<super::IncludedPassage> = Vec::new();
     let mut packs = 0;
     let mut notes = 0;
     for item in referenced {
-        if included_passages.contains(&item.reference) {
-            continue;
-        }
         if !item.reference.valid_metadata()
             || !item.reference.locator.matches_source(&item.source)
             || item.reference.spans.len() != item.passages.len()
@@ -288,6 +310,17 @@ pub(crate) fn build_followup_prompt_context(
                 return Err(invalid());
             }
         }
+        if let Some(index) = included_passages
+            .iter()
+            .position(|reference| reference.locator == item.reference.locator)
+        {
+            if included_passages[index] != item.reference
+                || !item.source.same_document(&sources[index])
+            {
+                return Err(invalid());
+            }
+            continue;
+        }
         match &item.source {
             GroundedSource::EnsuPack { .. } => packs += 1,
             GroundedSource::LocalNote { .. } => notes += 1,
@@ -295,7 +328,7 @@ pub(crate) fn build_followup_prompt_context(
         if packs > MAX_PACK_HITS || notes > MAX_NOTES_GROUNDING_HITS {
             return Err(invalid());
         }
-        let prefix = format!("\n\n# {}\n", grounded_label(&item.source)?);
+        let prefix = grounded_prefix(&item.source)?;
         let passages = item.passages.join("\n[omitted source text]\n");
         if used_bytes
             .saturating_add(prefix.len())
@@ -309,7 +342,14 @@ pub(crate) fn build_followup_prompt_context(
         sources.push(item.source.clone());
         included_passages.push(item.reference.clone());
     }
-    for item in searched {
+    let mut ordered: Vec<_> = searched.iter().collect();
+    ordered.sort_by_key(|item| {
+        referenced
+            .iter()
+            .position(|old| old.reference.locator == item.locator)
+            .unwrap_or(usize::MAX)
+    });
+    for item in ordered {
         if let Some(index) = included_passages
             .iter()
             .position(|reference| reference.locator == item.locator)
@@ -317,13 +357,12 @@ pub(crate) fn build_followup_prompt_context(
             let reference = &included_passages[index];
             if !item.score.is_finite()
                 || !item.locator.matches_source(&item.source)
+                || !item.source.same_document(&sources[index])
                 || reference.verified_spans(&item.text).is_none()
             {
                 continue;
             }
-            // Fresh search may add text beyond the saved spans, but every old
-            // span must still fit. Keep one source entry for the entire chunk.
-            let prefix = format!("\n\n# {}\n", grounded_label(&sources[index])?);
+            let prefix = grounded_prefix(&sources[index])?;
             let available = max_utf8_bytes - used_bytes + sections[index].len() - prefix.len();
             let cleaned = super::clean_passage_text(&item.text);
             let passage = truncate_utf8(&cleaned, available).trim_end();
@@ -345,7 +384,7 @@ pub(crate) fn build_followup_prompt_context(
         if (is_pack && packs >= MAX_PACK_HITS) || (!is_pack && notes >= MAX_NOTES_GROUNDING_HITS) {
             continue;
         }
-        let prefix = format!("\n\n# {}\n", grounded_label(&item.source)?);
+        let prefix = grounded_prefix(&item.source)?;
         let Some(available) = max_utf8_bytes.checked_sub(used_bytes + prefix.len()) else {
             continue;
         };
@@ -408,7 +447,7 @@ mod tests {
 
     fn note(document_id: &str, score: f32) -> NotesSearchHit {
         NotesSearchHit {
-            locator: crate::retrieval::PassageLocator::LocalNote {
+            locator: crate::notes::NotePassageLocator {
                 collection_id: COLLECTION.to_owned(),
                 document_id: document_id.to_owned(),
                 indexed_revision: "a".repeat(64),
@@ -428,7 +467,7 @@ mod tests {
     #[test]
     fn mismatched_passage_sources_and_text_are_rejected() {
         let mut wrong = select_mixed_grounding_candidates(&[], &[note("one.md", 0.9)], 5).unwrap();
-        wrong[0].locator = note("other.md", 0.9).locator;
+        wrong[0].locator = super::super::PassageLocator::LocalNote(note("other.md", 0.9).locator);
         assert!(build_grounded_prompt_context(&wrong, 6000).is_err());
         let mut old = previous();
         old.passages[0] = "Cafe 🙂".into();
@@ -503,7 +542,7 @@ mod tests {
     }
 
     fn previous() -> ReferencedPassage {
-        let (reference, raw) = super::super::passage_fixture();
+        let (reference, _) = super::super::passage_fixture();
         let source = GroundedSource::LocalNote {
             reference: NoteSourceReference {
                 collection_id: "123e4567-e89b-12d3-a456-426614174000".into(),
@@ -515,7 +554,7 @@ mod tests {
             },
         };
         ReferencedPassage {
-            passages: reference.verified_spans(raw).unwrap(),
+            passages: vec!["Café🙂".into(), "end".into()],
             reference,
             source,
         }
@@ -530,8 +569,8 @@ mod tests {
             text: "UNSUPPLIED source remainder".into(),
         };
         let mut fresh = duplicate.clone();
-        if let super::super::PassageLocator::LocalNote { chunk_index, .. } = &mut fresh.locator {
-            *chunk_index += 1;
+        if let super::super::PassageLocator::LocalNote(locator) = &mut fresh.locator {
+            locator.chunk_index += 1;
         }
         fresh.text = "Fresh café🙂 context".into();
         let full = build_followup_prompt_context(
@@ -548,10 +587,9 @@ mod tests {
         let required = build_followup_prompt_context(std::slice::from_ref(&old), &[], 6000)
             .unwrap()
             .unwrap();
-        for budget in [
-            required.text.len(),
-            required.text.len() + 8,
-            full.text.len() - 1,
+        for (case, budget) in [
+            ("required only", required.text.len()),
+            ("truncated optional passage", full.text.len() - 1),
         ] {
             let packed = build_followup_prompt_context(
                 std::slice::from_ref(&old),
@@ -560,8 +598,8 @@ mod tests {
             )
             .unwrap()
             .unwrap();
-            assert!(packed.text.len() <= budget);
-            assert_eq!(packed.included_passages[0], old.reference);
+            assert!(packed.text.len() <= budget, "{case}");
+            assert_eq!(packed.included_passages[0], old.reference, "{case}");
         }
 
         let raw = super::super::passage_fixture().1;
@@ -580,14 +618,10 @@ mod tests {
         .unwrap();
         assert_eq!(expanded.sources, vec![old.source.clone()]);
         assert_eq!(expanded.included_passages.len(), 1);
-        assert!(
-            expanded
-                .text
-                .contains(&super::super::clean_passage_text(raw))
-        );
+        assert!(expanded.text.contains("Café🙂\nबीच\tend"));
         assert_eq!(
             expanded.included_passages[0].verified_spans(raw).unwrap(),
-            vec![super::super::clean_passage_text(raw)]
+            ["Café🙂\nबीच\tend"]
         );
 
         let mut prefix = old.clone();
@@ -597,7 +631,10 @@ mod tests {
             build_followup_prompt_context(std::slice::from_ref(&prefix), &[], 6000)
                 .unwrap()
                 .unwrap();
-        for budget in required_prefix.text.len()..=expanded.text.len() {
+        for (case, budget) in [
+            ("required prefix only", required_prefix.text.len()),
+            ("truncated expansion", expanded.text.len() - 1),
+        ] {
             let packed = build_followup_prompt_context(
                 std::slice::from_ref(&prefix),
                 std::slice::from_ref(&matching),
@@ -605,11 +642,11 @@ mod tests {
             )
             .unwrap()
             .unwrap();
-            assert!(packed.text.len() <= budget);
-            assert_eq!(packed.included_passages.len(), 1);
+            assert!(packed.text.len() <= budget, "{case}");
+            assert_eq!(packed.included_passages.len(), 1, "{case}");
             let spans = packed.included_passages[0].verified_spans(raw).unwrap();
-            assert!(spans[0].starts_with(&prefix.passages[0]));
-            assert!(packed.text.contains(&spans[0]));
+            assert!(spans[0].starts_with(&prefix.passages[0]), "{case}");
+            assert!(packed.text.contains(&spans[0]), "{case}");
         }
         assert!(build_followup_prompt_context(&[old], &[], required.text.len() - 1).is_err());
     }

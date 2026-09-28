@@ -1,20 +1,31 @@
 use std::collections::{BTreeMap, btree_map::Entry};
 use std::path::Path;
 
+use serde::{Deserialize, Serialize};
+
 use super::manifest::{
     collection_directory, document_storage_id, load_published_manifest, shard_directory,
 };
 use super::shard::{NotesShard, load_and_validate_shard_metadata, load_and_validate_vectors};
 use super::{NotesCollectionReadPin, NotesError, pinned_revision_key, validate_collection_id};
-use crate::retrieval::PassageLocator;
 
 const RELEVANCE_THRESHOLD: f32 = 0.50;
 const MAX_HITS_PER_COLLECTION: usize = 5;
 const MAX_HITS_PER_DOCUMENT: usize = 3;
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotePassageLocator {
+    pub collection_id: String,
+    pub document_id: String,
+    pub indexed_revision: String,
+    pub shard_sha256: String,
+    pub chunk_index: u64,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct NotesSearchHit {
-    pub locator: PassageLocator,
+    pub locator: NotePassageLocator,
     pub collection_id: String,
     pub document_id: String,
     pub revision: String,
@@ -186,18 +197,15 @@ impl NotesCollectionIndex {
 
     pub fn reload_passage(
         &self,
-        locator: &PassageLocator,
+        locator: &NotePassageLocator,
     ) -> Result<Option<NotesSearchHit>, NotesError> {
-        let PassageLocator::LocalNote {
+        let NotePassageLocator {
             collection_id,
             document_id,
             indexed_revision,
             shard_sha256,
             chunk_index,
-        } = locator
-        else {
-            return Ok(None);
-        };
+        } = locator;
         if collection_id != &self.collection_id {
             return Ok(None);
         }
@@ -215,17 +223,8 @@ impl NotesCollectionIndex {
             return Ok(None);
         }
         let shard = self.load_shard(document)?;
-        let chunk = &shard.chunks[chunk_index];
-        Ok(Some(NotesSearchHit {
-            locator: locator.clone(),
-            collection_id: collection_id.clone(),
-            document_id: document_id.clone(),
-            revision: indexed_revision.clone(),
-            score: 0.0,
-            title: shard.title,
-            section: chunk.section.clone(),
-            text: chunk.text.clone(),
-        }))
+        self.passage_hit(document, &shard, chunk_index, 0.0)
+            .map(Some)
     }
 
     pub fn search(&self, query: &[f32]) -> Result<Vec<NotesSearchHit>, NotesError> {
@@ -288,27 +287,37 @@ impl NotesCollectionIndex {
                 Entry::Occupied(entry) => entry.into_mut(),
                 Entry::Vacant(entry) => entry.insert(self.load_shard(document)?),
             };
-            let chunk = shard.chunks.get(candidate.chunk_index).ok_or_else(|| {
-                NotesError::InvalidIndex("selected shard chunk is missing".to_string())
-            })?;
-            hits.push(NotesSearchHit {
-                locator: PassageLocator::LocalNote {
-                    collection_id: self.collection_id.clone(),
-                    document_id: document.document_id.clone(),
-                    indexed_revision: document.revision.clone(),
-                    shard_sha256: document.shard_sha256.clone(),
-                    chunk_index: candidate.chunk_index as u64,
-                },
-                collection_id: self.collection_id.clone(),
-                document_id: document.document_id.clone(),
-                revision: document.revision.clone(),
-                score: candidate.score,
-                title: shard.title.clone(),
-                section: chunk.section.clone(),
-                text: chunk.text.clone(),
-            });
+            hits.push(self.passage_hit(document, shard, candidate.chunk_index, candidate.score)?);
         }
         Ok(hits)
+    }
+
+    fn passage_hit(
+        &self,
+        document: &IndexedDocument,
+        shard: &NotesShard,
+        chunk_index: usize,
+        score: f32,
+    ) -> Result<NotesSearchHit, NotesError> {
+        let chunk = shard.chunks.get(chunk_index).ok_or_else(|| {
+            NotesError::InvalidIndex("selected shard chunk is missing".to_string())
+        })?;
+        Ok(NotesSearchHit {
+            locator: NotePassageLocator {
+                collection_id: self.collection_id.clone(),
+                document_id: document.document_id.clone(),
+                indexed_revision: document.revision.clone(),
+                shard_sha256: document.shard_sha256.clone(),
+                chunk_index: chunk_index as u64,
+            },
+            collection_id: self.collection_id.clone(),
+            document_id: document.document_id.clone(),
+            revision: document.revision.clone(),
+            score,
+            title: shard.title.clone(),
+            section: chunk.section.clone(),
+            text: chunk.text.clone(),
+        })
     }
 }
 
@@ -414,28 +423,19 @@ mod tests {
         assert_ne!(hits[0].locator, hits[1].locator);
         drop(index);
         let index = NotesCollectionIndex::open(temp.path(), COLLECTION_ID.to_string()).unwrap();
-        for hit in &hits {
+        for (hit, chunk) in hits.iter().zip(&doc.chunks) {
             let loaded = index.reload_passage(&hit.locator).unwrap().unwrap();
-            assert_eq!(loaded.text, hit.text);
+            assert_eq!(loaded.text, chunk.text);
             assert_eq!(loaded.locator, hit.locator);
         }
         for field in ["revision", "shard", "chunk", "collection", "document"] {
             let mut wrong = hits[0].locator.clone();
-            if let PassageLocator::LocalNote {
-                indexed_revision,
-                shard_sha256,
-                chunk_index,
-                collection_id,
-                document_id,
-            } = &mut wrong
-            {
-                match field {
-                    "revision" => *indexed_revision = "c".repeat(64),
-                    "shard" => *shard_sha256 = "c".repeat(64),
-                    "chunk" => *chunk_index = u64::MAX,
-                    "collection" => *collection_id = "other".to_string(),
-                    _ => *document_id = "other.md".to_string(),
-                }
+            match field {
+                "revision" => wrong.indexed_revision = "c".repeat(64),
+                "shard" => wrong.shard_sha256 = "c".repeat(64),
+                "chunk" => wrong.chunk_index = u64::MAX,
+                "collection" => wrong.collection_id = "other".to_string(),
+                _ => wrong.document_id = "other.md".to_string(),
             }
             assert!(index.reload_passage(&wrong).unwrap().is_none(), "{field}");
         }

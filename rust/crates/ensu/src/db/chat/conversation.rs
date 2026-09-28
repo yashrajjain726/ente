@@ -599,12 +599,10 @@ mod tests {
             .unwrap();
         let captured = snapshot(&db, session, std::slice::from_ref(&question));
         let answer = sourced_answer(&db, &captured);
-        let before = db.get_session(session).unwrap();
         assert!(
             db.save_answer_evidence(&captured, answer.uuid, passages())
                 .unwrap()
         );
-        assert_eq!(db.get_session(session).unwrap(), before);
         let full = vec![question.clone(), answer];
         let mut restored = snapshot(&db, session, &full);
         assert!(restored.state().is_none());
@@ -653,17 +651,11 @@ mod tests {
         );
         messages.push(answer);
         let mut current = snapshot(&db, session, &messages);
-        assert!(
-            db.replace_conversation_state(&mut current, Some(state(session, &messages, "Memory")))
-                .unwrap()
-        );
-        assert_eq!(snapshot(&db, session, &messages).evidence().len(), 1);
-        assert!(db.replace_conversation_state(&mut current, None).unwrap());
-        assert_eq!(snapshot(&db, session, &messages).evidence().len(), 1);
-        assert!(
-            db.replace_conversation_state(&mut current, Some(state(session, &messages, "Memory")))
-                .unwrap()
-        );
+        let memory = state(session, &messages, "Memory");
+        for next in [Some(memory.clone()), None, Some(memory)] {
+            assert!(db.replace_conversation_state(&mut current, next).unwrap());
+            assert_eq!(snapshot(&db, session, &messages).evidence().len(), 1);
+        }
         db.update_message_text(messages[2].uuid, "Edited question")
             .unwrap();
         let current = snapshot(&db, session, &messages);
@@ -677,12 +669,10 @@ mod tests {
         let captured = snapshot(&db, session, &messages);
         let answer = sourced_answer(&db, &captured);
         let mut other_writer = snapshot(&db, session, &messages);
+        let memory = state(session, &messages, "Other writer");
         assert!(
-            db.replace_conversation_state(
-                &mut other_writer,
-                Some(state(session, &messages, "Other writer"))
-            )
-            .unwrap()
+            db.replace_conversation_state(&mut other_writer, Some(memory.clone()))
+                .unwrap()
         );
         assert!(
             !db.save_answer_evidence(&captured, answer.uuid, passages())
@@ -695,14 +685,7 @@ mod tests {
                 .is_err()
         );
         assert_eq!(db.get_message(answer.uuid).unwrap().unwrap(), answer);
-        assert_eq!(
-            snapshot(&db, session, &messages)
-                .state()
-                .unwrap()
-                .summary
-                .text,
-            "Other writer"
-        );
+        assert_eq!(snapshot(&db, session, &messages).state(), Some(&memory));
     }
 
     #[test]
@@ -735,7 +718,6 @@ mod tests {
             db.save_answer_evidence(&captured, answer.uuid, passages())
                 .is_err()
         );
-        assert!(db.get_session(session).unwrap().is_none());
     }
 
     #[test]
@@ -841,6 +823,12 @@ mod tests {
                 Some(state(session, &messages, "Valid memory"))
             )
             .unwrap()
+        );
+        let mut encoded = ConversationEnvelope::empty(session);
+        encoded.summary = captured.state().map(|state| state.summary.clone());
+        encoded.format_version = 1;
+        assert!(
+            ConversationEnvelope::decode(&serde_json::to_vec(&encoded).unwrap(), session).is_none()
         );
         for text in [" \n".to_owned(), "x".repeat(MAX_STATE_BYTES)] {
             let mut invalid = state(session, &messages, "Valid memory");

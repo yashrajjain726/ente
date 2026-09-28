@@ -559,7 +559,7 @@ internal class ChatStoreActions(
                             } else null
                         }
                     if (!isActive() || stopRequested) {
-                        turn?.cancel()
+                        closeFollowup(turn)
                         return@launch
                     }
                     followup = turn
@@ -575,14 +575,8 @@ internal class ChatStoreActions(
                 return@launch
             } catch (error: Throwable) {
                 if (!isActive() || stopRequested) return@launch
-                logRepository.log(
-                    LogLevel.Warning,
-                    "Unable to prepare source search",
-                    details = error.message,
-                    tag = "Chat",
-                    throwable = error,
-                )
-                if (showFollowupError(error, userMessage.id)) return@launch
+                if (reportFollowupError(error, userMessage.id, "Unable to prepare source search"))
+                    return@launch
             }
             val retrievalQuery = userMessage.text.trim()
             val knowledgeHits =
@@ -652,17 +646,15 @@ internal class ChatStoreActions(
                     return@launch
                 } catch (error: Throwable) {
                     if (!isActive() || stopRequested) return@launch
-                    logRepository.log(
-                        LogLevel.Warning,
-                        "Unable to resolve earlier sources",
-                        details = error.message,
-                        tag = "Chat",
-                        throwable = error,
+                    if (
+                        reportFollowupError(
+                            error,
+                            userMessage.id,
+                            "Unable to resolve earlier sources",
+                        )
                     )
-                    if (showFollowupError(error, userMessage.id)) return@launch
-                    activeFollowup = null
-                    followup?.cancel()
-                    followup?.destroy()
+                        return@launch
+                    closeFollowup(followup)
                     followup = null
                     emptyList()
                 }
@@ -919,15 +911,26 @@ internal class ChatStoreActions(
         }
         generationJob = activeJob
         activeJob.invokeOnCompletion {
-            if (activeFollowup === followup) activeFollowup = null
-            followup?.cancel()
-            followup?.destroy()
+            closeFollowup(followup)
             notesScope.close()
             scope.launch { settleGenerationIfActive(generationToken, sessionId) }
         }
     }
 
-    private fun showFollowupError(error: Throwable, messageId: String): Boolean {
+    private fun closeFollowup(followup: ConversationFollowup?) {
+        if (activeFollowup === followup) activeFollowup = null
+        followup?.cancel()
+        followup?.destroy()
+    }
+
+    private fun reportFollowupError(error: Throwable, messageId: String, detail: String): Boolean {
+        logRepository.log(
+            LogLevel.Warning,
+            detail,
+            details = error.message,
+            tag = "Chat",
+            throwable = error,
+        )
         val message =
             when (error) {
                 is ConversationException.Stale -> "Conversation changed. Retry the message."
@@ -951,7 +954,7 @@ internal class ChatStoreActions(
             when (locator) {
                 is PassageLocator.EnsuPack ->
                     knowledgeProvider.reload(locator, state.value.knowledge.enabledReadyDatasets)
-                is PassageLocator.LocalNote -> notesStore.reload(locator)
+                is PassageLocator.LocalNote -> notesStore.reload(locator.locator)
             }
         } catch (error: kotlinx.coroutines.CancellationException) {
             throw error

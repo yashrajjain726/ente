@@ -3093,10 +3093,9 @@ const Page: React.FC = () => {
                     .text.replaceAll(MEDIA_MARKER, "")
                     .replace(/\[\d+ image attachments? provided\]/gi, "")
                     .trim();
-                const selectedMessages = slicePathUntil(
-                    historyPath,
-                    stopAtMessageUuid,
-                );
+                const conversationPath = useConversationMemory
+                    ? buildConversationPath(allMessages, parentMessage)
+                    : [];
                 let resolutionToken: string | undefined;
                 const remainingKnowledgeBytes = useConversationMemory
                     ? 6000
@@ -3146,20 +3145,15 @@ const Page: React.FC = () => {
 
                 if (
                     useConversationMemory &&
-                    selectedMessages.some((message) => message.sources?.length)
+                    historyPath.some((message) => message.sources?.length)
                 ) {
-                    const selectedPath = selectedMessages.map(
-                        (message) => message.messageUuid,
-                    );
-                    if (selectedPath.at(-1) !== parentMessageUuid)
-                        selectedPath.push(parentMessageUuid);
                     setConversationStatus("Finding sources");
                     try {
                         resolutionToken = await provider.withKnowledgeRetrieval(
                             (cancellationEpoch) =>
                                 resolveDesktopSourceFollowup({
                                     sessionUuid: activeSessionId,
-                                    path: selectedPath,
+                                    path: conversationPath,
                                     question: knowledgeQuery,
                                     enabledStableIds: enabledReadyPackIds,
                                     cancellationEpoch,
@@ -3244,10 +3238,7 @@ const Page: React.FC = () => {
                     const prepared = await prepareDesktopConversation(
                         {
                             sessionUuid: activeSessionId,
-                            path: buildConversationPath(
-                                allMessages,
-                                parentMessage,
-                            ),
+                            path: conversationPath,
                             system: normalSystemPrompt,
                             current: promptText,
                             historyQuery: resolutionToken
@@ -3484,7 +3475,6 @@ const Page: React.FC = () => {
             enabledKnowledgePackIds,
             knowledgePacks,
             loadEnabledKnowledgeCatalogOnce,
-            slicePathUntil,
         ],
     );
 

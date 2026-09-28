@@ -6,9 +6,9 @@ use crate::db::{Message, Sender};
 use crate::retrieval::IncludedPassage;
 
 pub const ENVELOPE_VERSION: u32 = 2;
-pub const MAX_EVIDENCE_ANSWERS: usize = 8;
-pub const MAX_EVIDENCE_BYTES: usize = 12 * 1024;
-pub(crate) use crate::retrieval::MAX_GROUNDING_HITS as MAX_ANSWER_PASSAGES;
+pub(super) const MAX_EVIDENCE_ANSWERS: usize = 8;
+pub(super) const MAX_EVIDENCE_BYTES: usize = 12 * 1024;
+pub(super) use crate::retrieval::MAX_GROUNDING_HITS as MAX_ANSWER_PASSAGES;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnswerEvidence {
@@ -27,10 +27,6 @@ impl AnswerEvidence {
                 history[index].sender == Sender::Other
                     && fingerprint(&history[..=index]) == self.prefix_fingerprint
             })
-    }
-
-    fn valid(&self) -> bool {
-        self.prefix_fingerprint.len() == 64 && valid_answer_passages(&self.passages)
     }
 }
 
@@ -76,16 +72,17 @@ impl ConversationEnvelope {
             .cloned()
             .and_then(|value| serde_json::from_value::<Summary>(value).ok())
             .filter(|summary| validate_summary_text(&summary.text).is_ok());
-        let mut evidence = Vec::new();
+        let mut evidence: Vec<AnswerEvidence> = Vec::new();
         if let Some(entries) = value.get("evidence").and_then(|value| value.as_array())
             && entries.len() <= MAX_EVIDENCE_ANSWERS
         {
             for value in entries {
                 if let Ok(entry) = serde_json::from_value::<AnswerEvidence>(value.clone())
-                    && entry.valid()
-                    && !evidence.iter().any(|old: &AnswerEvidence| {
-                        old.assistant_message_uuid == entry.assistant_message_uuid
-                    })
+                    && entry.prefix_fingerprint.len() == 64
+                    && valid_answer_passages(&entry.passages)
+                    && !evidence
+                        .iter()
+                        .any(|old| old.assistant_message_uuid == entry.assistant_message_uuid)
                 {
                     evidence.push(entry);
                 }

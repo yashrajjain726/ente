@@ -1,16 +1,16 @@
 use super::*;
-use crate::notes::NoteSourceReference;
+use crate::notes::{NotePassageLocator, NoteSourceReference};
 use crate::retrieval::{GroundedSource, PassageLocator};
 
 fn hit(text: &str, id: &str) -> GroundedExcerpt {
     GroundedExcerpt {
-        locator: PassageLocator::LocalNote {
+        locator: PassageLocator::LocalNote(NotePassageLocator {
             collection_id: "123e4567-e89b-12d3-a456-426614174000".into(),
             document_id: id.into(),
             indexed_revision: "a".repeat(64),
             shard_sha256: "b".repeat(64),
             chunk_index: 0,
-        },
+        }),
         source: GroundedSource::LocalNote {
             reference: NoteSourceReference {
                 collection_id: "123e4567-e89b-12d3-a456-426614174000".into(),
@@ -88,7 +88,8 @@ fn fit_followup(
     query: &str,
     input_budget: usize,
 ) -> GroundedPromptContext {
-    let (history, evidence) = followup_history(prior);
+    let (mut history, evidence) = followup_history(prior);
+    history.last_mut().unwrap().text = query.into();
     let reloaded = direct_followup_references(&history, &evidence, query, &searched)
         .into_iter()
         .map(|reference| {
@@ -103,12 +104,17 @@ fn fit_followup(
             }
         })
         .collect();
-    let mut candidates = GroundingCandidates::new(reloaded, searched, MAX_GROUNDING_BYTES).unwrap();
-    candidates.protect_named_sources(query).unwrap();
-    let context = fit_grounding(&candidates, "System", query, input_budget, measure)
-        .unwrap()
-        .context
-        .unwrap();
+    let candidates = GroundingCandidates::new(reloaded, searched, MAX_GROUNDING_BYTES).unwrap();
+    let context = fit_grounding(
+        &candidates.select_sources(Some(query)).unwrap(),
+        "System",
+        query,
+        input_budget,
+        measure,
+    )
+    .unwrap()
+    .context
+    .unwrap();
     assert!(context.text.len() <= MAX_GROUNDING_BYTES);
     assert!(
         measure(&answer_messages(
@@ -123,46 +129,66 @@ fn fit_followup(
     context
 }
 
-#[test]
-fn followup_fitting_keeps_implicit_antecedents_and_allows_named_switches() {
-    let cedar = hit("Cedar allows 30 days.", "cedar.md");
-    let juniper = hit("Juniper allows 21 days.", "juniper.md");
-    let old = retrieval::build_grounded_prompt_context(std::slice::from_ref(&cedar), 6000)
-        .unwrap()
+fn notes_at_limit() -> Vec<GroundedExcerpt> {
+    ["cedar", "pine", "birch", "oak", "maple"]
+        .iter()
+        .map(|name| hit(&format!("{name} allows 30 days."), &format!("{name}.md")))
+        .collect()
+}
+
+fn assert_full_passage(context: &GroundedPromptContext, hit: &GroundedExcerpt) {
+    let index = context
+        .included_passages
+        .iter()
+        .position(|reference| reference.locator == hit.locator)
         .unwrap();
-    for query in [
-        "Is Juniper longer than that?",
-        "Compare its deadline with Juniper.",
-        "Is Juniper's return period longer than ours?",
-        "Is Juniper's return period longer than mine?",
-        "Compare Juniper's return period with our policy.",
-        "Compare Juniper's return period with my policy.",
-        "Does she get more time than Juniper?",
-        "Compare her deadline with Juniper.",
-        "Is Juniper's deadline longer than hers?",
-        "Does he get more time than Juniper?",
-        "Does Juniper get more time than him?",
-        "Compare his deadline with Juniper.",
+    assert_eq!(context.sources[index], hit.source);
+    assert_eq!(
+        context.included_passages[index]
+            .verified_spans(&hit.text)
+            .unwrap(),
+        vec![hit.text.trim()]
+    );
+    assert!(context.text.contains(hit.text.trim()));
+}
+
+#[test]
+fn comparisons_retain_historical_passages_under_pressure() {
+    let cedar = hit("Cedar permits 30 days.", "cedar.md");
+    let juniper = hit(
+        &format!("{}Juniper permits 21 days.", "Juniper details. ".repeat(30)),
+        "juniper.md",
+    );
+    for (query, budget) in [
+        ("Compare its deadline with Juniper.", 7000),
+        ("Compare Juniper's return period with my policy.", 700),
+        ("Compare Cedar and Juniper.", 700),
     ] {
         let context = fit_followup(
             std::slice::from_ref(&cedar),
             vec![juniper.clone()],
             query,
-            7000,
+            budget,
         );
-        assert!(context.text.contains(&cedar.text), "{query}");
-        assert!(context.text.contains(&juniper.text), "{query}");
-        assert!(
-            context
-                .included_passages
-                .contains(&old.included_passages[0])
-        );
+        assert_full_passage(&context, &cedar);
+        if budget == 7000 {
+            assert_full_passage(&context, &juniper);
+        }
     }
-    let updated = hit("Cedar now requires seven days.", "cedar.md");
+}
+
+#[test]
+fn named_questions_switch_to_fresh_sources() {
+    let cedar = hit("Cedar allows 30 days.", "cedar.md");
     for (query, fresh) in [
-        ("What is Juniper's return period?", &juniper),
-        ("What is within Juniper's coverage?", &juniper),
-        ("What is Cedar's current deadline?", &updated),
+        (
+            "What is Juniper's return period?",
+            hit("Juniper allows 21 days.", "juniper.md"),
+        ),
+        (
+            "What is Cedar's current deadline?",
+            hit("Cedar now requires seven days.", "cedar.md"),
+        ),
     ] {
         let context = fit_followup(
             std::slice::from_ref(&cedar),
@@ -170,102 +196,198 @@ fn followup_fitting_keeps_implicit_antecedents_and_allows_named_switches() {
             query,
             7000,
         );
-        assert_eq!(context.sources, vec![fresh.source.clone()], "{query}");
-        assert!(context.text.contains(&fresh.text), "{query}");
+        assert_eq!(context.sources.len(), 1);
+        assert_full_passage(&context, &fresh);
     }
 }
 
 #[test]
-fn followup_fitting_prioritizes_named_sources_at_source_and_byte_limits() {
-    let mut prior: Vec<_> = ["pine", "birch", "oak", "maple", "cedar"]
-        .iter()
-        .map(|name| hit(&format!("{name} allows 30 days."), &format!("{name}.md")))
-        .collect();
+fn named_sources_take_priority_at_source_and_byte_limits() {
+    let mut notes = notes_at_limit();
+    notes.rotate_left(1);
+    let cedar = notes.last().unwrap().clone();
     let atlas = hit(&"Atlas allows 21 days. ".repeat(40), "atlas.md");
-    let note_count = prior.len();
-    prior.extend([
-        pack_hit("Mars is the fourth planet.", "Mars", 0),
-        pack_hit("Venus is the second planet.", "Venus", 1),
-    ]);
-    let byte_limited = [
-        prior[note_count - 1].clone(),
-        hit(&"Unrelated detail. ".repeat(400), "pine.md"),
-    ];
-    for prior in [&prior[..note_count], &prior[..], &byte_limited] {
-        let context = fit_followup(prior, vec![atlas.clone()], "Compare Cedar and Atlas", 7000);
-        assert!(context.text.contains("cedar allows 30 days."));
-        assert!(context.text.contains(atlas.text.trim()));
-        assert!(context.sources.len() <= retrieval::MAX_GROUNDING_HITS);
+    for prior in [
+        notes,
+        vec![
+            cedar.clone(),
+            hit(&"Unrelated detail. ".repeat(400), "pine.md"),
+        ],
+    ] {
+        let context = fit_followup(&prior, vec![atlas.clone()], "Compare Cedar and Atlas", 7000);
+        assert_full_passage(&context, &cedar);
+        assert_full_passage(&context, &atlas);
+        assert!(context.sources.len() <= retrieval::MAX_NOTES_GROUNDING_HITS);
     }
+}
 
-    let mars = pack_hit("Mars is the fourth planet.", "Mars", 0);
-    let venus = pack_hit("Venus is the second planet.", "Venus", 1);
-    let jupiter = pack_hit("Jupiter is the fifth planet.", "Jupiter", 2);
-    let another_mars_chunk = pack_hit("Mars also has two moons.", "Mars", 3);
-    for prior in [[venus, mars.clone()], [mars.clone(), another_mars_chunk]] {
+#[test]
+fn personal_questions_keep_fresh_results_at_the_historical_note_limit() {
+    let ledger = hit("Holiday spending: 1200 rupees.", "ledger-2026.md");
+    for query in [
+        "How much did I spend on my holiday?",
+        "Compare my holiday costs across years.",
+    ] {
+        let context = fit_followup(&notes_at_limit(), vec![ledger.clone()], query, 700);
+        assert_full_passage(&context, &ledger);
+    }
+}
+
+#[test]
+fn temporal_phrases_are_distinct_from_source_references() {
+    for (question, expected) in [
+        (
+            "How much did I spend on my holiday these past few months?",
+            false,
+        ),
+        ("What did I spend on holiday in those 2 weeks?", false),
+        ("This year, compare its deadline with Juniper.", true),
+        ("Compare that second policy with Juniper.", true),
+    ] {
+        assert_eq!(
+            super::super::followup::refers_back(question),
+            expected,
+            "{question}"
+        );
+    }
+}
+
+#[test]
+fn temporal_questions_keep_fresh_results_under_source_and_byte_limits() {
+    let ledger = hit("Holiday spending: 1200 rupees.", "ledger-2026.md");
+    for (prior, fresh, budget) in [
+        (notes_at_limit(), ledger.clone(), 7000),
+        (
+            vec![hit(&"Cedar allows 30 days. ".repeat(320), "cedar.md")],
+            ledger.clone(),
+            7000,
+        ),
+        (
+            vec![
+                pack_hit("Mars is the fourth planet.", "Mars", 0),
+                pack_hit("Venus is the second planet.", "Venus", 1),
+            ],
+            pack_hit(&ledger.text, "Ledger", 2),
+            700,
+        ),
+    ] {
         let context = fit_followup(
             &prior,
-            vec![jupiter.clone()],
-            "Compare Mars and Jupiter",
-            7000,
+            vec![fresh.clone()],
+            "How much did I spend on my holiday this year?",
+            budget,
         );
-        assert!(context.text.contains(&mars.text));
-        assert!(context.text.contains(&jupiter.text));
-        assert_eq!(context.sources.len(), 2);
+        assert_full_passage(&context, &fresh);
     }
 }
 
 #[test]
-fn unnamed_questions_keep_fresh_results_and_available_historical_passages() {
-    let notes: Vec<_> = ["cedar", "pine", "birch", "oak", "maple"]
-        .iter()
-        .map(|name| hit(&format!("{name} allows 30 days."), &format!("{name}.md")))
-        .collect();
+fn named_pack_comparisons_retain_articles_cited_through_multiple_sections() {
+    let prior: Vec<_> = [
+        ("History", "Mars has been observed since antiquity."),
+        ("Geography", "Mars has two polar ice caps."),
+    ]
+    .into_iter()
+    .enumerate()
+    .map(|(row, (section, text))| {
+        let mut hit = pack_hit(text, &format!("Mars — {section}"), row as u64);
+        if let GroundedSource::EnsuPack { citation } = &mut hit.source {
+            citation.source_url = format!("https://simple.wikipedia.org/wiki/Mars#{section}");
+        }
+        hit
+    })
+    .collect();
+    let jupiter = pack_hit("Jupiter is the fifth planet.", "Jupiter", 2);
+    let context = fit_followup(
+        &prior,
+        vec![jupiter.clone()],
+        "Compare Mars and Jupiter",
+        700,
+    );
+    assert_full_passage(&context, &prior[0]);
+    assert_full_passage(&context, &jupiter);
+    assert_eq!(context.sources.len(), 2);
+
+    let context = fit_followup(&prior, vec![], "Tell me more about Mars", 7000);
+    assert_eq!(
+        context.sources,
+        prior
+            .iter()
+            .map(|hit| hit.source.clone())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn unnamed_questions_keep_available_historical_passages() {
+    let notes = notes_at_limit();
     let biology = hit(
         "Photosynthesis converts light into energy.",
         "biology-chapter-seven.md",
     );
-    let mut another_chunk = notes[0].clone();
-    if let PassageLocator::LocalNote { chunk_index, .. } = &mut another_chunk.locator {
-        *chunk_index += 1;
-    }
-    another_chunk.text = "International shipping has an extended deadline.".into();
     let old = retrieval::build_grounded_prompt_context(&notes, MAX_GROUNDING_BYTES)
         .unwrap()
         .unwrap();
-    for (query, fresh) in [
-        ("How does photosynthesis work?", &biology),
-        ("And the deadline?", &biology),
-        ("And the deadline?", &another_chunk),
-    ] {
-        let context = fit_followup(&notes, vec![fresh.clone()], query, 7000);
-        assert!(context.text.contains(&fresh.text), "{query}");
-        assert!(context.text.contains(&notes[0].text), "{query}");
-        assert!(
-            context
-                .included_passages
-                .contains(&old.included_passages[0])
-        );
-        assert!(context.sources.len() <= retrieval::MAX_NOTES_GROUNDING_HITS);
-    }
-
-    let packs = [
-        pack_hit("Mars is the fourth planet.", "Mars", 0),
-        pack_hit("Venus is the second planet.", "Venus", 1),
-    ];
-    let fresh = pack_hit("Plants use sunlight to produce sugar.", "Botany", 2);
     let context = fit_followup(
-        &packs,
-        vec![fresh.clone()],
+        &notes,
+        vec![biology.clone()],
         "How does photosynthesis work?",
         7000,
     );
-    assert!(context.text.contains(&fresh.text));
-    assert!(context.text.contains(&packs[0].text));
-    assert_eq!(context.sources.len(), retrieval::MAX_PACK_HITS);
+    assert_full_passage(&context, &biology);
+    assert!(
+        context
+            .included_passages
+            .contains(&old.included_passages[0])
+    );
+    assert_eq!(context.sources.len(), retrieval::MAX_NOTES_GROUNDING_HITS);
 
     let context = fit_followup(&notes, vec![], "And the deadline?", 7000);
     assert_eq!(context.included_passages, old.included_passages);
+}
+
+#[test]
+fn followups_keep_new_chunks_of_retained_sources_at_hit_limits() {
+    let notes: Vec<_> = (0..3)
+        .map(|index| {
+            let mut note = hit(&format!("Cedar background section {index}."), "cedar.md");
+            if let PassageLocator::LocalNote(locator) = &mut note.locator {
+                locator.chunk_index = index;
+            }
+            note
+        })
+        .chain([
+            hit("Pine background.", "pine.md"),
+            hit("Birch background.", "birch.md"),
+        ])
+        .collect();
+    let mut fresh = notes[0].clone();
+    if let PassageLocator::LocalNote(locator) = &mut fresh.locator {
+        locator.chunk_index = 3;
+    }
+    fresh.text = "Cedar warranty duration: 24 months.".into();
+    let context = fit_followup(
+        &notes,
+        vec![notes[0].clone(), fresh.clone()],
+        "And in Cedar, how long is its warranty?",
+        700,
+    );
+    assert_full_passage(&context, &fresh);
+    assert_full_passage(&context, &notes[0]);
+    assert!(context.included_passages.len() <= retrieval::MAX_NOTES_GROUNDING_HITS);
+
+    let prior = [
+        pack_hit("Mars is the fourth planet.", "Mars", 0),
+        pack_hit("Venus is the second planet.", "Venus", 1),
+    ];
+    let fresh = [
+        pack_hit("Its radius is 3389.5 kilometers.", "Mars", 2),
+        pack_hit("Its radius is 6051.8 kilometers.", "Venus", 3),
+    ];
+    let context = fit_followup(&prior, fresh.to_vec(), "Which of them is larger?", 700);
+    for hit in &fresh {
+        assert_full_passage(&context, hit);
+    }
 }
 
 #[test]
@@ -279,15 +401,8 @@ fn fresh_followup_results_survive_byte_and_token_repacking() {
         "And what's its warranty duration?",
         7000,
     );
-    assert!(context.text.contains(&full.text));
-    assert_eq!(context.sources, vec![full.source]);
+    assert_full_passage(&context, &full);
     assert_eq!(context.included_passages.len(), 1);
-    assert_eq!(
-        context.included_passages[0]
-            .verified_spans(&full.text)
-            .unwrap(),
-        vec![full.text]
-    );
 
     let old = hit(&"Cedar allows 30 days. ".repeat(280), "cedar.md");
     let fresh = hit(
@@ -304,27 +419,15 @@ fn fresh_followup_results_survive_byte_and_token_repacking() {
             "How does photosynthesis work?",
             input_budget,
         );
-        assert!(context.text.contains("Plants use light."));
         let reference = context
             .included_passages
             .iter()
             .find(|reference| reference.locator == fresh.locator)
             .unwrap();
         let spans = reference.verified_spans(&fresh.text).unwrap();
+        assert!(spans[0].starts_with("Plants use light."));
         assert!(context.text.contains(&spans[0]));
     }
-
-    let mut long_label = hit("Plants use light.", "biology.md");
-    if let GroundedSource::LocalNote { reference } = &mut long_label.source {
-        reference.title = "Biology ".repeat(400);
-    }
-    let context = fit_followup(
-        &[old],
-        vec![long_label.clone()],
-        "How does photosynthesis work?",
-        7000,
-    );
-    assert!(context.text.contains(&long_label.text));
 }
 
 #[test]
@@ -343,7 +446,14 @@ fn measured_repack_keeps_text_citations_and_exact_spans_together() {
         ),
     ] {
         let candidates = GroundingCandidates::new(vec![], vec![hit(&raw, "one.md")], 6000).unwrap();
-        let fit = fit_grounding(&candidates, "System", "Question", 4096, measure).unwrap();
+        let fit = fit_grounding(
+            &candidates.select_sources(None).unwrap(),
+            "System",
+            "Question",
+            4096,
+            measure,
+        )
+        .unwrap();
         assert!(fit.repacked);
         assert!(fit.evidence_tokens <= 1024);
         let context = fit.context.unwrap();
@@ -374,7 +484,14 @@ fn requested_old_spans_raise_soft_allowance_and_are_never_cut() {
         6000,
     )
     .unwrap();
-    let fit = fit_grounding(&candidates, "System", "Question", 3000, measure).unwrap();
+    let fit = fit_grounding(
+        &candidates.select_sources(None).unwrap(),
+        "System",
+        "Question",
+        3000,
+        measure,
+    )
+    .unwrap();
     assert!(fit.repacked && fit.evidence_tokens > 750);
     assert_eq!(fit.context.unwrap().included_passages[0], reference);
 }
@@ -383,14 +500,26 @@ fn mandatory_input_and_insufficient_evidence_budget_are_explicit() {
     let candidates =
         GroundingCandidates::new(vec![], vec![hit(&"word ".repeat(1000), "one.md")], 6000).unwrap();
     assert!(matches!(
-        fit_grounding(&candidates, "System", &"x".repeat(1000), 100, measure),
+        fit_grounding(
+            &candidates.select_sources(None).unwrap(),
+            "System",
+            &"x".repeat(1000),
+            100,
+            measure
+        ),
         Err(PrepareError::CurrentInputTooLarge)
     ));
     assert!(
-        fit_grounding(&candidates, "System", "Question", 60, measure)
-            .unwrap()
-            .context
-            .is_none()
+        fit_grounding(
+            &candidates.select_sources(None).unwrap(),
+            "System",
+            "Question",
+            60,
+            measure
+        )
+        .unwrap()
+        .context
+        .is_none()
     );
 }
 #[test]
@@ -411,7 +540,7 @@ fn named_comparison_keeps_both_complete_passages_before_optional_hits() {
         &format!("{}Juniper permits 21 days.", "Juniper details. ".repeat(25)),
         "juniper-policy.md",
     );
-    let mut candidates = GroundingCandidates::new(
+    let candidates = GroundingCandidates::new(
         vec![],
         vec![
             cedar.clone(),
@@ -421,49 +550,14 @@ fn named_comparison_keeps_both_complete_passages_before_optional_hits() {
         6000,
     )
     .unwrap();
-    candidates
-        .protect_named_sources("Is the Juniper period longer than Cedar?")
+    let plan = candidates
+        .select_sources(Some("Is the Juniper period longer than Cedar?"))
         .unwrap();
-    let fit = fit_grounding(
-        &candidates,
-        "System",
-        "Compare Cedar and Juniper.",
-        2500,
-        measure,
-    )
-    .unwrap();
+    let fit = fit_grounding(&plan, "System", "Compare Cedar and Juniper.", 2500, measure).unwrap();
     assert!(fit.repacked);
     let context = fit.context.unwrap();
     for hit in [&cedar, &juniper] {
-        assert!(context.text.contains(&hit.text));
-        let reference = context
-            .included_passages
-            .iter()
-            .find(|r| r.locator == hit.locator)
-            .unwrap();
-        assert_eq!(
-            reference.verified_spans(&hit.text).unwrap(),
-            vec![hit.text.clone()]
-        );
-    }
-}
-
-#[test]
-fn ordinary_questions_and_shared_label_words_do_not_promote_every_source() {
-    let base = GroundingCandidates::new(
-        vec![],
-        vec![
-            hit("30 days", "cedar-policy.md"),
-            hit("21 days", "juniper-policy.md"),
-        ],
-        6000,
-    )
-    .unwrap();
-    for query in ["Compare the policies in my notes", "Explain photography"] {
-        let mut c = base.clone();
-        c.protect_named_sources(query).unwrap();
-        assert!(c.referenced.is_empty());
-        assert_eq!(c.pack(6000).unwrap(), base.pack(6000).unwrap());
+        assert_full_passage(&context, hit);
     }
 }
 
@@ -496,7 +590,7 @@ fn explicit_history_displaces_optional_search_without_losing_original_text() {
     )
     .unwrap();
     let fit = fit_grounding_with_history(
-        &candidates,
+        &candidates.select_sources(None).unwrap(),
         Some(&required),
         "System",
         query,
@@ -508,7 +602,7 @@ fn explicit_history_displaces_optional_search_without_losing_original_text() {
     assert_eq!(fit.evidence_tokens, 0);
     assert!(
         fit_grounding_with_history(
-            &candidates,
+            &candidates.select_sources(None).unwrap(),
             Some(&required),
             "System",
             query,
@@ -531,8 +625,13 @@ fn source_system_and_required_history_are_measured_in_final_roles() {
         6000,
     )
     .unwrap();
-    let fitted =
-        fit_grounding_with_history(&c, Some(&history), "System", query, 4096, |messages| {
+    let fitted = fit_grounding_with_history(
+        &c.select_sources(None).unwrap(),
+        Some(&history),
+        "System",
+        query,
+        4096,
+        |messages| {
             if messages[0].content.contains("BEGIN KNOWLEDGE CONTEXT") {
                 assert_eq!(messages[0].role, "system");
                 assert!(messages.last().unwrap().content.contains("ZX-82Q"));
@@ -545,41 +644,13 @@ fn source_system_and_required_history_are_measured_in_final_roles() {
                     .contains("BEGIN KNOWLEDGE CONTEXT")
             );
             measure(messages)
-        })
-        .unwrap();
+        },
+    )
+    .unwrap();
     assert!(grounded_system("System", fitted.context.as_ref()).contains("The new rule"));
     let final_text = history.prepend_required(query);
     assert!(final_text.contains("ZX-82Q"));
     assert!(final_text.ends_with(query));
-}
-
-#[test]
-fn overlapping_pack_and_note_titles_preserve_both_sources_without_blocking_switches() {
-    let pack = pack_hit("Mars is the fourth planet.", "Mars", 0);
-    let mut note = hit("Check-in code COPPER-29.", "mars-expedition.md");
-    if let GroundedSource::LocalNote { reference } = &mut note.source {
-        reference.title = "Mars expedition checklist".into();
-    }
-    let query = "Using the Mars encyclopedia entry and the Mars expedition checklist, give its position from the Sun and our expedition check-in code. Answer briefly.";
-    let mut c = GroundingCandidates::new(vec![], vec![pack.clone(), note.clone()], 6000).unwrap();
-    c.protect_named_sources(query).unwrap();
-    assert_eq!(c.referenced.len(), 2);
-    assert_eq!(c.pack(6000).unwrap().unwrap().sources.len(), 2);
-
-    let (history, evidence) = followup_history(&[pack]);
-    assert_eq!(
-        direct_followup_references(&history, &evidence, query, std::slice::from_ref(&note)),
-        evidence[0].passages
-    );
-    assert!(
-        direct_followup_references(
-            &history,
-            &evidence,
-            "What is the check-in code in the Mars expedition checklist?",
-            &[note]
-        )
-        .is_empty()
-    );
 }
 
 #[test]

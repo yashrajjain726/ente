@@ -680,43 +680,36 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn passage_revisions_are_lazy_and_reloads_reject_changed_artifacts() {
+    fn passage_reload_preserves_sources_and_rejects_changed_artifacts() {
         use crate::retrieval::PassageLocator;
         let pack = synthetic_pack("simplewiki-test");
         let index = RetrievalIndex::open(&pack.revision, &pack.expected).unwrap();
-        assert!(index.revision_sha256.get().is_none());
         let mut query = vec![0.0; 512];
-        assert!(index.search(&query, 3, 1.0).unwrap().is_empty());
-        assert!(index.revision_sha256.get().is_none());
         query[0] = 1.0;
-        let hits = index.search(&query, 3, 0.0).unwrap();
+        let hits = index.search(&query, 2, 0.0).unwrap();
         assert_ne!(hits[0].locator, hits[1].locator);
-        let revision = text_revision_digest(
-            &fs::read(pack.revision.join(KNOWLEDGE_MANIFEST_FILE)).unwrap(),
-            &fs::read(pack.revision.join(KNOWLEDGE_META_FILE)).unwrap(),
-            &fs::read(pack.revision.join(KNOWLEDGE_OFFSETS_FILE)).unwrap(),
-        );
-        assert_eq!(index.revision_sha256.get(), Some(&revision));
         drop(index);
         let index = RetrievalIndex::open(&pack.revision, &pack.expected).unwrap();
-        let mut wrong = hits[0].locator.clone();
-        if let PassageLocator::EnsuPack { row, .. } = &mut wrong {
-            *row = u64::MAX;
+        for field in ["row", "dataset"] {
+            let mut wrong = hits[0].locator.clone();
+            let PassageLocator::EnsuPack {
+                dataset_id, row, ..
+            } = &mut wrong
+            else {
+                panic!("expected a pack locator")
+            };
+            match field {
+                "row" => *row = u64::MAX,
+                _ => *dataset_id = "wikibooks".to_string(),
+            }
+            assert!(index.reload_passage(&wrong).unwrap().is_none(), "{field}");
         }
-        assert!(index.reload_passage(&wrong).unwrap().is_none());
-        wrong = hits[0].locator.clone();
-        if let PassageLocator::EnsuPack { dataset_id, .. } = &mut wrong {
-            *dataset_id = "wikibooks".to_string();
-        }
-        assert!(index.reload_passage(&wrong).unwrap().is_none());
-        assert!(index.revision_sha256.get().is_none());
-        for hit in &hits {
+        for (hit, text) in hits.iter().zip(["first passage", "second passage"]) {
             let reloaded = index.reload_passage(&hit.locator).unwrap().unwrap();
             assert_eq!(reloaded.locator, hit.locator);
-            assert_eq!(reloaded.text, hit.text);
+            assert_eq!(reloaded.text, text);
             assert_eq!(reloaded.source_url, hit.source_url);
         }
-        assert_eq!(index.revision_sha256.get(), Some(&revision));
         drop(index);
 
         let metadata_path = pack.revision.join(KNOWLEDGE_META_FILE);

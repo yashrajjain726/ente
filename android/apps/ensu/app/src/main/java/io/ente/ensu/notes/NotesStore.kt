@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.compose.runtime.staticCompositionLocalOf
 import io.ente.ensu.bindings.GroundedExcerpt
 import io.ente.ensu.bindings.GroundedSource
+import io.ente.ensu.bindings.NotePassageLocator
 import io.ente.ensu.bindings.NoteSourceReference
 import io.ente.ensu.bindings.NotesCancellation
 import io.ente.ensu.bindings.NotesException
@@ -14,7 +15,6 @@ import io.ente.ensu.bindings.NotesIndexOptions
 import io.ente.ensu.bindings.NotesProgress
 import io.ente.ensu.bindings.NotesProgressCallback
 import io.ente.ensu.bindings.NotesSummary
-import io.ente.ensu.bindings.PassageLocator
 import io.ente.ensu.bindings.notesLimits
 import io.ente.ensu.bindings.selectMixedGroundingCandidates
 import io.ente.ensu.bindings.withNotesCollectionLabel
@@ -281,7 +281,7 @@ class NotesStore(
             hits
         }
 
-    suspend fun reload(locator: PassageLocator.LocalNote): GroundedExcerpt? =
+    suspend fun reload(locator: NotePassageLocator): GroundedExcerpt? =
         withContext(Dispatchers.Main.immediate) {
             if (_state.value.collections.none { it.id == locator.collectionId && it.eligible })
                 return@withContext null

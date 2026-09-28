@@ -68,6 +68,7 @@ fn saved_memory_preserves_uuid_strings() {
     let mut expected = serde_json::from_str::<serde_json::Value>(encoded).unwrap();
     expected["evidence"] = serde_json::json!([]);
     assert_eq!(serde_json::to_value(&restored).unwrap(), expected);
+    assert!(ConversationEnvelope::decode(encoded.as_bytes(), Uuid::nil()).is_none());
     let invalid = encoded.replace("00000000-0000-0000-0000-000000000002", "invalid");
     assert!(
         ConversationEnvelope::decode(invalid.as_bytes(), session)
@@ -75,10 +76,6 @@ fn saved_memory_preserves_uuid_strings() {
             .summary
             .is_none()
     );
-}
-
-fn evidence_passages() -> Vec<crate::retrieval::IncludedPassage> {
-    vec![crate::retrieval::passage_fixture().0]
 }
 
 #[test]
@@ -91,7 +88,7 @@ fn invalid_summary_and_evidence_are_discarded_independently() {
     let memory = ConversationState::new(session, &history, "Memory".into()).unwrap();
     let mut state = ConversationEnvelope::empty(session);
     state.summary = Some(memory.summary.clone());
-    assert!(state.add_evidence(&history, evidence_passages()));
+    assert!(state.add_evidence(&history, vec![crate::retrieval::passage_fixture().0]));
     let original = serde_json::to_value(&state).unwrap();
     let decode = |value: &serde_json::Value| {
         ConversationEnvelope::decode(&serde_json::to_vec(value).unwrap(), session)
@@ -107,17 +104,12 @@ fn invalid_summary_and_evidence_are_discarded_independently() {
     let decoded = decode(&value).unwrap();
     assert!(decoded.evidence.is_empty());
     assert_eq!(decoded.summary_state().unwrap(), memory);
-    value["format_version"] = 1.into();
-    assert!(decode(&value).is_none());
-    assert!(
-        ConversationEnvelope::decode(&serde_json::to_vec(&state).unwrap(), Uuid::nil()).is_none()
-    );
 }
 
 #[test]
 fn evidence_retention_obeys_answer_and_byte_limits() {
     for passage_count in [1, MAX_ANSWER_PASSAGES] {
-        let passages = vec![evidence_passages().remove(0); passage_count];
+        let passages = vec![crate::retrieval::passage_fixture().0; passage_count];
         let mut state = ConversationEnvelope::empty(Uuid::from_u128(100));
         let mut history = Vec::new();
         for index in 1..=10 {

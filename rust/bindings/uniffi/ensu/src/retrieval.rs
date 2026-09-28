@@ -35,11 +35,7 @@ pub enum PassageLocator {
         row: u64,
     },
     LocalNote {
-        collection_id: String,
-        document_id: String,
-        indexed_revision: String,
-        shard_sha256: String,
-        chunk_index: u64,
+        locator: crate::notes::NotePassageLocator,
     },
 }
 
@@ -55,18 +51,8 @@ impl From<core::PassageLocator> for PassageLocator {
                 revision_sha256,
                 row,
             },
-            core::PassageLocator::LocalNote {
-                collection_id,
-                document_id,
-                indexed_revision,
-                shard_sha256,
-                chunk_index,
-            } => Self::LocalNote {
-                collection_id,
-                document_id,
-                indexed_revision,
-                shard_sha256,
-                chunk_index,
+            core::PassageLocator::LocalNote(locator) => Self::LocalNote {
+                locator: locator.into(),
             },
         }
     }
@@ -84,19 +70,7 @@ impl From<PassageLocator> for core::PassageLocator {
                 revision_sha256,
                 row,
             },
-            PassageLocator::LocalNote {
-                collection_id,
-                document_id,
-                indexed_revision,
-                shard_sha256,
-                chunk_index,
-            } => Self::LocalNote {
-                collection_id,
-                document_id,
-                indexed_revision,
-                shard_sha256,
-                chunk_index,
-            },
+            PassageLocator::LocalNote { locator } => Self::LocalNote(locator.into()),
         }
     }
 }

@@ -268,6 +268,37 @@ fn select_verified_mixed_grounding(
     Ok(verified)
 }
 
+fn select_grounding(
+    app: &AppHandle,
+    pack_hits: &[retrieval::KnowledgePromptHit],
+    note_hits: &[ente_ensu::notes::NotesSearchHit],
+    notes: Option<&super::notes::RetrievalHandle>,
+    mut check_cancelled: impl FnMut() -> Result<(), ApiError>,
+) -> Result<Vec<retrieval::GroundedExcerpt>, ApiError> {
+    let mut excerpts = select_verified_mixed_grounding(pack_hits, note_hits, |reference| {
+        check_cancelled()?;
+        let Some(notes) = notes else { return Ok(false) };
+        let valid = notes.verify_source_reference(reference);
+        if !valid {
+            super::notes::mark_reference_stale(
+                app,
+                &reference.collection_id,
+                reference.document_id.clone(),
+            );
+        }
+        Ok(valid)
+    })?;
+    for excerpt in &mut excerpts {
+        if let (Some(notes), retrieval::GroundedSource::LocalNote { reference }) =
+            (notes, &mut excerpt.source)
+        {
+            reference.collection_label = notes.collection_label(&reference.collection_id);
+        }
+    }
+    check_cancelled()?;
+    Ok(excerpts)
+}
+
 fn reconcile_and_open(
     store: &AssetStore,
     indexes: &Mutex<HashMap<String, OpenIndex>>,
@@ -637,29 +668,7 @@ pub async fn knowledge_retrieve(
         check_cancelled()?;
 
         let context_budget = max_context_utf8_bytes.min(embedding.max_context_utf8_bytes);
-        let mut excerpts = select_verified_mixed_grounding(&pack_hits, &note_hits, |reference| {
-            check_cancelled()?;
-            let Some(notes) = &notes else {
-                return Ok(false);
-            };
-            let verified = notes.verify_source_reference(reference);
-            if !verified {
-                crate::commands::notes::mark_reference_stale(
-                    &app,
-                    &reference.collection_id,
-                    reference.document_id.clone(),
-                );
-            }
-            Ok(verified)
-        })?;
-        for excerpt in &mut excerpts {
-            if let (Some(notes), retrieval::GroundedSource::LocalNote { reference }) =
-                (&notes, &mut excerpt.source)
-            {
-                reference.collection_label = notes.collection_label(&reference.collection_id);
-            }
-        }
-        check_cancelled()?;
+        let excerpts = select_grounding(&app, &pack_hits, &note_hits, notes.as_ref(), check_cancelled)?;
 
         let candidates = ente_ensu::conversation::GroundingCandidates::new(vec![], excerpts, context_budget as usize)
             .map_err(|error| ApiError::new("conversation", error.to_string()))?;
@@ -727,12 +736,13 @@ pub(crate) async fn reload_for_followup(
                     hit,
                 });
             }
-            retrieval::PassageLocator::LocalNote { collection_id, .. } => {
+            retrieval::PassageLocator::LocalNote(locator) => {
+                let collection_id = &locator.collection_id;
                 if !collection_ids.contains(collection_id) {
                     return Ok(None);
                 }
                 let Some(notes) = &notes else { return Ok(None) };
-                match notes.reload_passage(&reference.locator) {
+                match notes.reload_passage(locator) {
                     Ok(Some(hit)) => note_hits.push(hit),
                     Ok(None) => return Ok(None),
                     Err(error) => {
@@ -747,31 +757,14 @@ pub(crate) async fn reload_for_followup(
             }
         }
         check_cancelled()?;
-        let mut selected = select_verified_mixed_grounding(&packs, &note_hits, |source| {
-            check_cancelled()?;
-            let valid = notes
-                .as_ref()
-                .is_some_and(|notes| notes.verify_source_reference(source));
-            if !valid {
-                crate::commands::notes::mark_reference_stale(
-                    &app,
-                    &source.collection_id,
-                    source.document_id.clone(),
-                );
-            }
-            Ok(valid)
-        })?;
-        let Some(mut excerpt) = selected.pop() else {
+        let Some(excerpt) =
+            select_grounding(&app, &packs, &note_hits, notes.as_ref(), check_cancelled)?.pop()
+        else {
             return Ok(None);
         };
         let Some(passages) = reference.verified_spans(&excerpt.text) else {
             return Ok(None);
         };
-        if let (Some(notes), retrieval::GroundedSource::LocalNote { reference }) =
-            (&notes, &mut excerpt.source)
-        {
-            reference.collection_label = notes.collection_label(&reference.collection_id);
-        }
         check_cancelled()?;
         Ok(Some(retrieval::ReferencedPassage {
             reference,
@@ -811,7 +804,7 @@ mod tests {
 
     fn note(index: usize) -> NotesSearchHit {
         NotesSearchHit {
-            locator: retrieval::PassageLocator::LocalNote {
+            locator: ente_ensu::notes::NotePassageLocator {
                 collection_id: COLLECTION_ID.to_owned(),
                 document_id: format!("note-{index}.md"),
                 indexed_revision: "a".repeat(64),

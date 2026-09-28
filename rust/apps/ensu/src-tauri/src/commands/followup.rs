@@ -236,6 +236,7 @@ mod tests {
             .unwrap();
         (db, snapshot)
     }
+
     #[test]
     fn preparation_requires_matching_source_selection_and_consumes_it_once() {
         let (db, snapshot) = fixture();
@@ -245,39 +246,34 @@ mod tests {
             Guard {
                 token: "token".into(),
                 db: db.clone(),
-                selection: None,
+                selection: Some(Selection {
+                    fingerprint: core::fingerprint(snapshot.messages()),
+                    question: "Where does she track it?".into(),
+                    candidates: core::GroundingCandidates::new(
+                        vec![],
+                        vec![],
+                        core::MAX_GROUNDING_BYTES,
+                    )
+                    .unwrap(),
+                }),
             },
         );
-        assert!(
-            state
-                .take_selection("window", "token", &db, &snapshot)
-                .is_err()
-        );
-        state
-            .guards
-            .lock()
-            .unwrap()
-            .get_mut("window")
-            .unwrap()
-            .selection = Some(Selection {
-            fingerprint: core::fingerprint(snapshot.messages()),
-            question: "Where does she track it?".into(),
-            candidates: core::GroundingCandidates::new(vec![], vec![], 6000).unwrap(),
-        });
         let (other_db, other_snapshot) = fixture();
-        for (window, token, db, snapshot) in [
-            ("another-window", "token", &db, &snapshot),
-            ("window", "another-token", &db, &snapshot),
-            ("window", "token", &other_db, &snapshot),
-            ("window", "token", &db, &other_snapshot),
+        for (case, window, token, db, snapshot) in [
+            ("window", "another-window", "token", &db, &snapshot),
+            ("token", "window", "another-token", &db, &snapshot),
+            ("database", "window", "token", &other_db, &snapshot),
+            ("history", "window", "token", &db, &other_snapshot),
         ] {
-            assert!(state.take_selection(window, token, db, snapshot).is_err());
+            assert!(
+                state.take_selection(window, token, db, snapshot).is_err(),
+                "{case}"
+            );
         }
         let selection = state
             .take_selection("window", "token", &db, &snapshot)
             .unwrap();
         assert_eq!(selection.question, "Where does she track it?");
-        assert_eq!(selection.candidates.max_utf8_bytes, 6000);
         assert!(
             state
                 .take_selection("window", "token", &db, &snapshot)

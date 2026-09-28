@@ -1,5 +1,6 @@
 use super::*;
 use crate::retrieval::{self, GroundedExcerpt, GroundedPromptContext, ReferencedPassage};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const MAX_GROUNDING_BYTES: usize = 6000;
 pub const MAX_CANDIDATE_BYTES: usize = 64 * 1024;
@@ -12,24 +13,10 @@ pub struct GroundingCandidates {
     pub max_utf8_bytes: usize,
 }
 
-pub(super) fn source_key(source: &retrieval::GroundedSource) -> (u8, String, String) {
-    match source {
-        retrieval::GroundedSource::LocalNote { reference } => (
-            0,
-            reference.collection_id.clone(),
-            reference.document_id.clone(),
-        ),
-        retrieval::GroundedSource::EnsuPack { citation } => {
-            (1, citation.dataset_id.clone(), citation.source_url.clone())
-        }
-    }
-}
-
 pub(super) fn named_source_keys<'a>(
     query: &str,
     sources: impl Iterator<Item = &'a retrieval::GroundedSource>,
-) -> std::collections::BTreeSet<(u8, String, String)> {
-    use std::collections::{BTreeMap, BTreeSet};
+) -> BTreeSet<(u8, &'a str, &'a str)> {
     let words = |text: &str| -> BTreeSet<String> {
         text.split(|c: char| !c.is_alphanumeric())
             .filter(|s| s.chars().count() >= 3)
@@ -56,7 +43,7 @@ pub(super) fn named_source_keys<'a>(
             let title = tokens(title);
             for (start, window) in query_tokens.windows(title.len()).enumerate() {
                 if window == title {
-                    title_matches.push((source_key(source), start, start + title.len()));
+                    title_matches.push((source.document_key(), start, start + title.len()));
                 }
             }
         }
@@ -64,7 +51,7 @@ pub(super) fn named_source_keys<'a>(
             label_words.extend(words(&reference.document_id));
         }
         documents
-            .entry(source_key(source))
+            .entry(source.document_key())
             .or_default()
             .extend(label_words);
     }
@@ -88,88 +75,302 @@ pub(super) fn named_source_keys<'a>(
                         == 1
             })
         })
-        .map(|(key, _)| key.clone())
+        .map(|(key, _)| *key)
         .collect()
 }
 
-impl GroundingCandidates {
-    pub(super) fn protect_named_sources(&mut self, query: &str) -> Result<(), PrepareError> {
-        self.validate()?;
-        if query.len() > super::lookup::LOOKUP_MAX_QUERY_BYTES {
-            return Ok(());
+enum PassageSlot {
+    Historical {
+        minimum: Box<ReferencedPassage>,
+        current: Option<GroundedExcerpt>,
+    },
+    Current(GroundedExcerpt),
+}
+
+impl PassageSlot {
+    fn locator(&self) -> &retrieval::PassageLocator {
+        match self {
+            Self::Historical { minimum, .. } => &minimum.reference.locator,
+            Self::Current(current) => &current.locator,
         }
+    }
+
+    fn source(&self) -> &retrieval::GroundedSource {
+        match self {
+            Self::Historical { minimum, .. } => &minimum.source,
+            Self::Current(current) => &current.source,
+        }
+    }
+
+    fn minimum(&self) -> Option<&ReferencedPassage> {
+        match self {
+            Self::Historical { minimum, .. } => Some(minimum),
+            Self::Current(_) => None,
+        }
+    }
+
+    fn current(&self) -> Option<&GroundedExcerpt> {
+        match self {
+            Self::Historical { current, .. } => current.as_ref(),
+            Self::Current(current) => Some(current),
+        }
+    }
+
+    fn minimum_coverage(&self) -> Result<ReferencedPassage, PrepareError> {
+        let current = match self {
+            Self::Historical {
+                minimum,
+                current: None,
+            } => return Ok(minimum.as_ref().clone()),
+            Self::Historical {
+                current: Some(current),
+                ..
+            }
+            | Self::Current(current) => current,
+        };
+        let text = retrieval::clean_passage_text(&current.text);
+        let end = if let Some(old) = self.minimum() {
+            let end = old
+                .reference
+                .spans
+                .last()
+                .ok_or_else(|| {
+                    PrepareError::Backend("Historical source has no verified spans".into())
+                })?
+                .end_utf8 as usize;
+            if end >= old.passages.join("\n[omitted source text]\n").len() {
+                return Ok(old.clone());
+            }
+            end
+        } else {
+            text.chars()
+                .next()
+                .ok_or_else(|| PrepareError::Backend("Current source has no usable text".into()))?
+                .len_utf8()
+        };
+        let passage = text[..end].to_owned();
+        let reference = retrieval::IncludedPassage::prefix(current.locator.clone(), &passage)
+            .map_err(retrieval_error)?;
+        Ok(ReferencedPassage {
+            reference,
+            source: self.source().clone(),
+            passages: vec![passage],
+        })
+    }
+}
+
+pub(super) struct GroundingPlan {
+    slots: Vec<PassageSlot>,
+    incidental: Vec<ReferencedPassage>,
+    searched: Vec<GroundedExcerpt>,
+    max_utf8_bytes: usize,
+}
+
+impl GroundingPlan {
+    fn freeze(
+        &self,
+        context: Option<&GroundedPromptContext>,
+    ) -> Result<Vec<ReferencedPassage>, PrepareError> {
+        let Some(context) = context else {
+            return Ok(Vec::new());
+        };
+        context
+            .included_passages
+            .iter()
+            .zip(&context.sources)
+            .map(|(reference, source)| {
+                let passages = self
+                    .searched
+                    .iter()
+                    .filter(|hit| {
+                        hit.locator == reference.locator && hit.source.same_document(source)
+                    })
+                    .find_map(|hit| reference.verified_spans(&hit.text))
+                    .or_else(|| {
+                        self.slots
+                            .iter()
+                            .filter_map(|slot| slot.minimum())
+                            .chain(&self.incidental)
+                            .find(|old| {
+                                old.reference == *reference && old.source.same_document(source)
+                            })
+                            .map(|old| old.passages.clone())
+                    })
+                    .ok_or_else(|| {
+                        PrepareError::Backend("Fitted source coverage could not be verified".into())
+                    })?;
+                Ok(ReferencedPassage {
+                    reference: reference.clone(),
+                    source: source.clone(),
+                    passages,
+                })
+            })
+            .collect()
+    }
+}
+
+struct SourceGroup<'a> {
+    key: (u8, &'a str, &'a str),
+    slots: Vec<PassageSlot>,
+}
+
+fn source_group<'a, 'b>(
+    groups: &'a mut Vec<SourceGroup<'b>>,
+    source: &'b retrieval::GroundedSource,
+) -> &'a mut SourceGroup<'b> {
+    let key = source.document_key();
+    let index = groups
+        .iter()
+        .position(|group| group.key == key)
+        .unwrap_or_else(|| {
+            groups.push(SourceGroup {
+                key,
+                slots: Vec::new(),
+            });
+            groups.len() - 1
+        });
+    &mut groups[index]
+}
+
+fn retrieval_error(error: retrieval::RetrievalError) -> PrepareError {
+    PrepareError::Backend(error.to_string())
+}
+
+impl GroundingCandidates {
+    pub(super) fn select_sources(
+        &self,
+        query: Option<&str>,
+    ) -> Result<GroundingPlan, PrepareError> {
+        self.validate()?;
+        let query = query.filter(|query| query.len() <= super::lookup::LOOKUP_MAX_QUERY_BYTES);
         let named = named_source_keys(
-            query,
+            query.unwrap_or_default(),
             self.referenced
                 .iter()
                 .map(|r| &r.source)
                 .chain(self.searched.iter().map(|r| &r.source)),
         );
-        let fresh_index = if !self.referenced.is_empty() && named.is_empty() {
-            self.searched.iter().position(|hit| {
-                !hit.text.trim().is_empty()
-                    && !self
-                        .referenced
-                        .iter()
-                        .any(|r| r.reference.locator == hit.locator)
-            })
-        } else {
-            None
-        };
-        if let Some(index) = fresh_index {
-            self.searched[..=index].rotate_right(1);
-        }
-        let mut required: std::collections::BTreeSet<_> = self
+        let historical: BTreeSet<_> = self
             .referenced
             .iter()
-            .map(|r| source_key(&r.source))
+            .map(|old| old.source.document_key())
             .collect();
-        let mut promoted = Vec::new();
-        for (index, hit) in self.searched.iter().enumerate() {
-            let fresh = fresh_index.is_some() && index == 0;
-            let id = source_key(&hit.source);
-            if !fresh && (!named.contains(&id) || required.contains(&id)) {
+        let compares_owned_source = query.is_some_and(super::followup::compares_owned_source)
+            && self
+                .searched
+                .iter()
+                .any(|hit| named.contains(&hit.source.document_key()));
+        let refers_back = !historical.is_empty()
+            && (query.is_some_and(super::followup::refers_back)
+                || compares_owned_source
+                || self
+                    .searched
+                    .iter()
+                    .all(|hit| retrieval::clean_passage_text(&hit.text).is_empty()));
+        let mut searched = self.searched.clone();
+        searched.sort_by_key(|hit| {
+            self.referenced
+                .iter()
+                .any(|old| old.reference.locator == hit.locator)
+        });
+        let mut groups: Vec<SourceGroup> = Vec::new();
+        for old in &self.referenced {
+            let group = source_group(&mut groups, &old.source);
+            if !group
+                .slots
+                .iter()
+                .any(|slot| slot.locator() == &old.reference.locator)
+            {
+                group.slots.push(PassageSlot::Historical {
+                    minimum: Box::new(old.clone()),
+                    current: None,
+                });
+            }
+        }
+        for hit in &searched {
+            if let Some(slot) = groups
+                .iter_mut()
+                .flat_map(|group| &mut group.slots)
+                .find(|slot| slot.locator() == &hit.locator)
+            {
+                if let PassageSlot::Historical { minimum, current } = slot
+                    && current.is_none()
+                    && minimum.source.same_document(&hit.source)
+                    && minimum.reference.verified_spans(&hit.text).is_some()
+                {
+                    *current = Some(hit.clone());
+                }
                 continue;
             }
-            let budgets = if fresh {
-                [self.max_utf8_bytes / 2, self.max_utf8_bytes]
-            } else {
-                [usize::MAX; 2]
-            };
-            let Some(reference) = budgets.into_iter().find_map(|budget| {
-                retrieval::build_grounded_prompt_context(std::slice::from_ref(hit), budget)
-                    .ok()
-                    .flatten()?
-                    .included_passages
-                    .into_iter()
-                    .next()
-            }) else {
-                continue;
-            };
-            let Some(passages) = reference.verified_spans(&hit.text) else {
-                continue;
-            };
-            required.insert(id);
-            promoted.push(ReferencedPassage {
-                reference,
-                source: hit.source.clone(),
-                passages,
+            let key = hit.source.document_key();
+            let selected = query.is_some()
+                && (named.contains(&key)
+                    || (!historical.is_empty()
+                        && (named.is_empty() || groups.iter().any(|group| group.key == key))));
+            if selected && !retrieval::clean_passage_text(&hit.text).is_empty() {
+                source_group(&mut groups, &hit.source)
+                    .slots
+                    .push(PassageSlot::Current(hit.clone()));
+            }
+        }
+        if query.is_some() {
+            for group in &mut groups {
+                group.slots.sort_by_key(|slot| {
+                    searched
+                        .iter()
+                        .position(|hit| &hit.locator == slot.locator())
+                        .unwrap_or(usize::MAX)
+                });
+            }
+            let antecedent = self
+                .referenced
+                .iter()
+                .find(|old| named.contains(&old.source.document_key()))
+                .or_else(|| self.referenced.first())
+                .map(|old| old.source.document_key());
+            groups.sort_by_key(|group| {
+                let current = searched
+                    .iter()
+                    .position(|hit| hit.source.document_key() == group.key);
+                if named.contains(&group.key) {
+                    (0, 0)
+                } else if refers_back && antecedent.as_ref() == Some(&group.key) {
+                    (1, 0)
+                } else if refers_back && historical.contains(&group.key) {
+                    current.map_or((3, 0), |index| (2, index))
+                } else if named.is_empty()
+                    && let Some(index) = current
+                {
+                    (4, index)
+                } else {
+                    (5, 0)
+                }
             });
         }
-
-        let (mut named_references, incidental): (Vec<_>, Vec<_>) =
-            std::mem::take(&mut self.referenced)
-                .into_iter()
-                .partition(|r| named.contains(&source_key(&r.source)));
-        named_references.extend(promoted);
-        let mut seen = std::collections::BTreeSet::new();
-        let (distinct, additional): (Vec<_>, Vec<_>) = named_references
-            .into_iter()
-            .partition(|r| seen.insert(source_key(&r.source)));
+        let mut prioritized = Vec::new();
+        for (group_index, group) in groups.into_iter().enumerate() {
+            let primary = query.is_none()
+                || named.contains(&group.key)
+                || (refers_back && historical.contains(&group.key));
+            for (slot_index, slot) in group.slots.into_iter().enumerate() {
+                let primary =
+                    primary || (!refers_back && named.is_empty() && slot.current().is_some());
+                prioritized.push(((!primary, slot_index > 0, group_index), slot));
+            }
+        }
+        prioritized.sort_by_key(|(priority, _)| *priority);
+        searched.sort_by_key(|hit| {
+            prioritized
+                .iter()
+                .position(|(_, slot)| slot.locator() == &hit.locator)
+                .unwrap_or(usize::MAX)
+        });
         let mut packs = 0;
         let mut notes = 0;
-        for reference in distinct.into_iter().chain(additional).chain(incidental) {
-            let (count, limit) = match &reference.source {
+        let mut slots = Vec::new();
+        let mut incidental = Vec::new();
+        for ((is_incidental, _, _), slot) in prioritized {
+            let (count, limit) = match slot.source() {
                 retrieval::GroundedSource::EnsuPack { .. } => {
                     (&mut packs, retrieval::MAX_PACK_HITS)
                 }
@@ -180,18 +381,23 @@ impl GroundingCandidates {
             if *count == limit {
                 continue;
             }
-            self.referenced.push(reference);
-            if self.validate().is_err() {
-                self.referenced.pop();
-            } else {
-                *count += 1;
+            *count += 1;
+            if !is_incidental {
+                slots.push(slot);
+            } else if let PassageSlot::Historical { minimum, .. } = slot {
+                incidental.push(*minimum);
             }
         }
-        Ok(())
+        Ok(GroundingPlan {
+            slots,
+            incidental,
+            searched,
+            max_utf8_bytes: self.max_utf8_bytes,
+        })
     }
 
     pub fn new(
-        mut referenced: Vec<ReferencedPassage>,
+        referenced: Vec<ReferencedPassage>,
         mut searched: Vec<GroundedExcerpt>,
         max_utf8_bytes: usize,
     ) -> Result<Self, PrepareError> {
@@ -202,16 +408,6 @@ impl GroundingCandidates {
                 end -= 1;
             }
             hit.text.truncate(end);
-        }
-        referenced.truncate(retrieval::MAX_GROUNDING_HITS);
-        while referenced
-            .iter()
-            .flat_map(|r| &r.passages)
-            .map(String::len)
-            .sum::<usize>()
-            > MAX_GROUNDING_BYTES
-        {
-            referenced.pop();
         }
         let result = Self {
             referenced,
@@ -241,9 +437,7 @@ impl GroundingCandidates {
                 .referenced
                 .iter()
                 .flat_map(|r| &r.passages)
-                .map(String::len)
-                .sum::<usize>()
-                > MAX_GROUNDING_BYTES
+                .any(|passage| passage.len() > MAX_GROUNDING_BYTES)
             || serde_json::to_vec(self)
                 .map_err(|e| PrepareError::Backend(e.to_string()))?
                 .len()
@@ -252,6 +446,12 @@ impl GroundingCandidates {
             return Err(PrepareError::Backend(
                 "Source candidates exceed the supported preparation limits".into(),
             ));
+        }
+        retrieval::build_followup_prompt_context(&self.referenced, &[], usize::MAX)
+            .map_err(retrieval_error)?;
+        for hit in &self.searched {
+            retrieval::build_grounded_prompt_context(std::slice::from_ref(hit), usize::MAX)
+                .map_err(retrieval_error)?;
         }
         Ok(())
     }
@@ -262,7 +462,7 @@ impl GroundingCandidates {
             &self.searched,
             budget.min(self.max_utf8_bytes),
         )
-        .map_err(|e| PrepareError::Backend(e.to_string()))
+        .map_err(retrieval_error)
     }
 }
 
@@ -281,7 +481,7 @@ pub(super) fn grounded_system(system: &str, context: Option<&GroundedPromptConte
 }
 
 pub(super) fn fit_grounding_with_history(
-    candidates: &GroundingCandidates,
+    candidates: &GroundingPlan,
     history: Option<&HistoryLookup>,
     system: &str,
     current: &str,
@@ -308,13 +508,12 @@ pub(super) fn fit_grounding_with_history(
 }
 
 fn fit_grounding(
-    candidates: &GroundingCandidates,
+    candidates: &GroundingPlan,
     system: &str,
     current: &str,
     input_budget: usize,
     mut measure: impl FnMut(&[ChatMessage]) -> Result<usize, PrepareError>,
 ) -> Result<FittedGrounding, PrepareError> {
-    candidates.validate()?;
     let base = measure(&answer_messages(system, None, &[], current))?;
     let room = input_budget
         .checked_sub(base)
@@ -327,69 +526,128 @@ fn fit_grounding(
             current,
         ))
     };
-    let original_references = candidates.referenced.len();
-    let mut candidates = candidates.clone();
-    let (initial, required, required_tokens) = loop {
-        let packed = candidates.pack(candidates.max_utf8_bytes);
-        let required = retrieval::build_followup_prompt_context(
-            &candidates.referenced,
-            &[],
-            candidates.max_utf8_bytes,
-        );
-        if let (Ok(initial), Ok(required)) = (packed, required) {
-            let tokens = count_context(required.as_ref())?.saturating_sub(base);
-            if tokens <= room {
-                break (initial, required, tokens);
-            }
+    let mut selected = candidates
+        .slots
+        .iter()
+        .map(PassageSlot::minimum_coverage)
+        .collect::<Result<Vec<_>, _>>()?;
+    let preferred_hits = |count: usize| -> Vec<GroundedExcerpt> {
+        candidates.slots[..count]
+            .iter()
+            .filter_map(|slot| slot.current().cloned())
+            .collect()
+    };
+    let preferred = retrieval::build_followup_prompt_context(
+        &selected,
+        &preferred_hits(selected.len()),
+        usize::MAX,
+    )
+    .map_err(retrieval_error)?;
+    let preferred_tokens = count_context(preferred.as_ref())?.saturating_sub(base);
+    let allowance = 1500.min(input_budget / 4).max(preferred_tokens).min(room);
+    let ceiling = base.saturating_add(allowance).min(input_budget);
+
+    let (minimum, minimum_count) = loop {
+        let minimum = retrieval::build_followup_prompt_context(&selected, &[], usize::MAX)
+            .map_err(retrieval_error)?;
+        let count = count_context(minimum.as_ref())?;
+        if minimum
+            .as_ref()
+            .is_none_or(|context| context.text.len() <= candidates.max_utf8_bytes)
+            && count <= ceiling
+        {
+            break (minimum, count);
         }
-        if candidates.referenced.pop().is_none() {
-            break (None, None, 0);
+        if selected.pop().is_none() {
+            return Err(PrepareError::CurrentInputTooLarge);
         }
     };
-    let allowance = 1500.min(input_budget / 4).max(required_tokens).min(room);
-    let initial_count = count_context(initial.as_ref())?;
-    let initial_tokens = initial_count.saturating_sub(base);
-    if initial_count <= input_budget && initial_tokens <= allowance {
-        return Ok(FittedGrounding {
-            context: initial,
-            repacked: candidates.referenced.len() != original_references,
-            evidence_tokens: initial_tokens,
-            history_included: false,
-        });
-    }
-    let required_bytes = required.as_ref().map_or(0, |c| c.text.len());
-    let initial_bytes = initial.as_ref().map_or(0, |c| c.text.len());
-    let extra_tokens = initial_tokens.saturating_sub(required_tokens).max(1);
-    let extra_allowance = allowance.saturating_sub(required_tokens);
-    let smaller = required_bytes
-        + initial_bytes
-            .saturating_sub(required_bytes)
-            .saturating_mul(extra_allowance)
-            .saturating_mul(4)
-            / extra_tokens
-            / 5;
-    let packed = candidates
-        .pack(smaller.min(initial_bytes.saturating_sub(1)))
-        .ok()
-        .flatten();
-    if let Some(packed) = packed {
-        let final_count = count_context(Some(&packed))?;
-        let final_tokens = final_count.saturating_sub(base);
-        if final_count <= input_budget && final_tokens <= allowance {
-            return Ok(FittedGrounding {
-                context: Some(packed),
-                repacked: true,
-                evidence_tokens: final_tokens,
-                history_included: false,
-            });
+    let demoted = selected.len() != candidates.slots.len();
+    let (preferred, preferred_count, reduced) = fit_coverage(
+        &selected,
+        &preferred_hits(selected.len()),
+        candidates.max_utf8_bytes,
+        minimum,
+        minimum_count,
+        ceiling,
+        &mut count_context,
+    )?;
+    let (context, count, optional_reduced) = if reduced {
+        (preferred, preferred_count, false)
+    } else {
+        let mut fixed = candidates.freeze(preferred.as_ref())?;
+        let mut context = preferred;
+        let mut count = preferred_count;
+        for old in &candidates.incidental {
+            fixed.push(old.clone());
+            let extended = retrieval::build_followup_prompt_context(&fixed, &[], usize::MAX)
+                .map_err(retrieval_error)?;
+            if extended
+                .as_ref()
+                .is_some_and(|context| context.text.len() > candidates.max_utf8_bytes)
+            {
+                fixed.pop();
+                continue;
+            }
+            let extended_count = count_context(extended.as_ref())?;
+            if extended_count > ceiling {
+                fixed.pop();
+                continue;
+            }
+            context = extended;
+            count = extended_count;
         }
-    }
+        fit_coverage(
+            &fixed,
+            &candidates.searched,
+            candidates.max_utf8_bytes,
+            context,
+            count,
+            ceiling,
+            &mut count_context,
+        )?
+    };
     Ok(FittedGrounding {
-        context: required,
-        repacked: true,
-        evidence_tokens: required_tokens,
+        context,
+        repacked: demoted || reduced || optional_reduced,
+        evidence_tokens: count.saturating_sub(base),
         history_included: false,
     })
+}
+
+fn fit_coverage(
+    selected: &[ReferencedPassage],
+    searched: &[GroundedExcerpt],
+    max_bytes: usize,
+    minimum: Option<GroundedPromptContext>,
+    minimum_count: usize,
+    ceiling: usize,
+    count_context: &mut impl FnMut(Option<&GroundedPromptContext>) -> Result<usize, PrepareError>,
+) -> Result<(Option<GroundedPromptContext>, usize, bool), PrepareError> {
+    let full = retrieval::build_followup_prompt_context(selected, searched, max_bytes)
+        .map_err(retrieval_error)?;
+    let full_count = count_context(full.as_ref())?;
+    if full_count <= ceiling {
+        return Ok((full, full_count, false));
+    }
+    let mut lower = minimum.as_ref().map_or(0, |context| context.text.len());
+    let mut upper = full.as_ref().map_or(0, |context| context.text.len());
+    let mut best = minimum;
+    let mut best_count = minimum_count;
+    while lower + 1 < upper {
+        let budget = lower + (upper - lower) / 2;
+        let packed = retrieval::build_followup_prompt_context(selected, searched, budget)
+            .map_err(retrieval_error)?;
+        let count = count_context(packed.as_ref())?;
+        if count <= ceiling {
+            lower = budget;
+            best = packed;
+            best_count = count;
+        } else {
+            upper = budget;
+        }
+    }
+    Ok((best, best_count, true))
 }
 
 #[cfg(test)]
