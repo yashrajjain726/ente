@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import "package:photos/service_locator.dart";
 import "package:photos/services/review_service.dart";
+import 'package:photos/ui/notification/toast.dart';
 import 'package:photos/ui/notification/update/change_log_entry.dart';
 import 'package:photos/ui/notification/update/change_log_strings.dart';
 import 'package:url_launcher/url_launcher_string.dart';
@@ -79,11 +80,22 @@ class _ChangeLogPageState extends State<ChangeLogPage> {
                 await ReviewService.launch();
               } else {
                 final navigator = Navigator.of(context);
-                if (navigator.canPop()) navigator.pop();
-                await launchUrlString(
-                  'https://ente.com/locker/get',
-                  mode: LaunchMode.externalApplication,
-                );
+                final route = ModalRoute.of(context);
+                bool launched;
+                try {
+                  launched = await launchUrlString(
+                    'https://ente.com/locker/get',
+                    mode: LaunchMode.externalApplication,
+                  );
+                } catch (_) {
+                  launched = false;
+                }
+                if (!context.mounted || route?.isCurrent != true) return;
+                if (launched) {
+                  navigator.pop();
+                } else {
+                  showShortToast(context, l10n.somethingWentWrong);
+                }
               }
             },
           ),
