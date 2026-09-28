@@ -721,6 +721,15 @@ class SettingsSearchRegistry {
 
     items.addAll([
       SettingsSearchItem(
+        title: l10n.whatsNew,
+        subtitle: l10n.about,
+        sectionPath: l10n.about,
+        icon: HugeIcons.strokeRoundedParty,
+        routeBuilder: (_) => const AboutUsPage(),
+        isSubPage: true,
+        keywords: ["changelog", "updates", "new"],
+      ),
+      SettingsSearchItem(
         title: l10n.weAreOpenSource,
         subtitle: l10n.about,
         sectionPath: l10n.about,

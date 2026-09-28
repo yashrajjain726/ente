@@ -20,6 +20,7 @@ import "package:photos/ui/account/login_page.dart";
 import "package:photos/ui/components/banners/offline_settings_banner.dart";
 import "package:photos/ui/growth/referral_screen.dart";
 import "package:photos/ui/notification/toast.dart";
+import "package:photos/ui/notification/update/change_log_page.dart";
 import "package:photos/ui/settings/about/about_us_page.dart";
 import "package:photos/ui/settings/account/account_settings_page.dart";
 import "package:photos/ui/settings/appearance/appearance_settings_page.dart";
@@ -170,7 +171,10 @@ class _SettingsBody extends StatelessWidget {
               padding: EdgeInsets.symmetric(vertical: 28),
               child: SocialIconsRow(),
             ),
-            const AppVersionWidget(),
+            InkWell(
+              onTap: () async => showChangeLogSheet(context),
+              child: const AppVersionWidget(),
+            ),
             if (hasLoggedIn &&
                 !isLocalGalleryMode &&
                 (flagService.flags.internalUser || kDebugMode)) ...[
