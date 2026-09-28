@@ -34,7 +34,15 @@ pub struct EncryptedChatPayload {
 }
 
 pub fn sha256(bytes: &[u8]) -> [u8; 32] {
-    Sha256::digest(bytes).into()
+    sha256_parts(&[bytes])
+}
+
+pub fn sha256_parts(parts: &[&[u8]]) -> [u8; 32] {
+    let mut hash = Sha256::new();
+    for bytes in parts {
+        hash.update(bytes);
+    }
+    hash.finalize().into()
 }
 
 pub fn generate_chat_key() -> String {

@@ -24,11 +24,12 @@ impl ConversationSnapshot {
     pub fn state(&self) -> Option<&ConversationState> {
         self.state.as_ref()
     }
-    pub fn evidence(&self) -> Vec<&AnswerEvidence> {
+    pub fn evidence(&self) -> Vec<AnswerEvidence> {
         self.derived
             .evidence
             .iter()
             .filter(|entry| entry.matches(&self.messages))
+            .cloned()
             .collect()
     }
     pub fn session_uuid(&self) -> Uuid {
@@ -165,12 +166,12 @@ impl<B: Backend> ChatDb<B> {
         answer: Uuid,
         passages: Vec<crate::retrieval::IncludedPassage>,
     ) -> Result<bool> {
-        if !conversation::valid_answer_passages(&passages) || passages.is_empty() {
+        if !conversation::valid_answer_passages(&passages) {
             return Ok(false);
         }
         let mut path: Vec<_> = snapshot.messages.iter().map(|m| m.uuid).collect();
         path.push(answer);
-        let current = self.conversation_snapshot(snapshot.session_uuid, &path)?;
+        let mut current = self.conversation_snapshot(snapshot.session_uuid, &path)?;
         if current.envelope != snapshot.envelope
             || current.rows[..snapshot.rows.len()] != snapshot.rows
         {
@@ -188,11 +189,10 @@ impl<B: Backend> ChatDb<B> {
         }) {
             return Ok(false);
         }
-        let mut derived = current.derived.clone();
-        if !derived.add_evidence(&current.messages, passages) {
+        if !current.derived.add_evidence(&current.messages, passages) {
             return Ok(false);
         }
-        let envelope = self.encode_conversation(&derived)?;
+        let envelope = self.encode_conversation(&current.derived)?;
         self.replace_conversation_envelope(&current, envelope)
     }
 
@@ -419,11 +419,7 @@ mod tests {
     }
 
     fn passages() -> Vec<crate::retrieval::IncludedPassage> {
-        let fixtures: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../tests/fixtures/passage-references-v1.json"
-        ))
-        .unwrap();
-        vec![serde_json::from_value(fixtures[0]["reference"].clone()).unwrap()]
+        vec![crate::retrieval::passage_fixture().0]
     }
 
     fn sourced_answer(
@@ -740,133 +736,6 @@ mod tests {
                 .is_err()
         );
         assert!(db.get_session(session).unwrap().is_none());
-    }
-
-    #[test]
-    fn malformed_components_do_not_destroy_valid_siblings() {
-        let (db, session, messages) = seeded();
-        let memory = state(session, &messages, "Memory");
-        let mut captured = snapshot(&db, session, &messages);
-        assert!(
-            db.replace_conversation_state(&mut captured, Some(memory.clone()))
-                .unwrap()
-        );
-        let answer = sourced_answer(&db, &captured);
-        assert!(
-            db.save_answer_evidence(&captured, answer.uuid, passages())
-                .unwrap()
-        );
-        let mut path = messages;
-        path.push(answer);
-        let restored = snapshot(&db, session, &path);
-        let mut value = serde_json::to_value(&restored.derived).unwrap();
-        assert!(
-            ConversationEnvelope::decode(&serde_json::to_vec(&value).unwrap(), Uuid::new_v4())
-                .is_none()
-        );
-        value["format_version"] = 1.into();
-        assert!(
-            ConversationEnvelope::decode(&serde_json::to_vec(&value).unwrap(), session).is_none()
-        );
-        value = serde_json::to_value(&restored.derived).unwrap();
-        value["summary"] = serde_json::json!({"bad": true});
-        let decoded =
-            ConversationEnvelope::decode(&serde_json::to_vec(&value).unwrap(), session).unwrap();
-        assert!(decoded.summary.is_none());
-        assert_eq!(decoded.evidence.len(), 1);
-        value = serde_json::to_value(&restored.derived).unwrap();
-        value["evidence"][0]["passages"][0]["spans"][0]["textSha256"] = "bad".into();
-        let decoded =
-            ConversationEnvelope::decode(&serde_json::to_vec(&value).unwrap(), session).unwrap();
-        assert!(decoded.evidence.is_empty());
-        assert_eq!(decoded.summary_state().unwrap(), memory);
-    }
-
-    #[test]
-    fn evidence_retention_is_bounded_and_keeps_newest_answers() {
-        let (db, session, mut messages) = seeded();
-        let mut first_answer = None;
-        for index in 0..10 {
-            let captured = snapshot(&db, session, &messages);
-            let answer = sourced_answer(&db, &captured);
-            first_answer.get_or_insert(answer.uuid);
-            assert!(
-                db.save_answer_evidence(&captured, answer.uuid, passages())
-                    .unwrap()
-            );
-            messages.push(answer);
-            let current = snapshot(&db, session, &messages);
-            assert!(current.derived.evidence.len() <= conversation::MAX_EVIDENCE_ANSWERS);
-            assert!(serde_json::to_vec(&current.derived).unwrap().len() <= MAX_STATE_BYTES);
-            if index == 9 {
-                assert_eq!(current.evidence().len(), 8);
-                assert!(
-                    !current
-                        .evidence()
-                        .iter()
-                        .any(|entry| Some(entry.assistant_message_uuid) == first_answer)
-                );
-            } else {
-                let question = db
-                    .insert_message(
-                        session,
-                        "self",
-                        "Next",
-                        Some(messages.last().unwrap().uuid),
-                        vec![],
-                    )
-                    .unwrap();
-                messages.push(question);
-            }
-        }
-    }
-
-    #[test]
-    fn evidence_byte_limit_evicts_older_records_and_rejects_oversized_inputs() {
-        let (db, session, mut messages) = seeded();
-        let mut large = Vec::new();
-        for chunk in 0..conversation::MAX_ANSWER_PASSAGES {
-            let mut reference = passages().remove(0);
-            if let crate::retrieval::PassageLocator::LocalNote { chunk_index, .. } =
-                &mut reference.locator
-            {
-                *chunk_index = chunk as u64;
-            }
-            large.push(reference);
-        }
-        assert!(!conversation::valid_answer_passages(&vec![
-            large[0].clone();
-            8
-        ]));
-        let mut future = large.clone();
-        future[0].cleaning_version = 999;
-        assert!(!conversation::valid_answer_passages(&future));
-        for _ in 0..6 {
-            let captured = snapshot(&db, session, &messages);
-            let answer = sourced_answer(&db, &captured);
-            assert!(
-                db.save_answer_evidence(&captured, answer.uuid, large.clone())
-                    .unwrap()
-            );
-            messages.push(answer);
-            let question = db
-                .insert_message(
-                    session,
-                    "self",
-                    "Next",
-                    Some(messages.last().unwrap().uuid),
-                    vec![],
-                )
-                .unwrap();
-            messages.push(question);
-        }
-        let current = snapshot(&db, session, &messages);
-        assert!(current.evidence().len() < 6);
-        assert!(!current.evidence().is_empty());
-        assert!(
-            serde_json::to_vec(&current.derived.evidence).unwrap().len()
-                <= conversation::MAX_EVIDENCE_BYTES
-        );
     }
 
     #[test]

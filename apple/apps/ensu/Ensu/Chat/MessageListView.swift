@@ -14,7 +14,6 @@ struct MessageListView: View {
     let onEdit: (RenderedChatMessage) -> Void
     let onCopy: (RenderedChatMessage) -> Void
     let onRetry: (RenderedChatMessage) -> Void
-    let onSearch: ((RenderedChatMessage) -> Void)?
     let onBranchChange: (RenderedChatMessage, Int) -> Void
     let onDismissKeyboard: () -> Void
 
@@ -205,7 +204,6 @@ struct MessageListView: View {
                             isLastMessage: message.id == messages.last?.id,
                             onCopy: { onCopy(message) },
                             onRetry: { onRetry(message) },
-                            onSearch: onSearch.map { search in { search(message) } },
                             onBranchChange: { delta in onBranchChange(message, delta) },
                             onOpenAttachment: openAttachment,
                             showsMetadata: true

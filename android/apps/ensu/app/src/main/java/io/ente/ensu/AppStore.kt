@@ -193,8 +193,7 @@ class AppStore(
         modelSettingsActions.cancelModelDownload()
     }
 
-    fun retryAssistantMessage(messageId: String, searchAsWritten: Boolean = false) =
-        chatActions.retryAssistantMessage(messageId, searchAsWritten)
+    fun retryAssistantMessage(messageId: String) = chatActions.retryAssistantMessage(messageId)
 
     fun sendMessage() = chatActions.sendMessage()
 

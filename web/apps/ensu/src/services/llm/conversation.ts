@@ -86,11 +86,6 @@ export const prepareDesktopConversation = async (
     }
 };
 
-export interface ResolvedSourceFollowup {
-    token: string;
-    candidates: unknown;
-}
-
 export const resolveDesktopSourceFollowup = (input: {
     sessionUuid: string;
     path: string[];
@@ -98,7 +93,7 @@ export const resolveDesktopSourceFollowup = (input: {
     enabledStableIds: string[];
     cancellationEpoch: number;
     candidates?: unknown;
-}): Promise<ResolvedSourceFollowup> =>
-    invoke<ResolvedSourceFollowup>("conversation_resolve_followup", {
+}): Promise<string> =>
+    invoke<string>("conversation_resolve_followup", {
         input: { ...input, token: crypto.randomUUID() },
     });

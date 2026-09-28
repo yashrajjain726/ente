@@ -3,10 +3,10 @@ use ente_ensu::{
     conversation as core,
     db::{ChatDb, SqliteBackend, chat::ConversationSnapshot},
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, atomic::Ordering};
-use tauri::{AppHandle, Manager, State as TauriState, WebviewWindow};
+use tauri::{AppHandle, Manager, State as TauriState, WebviewWindow, async_runtime};
 use uuid::Uuid;
 
 #[derive(Default)]
@@ -15,9 +15,13 @@ pub struct State {
 }
 struct Guard {
     token: String,
-    fingerprint: String,
     db: Arc<ChatDb<SqliteBackend>>,
-    candidates: Option<String>,
+    selection: Option<Selection>,
+}
+pub(crate) struct Selection {
+    fingerprint: String,
+    pub question: String,
+    pub candidates: core::GroundingCandidates,
 }
 
 fn error(message: impl Into<String>) -> ApiError {
@@ -25,36 +29,35 @@ fn error(message: impl Into<String>) -> ApiError {
 }
 
 impl State {
-    pub(crate) fn validate(
+    pub(crate) fn take_selection(
         &self,
         window: &str,
         token: &str,
         db: &Arc<ChatDb<SqliteBackend>>,
         snapshot: &ConversationSnapshot,
-        candidates: Option<&core::GroundingCandidates>,
-    ) -> Result<(), ApiError> {
-        let guards = self
+    ) -> Result<Selection, ApiError> {
+        let fingerprint = core::fingerprint(snapshot.messages());
+        let mut guards = self
             .guards
             .lock()
             .map_err(|_| error("Follow-up state is unavailable"))?;
-        if guards.get(window).is_some_and(|guard| {
-            guard.token == token
-                && guard.candidates.as_ref().is_some_and(|expected| {
-                    candidates
-                        .and_then(|c| serde_json::to_string(c).ok())
+        guards
+            .get_mut(window)
+            .filter(|guard| {
+                guard.token == token
+                    && Arc::ptr_eq(&guard.db, db)
+                    && guard
+                        .selection
                         .as_ref()
-                        == Some(expected)
-                })
-                && Arc::ptr_eq(&guard.db, db)
-                && guard.fingerprint == core::fingerprint(snapshot.messages())
-        }) {
-            Ok(())
-        } else {
-            Err(ApiError::new(
-                "stale",
-                "Conversation changed after selecting sources; retry the reply",
-            ))
-        }
+                        .is_some_and(|selection| selection.fingerprint == fingerprint)
+            })
+            .and_then(|guard| guard.selection.take())
+            .ok_or_else(|| {
+                ApiError::new(
+                    "stale",
+                    "Source selection expired or conversation changed; retry the reply",
+                )
+            })
     }
 }
 
@@ -69,13 +72,6 @@ pub struct Request {
     cancellation_epoch: u64,
     candidates: Option<core::GroundingCandidates>,
 }
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Response {
-    token: String,
-    candidates: core::GroundingCandidates,
-}
-
 #[tauri::command]
 pub async fn conversation_resolve_followup(
     app: AppHandle,
@@ -83,7 +79,7 @@ pub async fn conversation_resolve_followup(
     state: TauriState<'_, State>,
     llm_state: TauriState<'_, super::llm::State>,
     input: Request,
-) -> Result<Response, ApiError> {
+) -> Result<String, ApiError> {
     if Uuid::parse_str(&input.token).is_err()
         || input.path.is_empty()
         || input.path.len() > core::MAX_HISTORY_MESSAGES
@@ -94,42 +90,10 @@ pub async fn conversation_resolve_followup(
         ));
     }
     let db = app.state::<ChatDbState>().database()?;
-    let snapshot = db
-        .conversation_snapshot(input.session_uuid, &input.path)
-        .map_err(ApiError::from)?;
-    let question = snapshot
-        .messages()
-        .last()
-        .ok_or_else(|| error("Missing current question"))?;
-    if question.sender != ente_ensu::db::Sender::SelfUser {
-        return Err(error("Follow-up must end at a user question"));
-    }
-    {
-        let mut guards = state
-            .guards
-            .lock()
-            .map_err(|_| error("Follow-up state is unavailable"))?;
-        if guards
-            .get(window.label())
-            .is_some_and(|guard| guard.token == input.token)
-        {
-            return Err(error(
-                "This source selection was already attempted; retry the reply",
-            ));
-        }
-        guards.insert(
-            window.label().to_owned(),
-            Guard {
-                token: input.token.clone(),
-                fingerprint: core::fingerprint(snapshot.messages()),
-                db: db.clone(),
-                candidates: None,
-            },
-        );
-    }
+    let window = window.label().to_owned();
     let epoch = llm_state.retrieval_epoch();
     let expected = input.cancellation_epoch;
-    let check = || {
+    let check = move || {
         if epoch.load(Ordering::Relaxed) == expected {
             Ok(())
         } else {
@@ -137,21 +101,68 @@ pub async fn conversation_resolve_followup(
         }
     };
     check()?;
-    let evidence: Vec<_> = snapshot.evidence().into_iter().cloned().collect();
-    let (searched, max_utf8_bytes) = input
-        .candidates
-        .map_or((Vec::new(), core::MAX_GROUNDING_BYTES), |fresh| {
-            (fresh.searched, fresh.max_utf8_bytes)
-        });
-    let mut candidates = core::GroundingCandidates::new(Vec::new(), searched, max_utf8_bytes)
-        .map_err(|cause| error(cause.to_string()))?;
-    let references = core::direct_followup_references(
-        snapshot.messages(),
-        &evidence,
-        &input.question,
-        &candidates.searched,
-    )
-    .unwrap_or_default();
+    {
+        let mut guards = state
+            .guards
+            .lock()
+            .map_err(|_| error("Follow-up state is unavailable"))?;
+        check()?;
+        if guards
+            .get(&window)
+            .is_some_and(|guard| guard.token == input.token)
+        {
+            return Err(error(
+                "This source selection was already attempted; retry the reply",
+            ));
+        }
+        guards.insert(
+            window.clone(),
+            Guard {
+                token: input.token.clone(),
+                db: db.clone(),
+                selection: None,
+            },
+        );
+    }
+    let work_db = db.clone();
+    let check_work = check.clone();
+    let (snapshot, mut selection, references) = async_runtime::spawn_blocking(move || {
+        check_work()?;
+        let snapshot = work_db
+            .conversation_snapshot(input.session_uuid, &input.path)
+            .map_err(ApiError::from)?;
+        let question = snapshot
+            .messages()
+            .last()
+            .ok_or_else(|| error("Missing current question"))?;
+        if question.sender != ente_ensu::db::Sender::SelfUser {
+            return Err(error("Follow-up must end at a user question"));
+        }
+        check_work()?;
+        let evidence = snapshot.evidence();
+        let (searched, max_utf8_bytes) = input
+            .candidates
+            .map_or((Vec::new(), core::MAX_GROUNDING_BYTES), |fresh| {
+                (fresh.searched, fresh.max_utf8_bytes)
+            });
+        let candidates = core::GroundingCandidates::new(Vec::new(), searched, max_utf8_bytes)
+            .map_err(|cause| error(cause.to_string()))?;
+        let references = core::direct_followup_references(
+            snapshot.messages(),
+            &evidence,
+            &input.question,
+            &candidates.searched,
+        );
+        let selection = Selection {
+            fingerprint: core::fingerprint(snapshot.messages()),
+            question: input.question,
+            candidates,
+        };
+        check_work()?;
+        Ok((snapshot, selection, references))
+    })
+    .await
+    .map_err(|_| error("Source selection task failed"))??;
     for reference in references {
         check()?;
         match super::knowledge::reload_for_followup(
@@ -162,7 +173,7 @@ pub async fn conversation_resolve_followup(
         )
         .await
         {
-            Ok(Some(passage)) => candidates.referenced.push(passage),
+            Ok(Some(passage)) => selection.candidates.referenced.push(passage),
             Ok(None) => {}
             Err(error) if error.name == Some("cancelled") => return Err(error),
             Err(error) => crate::logging::log(
@@ -171,42 +182,43 @@ pub async fn conversation_resolve_followup(
             ),
         }
     }
-    candidates
-        .validate()
-        .map_err(|cause| error(cause.to_string()))?;
-    check()?;
-    if !db
-        .conversation_snapshot_matches(&snapshot)
-        .map_err(ApiError::from)?
-        || !Arc::ptr_eq(&db, &app.state::<ChatDbState>().database()?)
-    {
-        return Err(ApiError::new(
-            "stale",
-            "Conversation changed while selecting sources; retry the reply",
-        ));
-    }
-    let mut guards = state
-        .guards
-        .lock()
-        .map_err(|_| error("Follow-up state is unavailable"))?;
-    let guard = guards
-        .get_mut(window.label())
-        .filter(|guard| guard.token == input.token)
-        .ok_or_else(|| ApiError::new("stale", "Source question was superseded"))?;
-    guard.candidates =
-        Some(serde_json::to_string(&candidates).map_err(|cause| error(cause.to_string()))?);
-    Ok(Response {
-        token: input.token,
-        candidates,
+    async_runtime::spawn_blocking(move || {
+        check()?;
+        selection
+            .candidates
+            .validate()
+            .map_err(|cause| error(cause.to_string()))?;
+        if !db
+            .conversation_snapshot_matches(&snapshot)
+            .map_err(ApiError::from)?
+            || !Arc::ptr_eq(&db, &app.state::<ChatDbState>().database()?)
+        {
+            return Err(ApiError::new(
+                "stale",
+                "Conversation changed while selecting sources; retry the reply",
+            ));
+        }
+        let state = app.state::<State>();
+        let mut guards = state
+            .guards
+            .lock()
+            .map_err(|_| error("Follow-up state is unavailable"))?;
+        check()?;
+        let guard = guards
+            .get_mut(&window)
+            .filter(|guard| guard.token == input.token)
+            .ok_or_else(|| ApiError::new("stale", "Source question was superseded"))?;
+        guard.selection = Some(selection);
+        Ok(input.token)
     })
+    .await
+    .map_err(|_| error("Source selection validation task failed"))?
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn candidates() -> core::GroundingCandidates {
-        core::GroundingCandidates::new(vec![], vec![], 6000).unwrap()
-    }
+
     fn fixture() -> (Arc<ChatDb<SqliteBackend>>, ConversationSnapshot) {
         let db = Arc::new(ChatDb::open_in_memory(vec![4; 32]).unwrap());
         let session = db.create_session("Synthetic source question").unwrap();
@@ -225,22 +237,20 @@ mod tests {
         (db, snapshot)
     }
     #[test]
-    fn preparation_requires_matching_completed_source_selection() {
+    fn preparation_requires_matching_source_selection_and_consumes_it_once() {
         let (db, snapshot) = fixture();
         let state = State::default();
-        let valid = candidates();
         state.guards.lock().unwrap().insert(
             "window".into(),
             Guard {
                 token: "token".into(),
-                fingerprint: core::fingerprint(snapshot.messages()),
                 db: db.clone(),
-                candidates: None,
+                selection: None,
             },
         );
         assert!(
             state
-                .validate("window", "token", &db, &snapshot, Some(&valid))
+                .take_selection("window", "token", &db, &snapshot)
                 .is_err()
         );
         state
@@ -249,36 +259,28 @@ mod tests {
             .unwrap()
             .get_mut("window")
             .unwrap()
-            .candidates = Some(serde_json::to_string(&valid).unwrap());
-        assert!(
-            state
-                .validate("window", "token", &db, &snapshot, Some(&valid))
-                .is_ok()
-        );
-        let mut changed = candidates();
-        changed.max_utf8_bytes = 3000;
-        let (other_db, _) = fixture();
-        for (token, db, candidates) in [
-            ("token", &db, Some(&changed)),
-            ("token", &db, None),
-            ("another-token", &db, Some(&valid)),
-            ("token", &other_db, Some(&valid)),
+            .selection = Some(Selection {
+            fingerprint: core::fingerprint(snapshot.messages()),
+            question: "Where does she track it?".into(),
+            candidates: core::GroundingCandidates::new(vec![], vec![], 6000).unwrap(),
+        });
+        let (other_db, other_snapshot) = fixture();
+        for (window, token, db, snapshot) in [
+            ("another-window", "token", &db, &snapshot),
+            ("window", "another-token", &db, &snapshot),
+            ("window", "token", &other_db, &snapshot),
+            ("window", "token", &db, &other_snapshot),
         ] {
-            assert!(
-                state
-                    .validate("window", token, db, &snapshot, candidates)
-                    .is_err()
-            );
+            assert!(state.take_selection(window, token, db, snapshot).is_err());
         }
-        let question = snapshot.messages()[0].uuid;
-        db.update_message_text(question, "Actually, use another source")
+        let selection = state
+            .take_selection("window", "token", &db, &snapshot)
             .unwrap();
-        let edited = db
-            .conversation_snapshot(snapshot.session_uuid(), &[question])
-            .unwrap();
+        assert_eq!(selection.question, "Where does she track it?");
+        assert_eq!(selection.candidates.max_utf8_bytes, 6000);
         assert!(
             state
-                .validate("window", "token", &db, &edited, Some(&valid))
+                .take_selection("window", "token", &db, &snapshot)
                 .is_err()
         );
     }

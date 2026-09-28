@@ -10,7 +10,6 @@ import io.ente.ensu.bindings.ConversationRequest
 import io.ente.ensu.bindings.DbException
 import io.ente.ensu.bindings.GroundedExcerpt
 import io.ente.ensu.bindings.GroundedSource
-import io.ente.ensu.bindings.IncludedPassage
 import io.ente.ensu.bindings.LlmException
 import io.ente.ensu.bindings.PassageLocator
 import io.ente.ensu.bindings.buildGroundedPromptContext
@@ -318,7 +317,7 @@ internal class ChatStoreActions(
         generationJob?.cancel()
     }
 
-    fun retryAssistantMessage(messageId: String, searchAsWritten: Boolean = false) {
+    fun retryAssistantMessage(messageId: String) {
         val priorGeneration = generationJob
         val priorSummary = sessionSummaryJob
         if (state.value.chat.isGenerating) {
@@ -347,7 +346,7 @@ internal class ChatStoreActions(
             priorGeneration?.join()
             priorSummary?.join()
             llmProvider.resetContext()
-            startGeneration(sessionId, parent, searchAsWritten)
+            startGeneration(sessionId, parent)
         }
     }
 
@@ -483,11 +482,7 @@ internal class ChatStoreActions(
         }
     }
 
-    private fun startGeneration(
-        sessionId: String,
-        userMessage: ChatMessage,
-        searchAsWritten: Boolean = false,
-    ) {
+    private fun startGeneration(sessionId: String, userMessage: ChatMessage) {
         val scope = scope ?: return
         if (!state.value.chat.deviceCapability.isChatSupported()) return
         val prompt = buildPrompt(userMessage.text, userMessage.attachments)
@@ -544,23 +539,21 @@ internal class ChatStoreActions(
             val enabledDatasets = state.value.knowledge.enabledReadyDatasets
             try {
                 if (prompt.imageFiles.isEmpty()) {
-                    val history = buildSelectedPath(sessionId).takeWhile { it.id != userMessage.id }
-                    val hasCurrentSources =
-                        searchAsWritten ||
-                            enabledDatasets.isNotEmpty() ||
-                            notesStore.state.value.collections.isNotEmpty()
+                    val messages = messageStore[sessionId].orEmpty()
+                    val path = conversationPath(messages, userMessage)
+                    val pathIds = path.toSet()
                     val turn =
                         withContext(Dispatchers.IO) {
                             if (
-                                hasCurrentSources ||
-                                    history.any {
+                                messages.any {
+                                    it.id in pathIds &&
                                         it.author == MessageAuthor.Assistant &&
-                                            parseGroundedAssistantText(it.text).sources.isNotEmpty()
-                                    }
+                                        parseGroundedAssistantText(it.text).sources.isNotEmpty()
+                                }
                             ) {
                                 chatRepository.startFollowup(
                                     sessionId,
-                                    history.map { it.id } + userMessage.id,
+                                    path,
                                     userMessage.text,
                                 )
                             } else null
@@ -645,13 +638,12 @@ internal class ChatStoreActions(
                 try {
                     followup
                         ?.let { turn ->
-                            val resolution =
+                            val locators =
                                 withContext(Dispatchers.IO) {
-                                    if (searchAsWritten) turn.searchAsWritten()
-                                    else turn.searchWithHistory(knowledgeHits)
+                                    turn.searchWithHistory(knowledgeHits)
                                 }
                             if (!isActive() || stopRequested) return@launch
-                            resolution.referencedPassages.mapNotNull { reloadPassage(it) }
+                            locators.mapNotNull { reloadPassage(it) }
                         }
                         .orEmpty()
                 } catch (error: kotlinx.coroutines.CancellationException) {
@@ -954,20 +946,14 @@ internal class ChatStoreActions(
         return true
     }
 
-    private suspend fun reloadPassage(reference: IncludedPassage): GroundedExcerpt? {
-        return try {
-            when (val locator = reference.locator) {
+    private suspend fun reloadPassage(locator: PassageLocator): GroundedExcerpt? =
+        try {
+            when (locator) {
                 is PassageLocator.EnsuPack ->
                     knowledgeProvider.reload(locator, state.value.knowledge.enabledReadyDatasets)
                 is PassageLocator.LocalNote -> notesStore.reload(locator)
             }
         } catch (error: kotlinx.coroutines.CancellationException) {
-            throw error
-        } catch (error: ConversationException.Cancelled) {
-            throw error
-        } catch (error: ConversationException.Stale) {
-            throw error
-        } catch (error: DbException) {
             throw error
         } catch (error: Exception) {
             logRepository.log(
@@ -979,7 +965,6 @@ internal class ChatStoreActions(
             )
             null
         }
-    }
 
     private suspend fun generateTextConversation(
         sessionId: String,

@@ -18,7 +18,6 @@ import {
     Copy01Icon,
     Edit01Icon,
     RepeatIcon,
-    Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -103,8 +102,7 @@ export interface ChatMessageListProps {
     ) => void;
     onEditMessage: (message: ChatMessage) => void;
     onCopyMessage: (text: string) => void;
-    onRetryMessage: (message: ChatMessage, searchAsWritten?: boolean) => void;
-    canSearchSources: boolean;
+    onRetryMessage: (message: ChatMessage) => void;
     onPrevBranch: (switcher: BranchSwitcher) => void;
     onNextBranch: (switcher: BranchSwitcher) => void;
     onRequestPreview: (attachment: ChatAttachment, sessionUuid: string) => void;
@@ -419,8 +417,7 @@ interface MessageRowProps {
     ) => void;
     onEditMessage: (message: ChatMessage) => void;
     onCopyMessage: (text: string) => void;
-    onRetryMessage: (message: ChatMessage, searchAsWritten?: boolean) => void;
-    canSearchSources: boolean;
+    onRetryMessage: (message: ChatMessage) => void;
     onPrevBranch: (switcher: BranchSwitcher) => void;
     onNextBranch: (switcher: BranchSwitcher) => void;
     attachmentPreviews: Record<string, string>;
@@ -454,7 +451,6 @@ const MessageRow = memo(
         onEditMessage,
         onCopyMessage,
         onRetryMessage,
-        canSearchSources,
         onPrevBranch,
         onNextBranch,
         attachmentPreviews,
@@ -780,24 +776,6 @@ const MessageRow = memo(
                                 </IconButton>
                             </>
                         )}
-                        {!isStreaming &&
-                            !isSelf &&
-                            (!isSynthetic || isLastMessage) &&
-                            canSearchSources && (
-                                <IconButton
-                                    aria-label="Search as written"
-                                    title="Search as written"
-                                    sx={actionButtonSx}
-                                    onClick={() =>
-                                        onRetryMessage(message, true)
-                                    }
-                                >
-                                    <HugeiconsIcon
-                                        icon={Search01Icon}
-                                        {...actionIconProps}
-                                    />
-                                </IconButton>
-                            )}
                     </Stack>
 
                     {isStreaming || isSynthetic ? null : (
@@ -959,7 +937,6 @@ export const ChatMessageList = memo(
         onEditMessage,
         onCopyMessage,
         onRetryMessage,
-        canSearchSources,
         onPrevBranch,
         onNextBranch,
         onRequestPreview,
@@ -1026,7 +1003,6 @@ export const ChatMessageList = memo(
                         onEditMessage={onEditMessage}
                         onCopyMessage={onCopyMessage}
                         onRetryMessage={onRetryMessage}
-                        canSearchSources={canSearchSources}
                         onPrevBranch={onPrevBranch}
                         onNextBranch={onNextBranch}
                         attachmentPreviews={attachmentPreviews}
@@ -1053,7 +1029,6 @@ export const ChatMessageList = memo(
                 assistantMarkdownSx,
                 attachmentPreviews,
                 branchSwitchers,
-                canSearchSources,
                 dialogCloseButtonSx,
                 dialogCloseIconProps,
                 dialogTitleSx,

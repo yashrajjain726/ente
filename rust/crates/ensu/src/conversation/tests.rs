@@ -1,3 +1,4 @@
+use super::state::{MAX_ANSWER_PASSAGES, MAX_EVIDENCE_ANSWERS, MAX_EVIDENCE_BYTES};
 use super::*;
 
 fn message(index: u128, sender: Sender, text: &str) -> Message {
@@ -74,6 +75,69 @@ fn saved_memory_preserves_uuid_strings() {
             .summary
             .is_none()
     );
+}
+
+fn evidence_passages() -> Vec<crate::retrieval::IncludedPassage> {
+    vec![crate::retrieval::passage_fixture().0]
+}
+
+#[test]
+fn invalid_summary_and_evidence_are_discarded_independently() {
+    let history = vec![
+        message(1, Sender::SelfUser, "Question"),
+        message(2, Sender::Other, "Answer"),
+    ];
+    let session = history[0].session_uuid;
+    let memory = ConversationState::new(session, &history, "Memory".into()).unwrap();
+    let mut state = ConversationEnvelope::empty(session);
+    state.summary = Some(memory.summary.clone());
+    assert!(state.add_evidence(&history, evidence_passages()));
+    let original = serde_json::to_value(&state).unwrap();
+    let decode = |value: &serde_json::Value| {
+        ConversationEnvelope::decode(&serde_json::to_vec(value).unwrap(), session)
+    };
+    let mut value = original.clone();
+    value["summary"] = serde_json::json!({"bad": true});
+    let decoded = decode(&value).unwrap();
+    assert!(decoded.summary.is_none());
+    assert_eq!(decoded.evidence, state.evidence);
+
+    value = original;
+    value["evidence"][0]["passages"][0]["spans"][0]["textSha256"] = "bad".into();
+    let decoded = decode(&value).unwrap();
+    assert!(decoded.evidence.is_empty());
+    assert_eq!(decoded.summary_state().unwrap(), memory);
+    value["format_version"] = 1.into();
+    assert!(decode(&value).is_none());
+    assert!(
+        ConversationEnvelope::decode(&serde_json::to_vec(&state).unwrap(), Uuid::nil()).is_none()
+    );
+}
+
+#[test]
+fn evidence_retention_obeys_answer_and_byte_limits() {
+    for passage_count in [1, MAX_ANSWER_PASSAGES] {
+        let passages = vec![evidence_passages().remove(0); passage_count];
+        let mut state = ConversationEnvelope::empty(Uuid::from_u128(100));
+        let mut history = Vec::new();
+        for index in 1..=10 {
+            history.push(message(index * 2 - 1, Sender::SelfUser, "Question"));
+            history.push(message(index * 2, Sender::Other, "Answer"));
+            assert!(state.add_evidence(&history, passages.clone()));
+        }
+        assert_eq!(
+            state.evidence.last().unwrap().assistant_message_uuid,
+            Uuid::from_u128(20)
+        );
+        assert_ne!(state.evidence[0].assistant_message_uuid, Uuid::from_u128(2));
+        assert!(serde_json::to_vec(&state.evidence).unwrap().len() <= MAX_EVIDENCE_BYTES);
+        if passage_count == 1 {
+            assert_eq!(state.evidence.len(), MAX_EVIDENCE_ANSWERS);
+        } else {
+            assert!(state.evidence.len() < MAX_EVIDENCE_ANSWERS);
+        }
+        assert!(!state.add_evidence(&history, vec![passages[0].clone(); MAX_ANSWER_PASSAGES + 1]));
+    }
 }
 
 #[test]

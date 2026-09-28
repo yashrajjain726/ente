@@ -265,6 +265,8 @@ pub(crate) fn build_followup_prompt_context(
     }
     let mut text = format!("{BEGIN_CONTEXT_SENTINEL}\n{CONTEXT_WARNING}");
     let footer = format!("\n{END_CONTEXT_SENTINEL}");
+    let mut sections = Vec::new();
+    let mut used_bytes = text.len() + footer.len();
     let mut sources = Vec::new();
     let mut included_passages = Vec::new();
     let mut packs = 0;
@@ -295,25 +297,48 @@ pub(crate) fn build_followup_prompt_context(
         }
         let prefix = format!("\n\n# {}\n", grounded_label(&item.source)?);
         let passages = item.passages.join("\n[omitted source text]\n");
-        if text
-            .len()
+        if used_bytes
             .saturating_add(prefix.len())
             .saturating_add(passages.len())
-            .saturating_add(footer.len())
             > max_utf8_bytes
         {
             return Err(invalid());
         }
-        text.push_str(&prefix);
-        text.push_str(&passages);
+        used_bytes += prefix.len() + passages.len();
+        sections.push(format!("{prefix}{passages}"));
         sources.push(item.source.clone());
         included_passages.push(item.reference.clone());
     }
     for item in searched {
-        if included_passages
+        if let Some(index) = included_passages
             .iter()
-            .any(|reference| reference.locator == item.locator)
+            .position(|reference| reference.locator == item.locator)
         {
+            let reference = &included_passages[index];
+            if !item.score.is_finite()
+                || !item.locator.matches_source(&item.source)
+                || reference.verified_spans(&item.text).is_none()
+            {
+                continue;
+            }
+            // Fresh search may add text beyond the saved spans, but every old
+            // span must still fit. Keep one source entry for the entire chunk.
+            let prefix = format!("\n\n# {}\n", grounded_label(&sources[index])?);
+            let available = max_utf8_bytes - used_bytes + sections[index].len() - prefix.len();
+            let cleaned = super::clean_passage_text(&item.text);
+            let passage = truncate_utf8(&cleaned, available).trim_end();
+            if reference
+                .spans
+                .iter()
+                .any(|span| span.end_utf8 as usize > passage.len())
+            {
+                continue;
+            }
+            let expanded = super::IncludedPassage::prefix(item.locator.clone(), passage)?;
+            used_bytes -= sections[index].len();
+            sections[index] = format!("{prefix}{passage}");
+            used_bytes += sections[index].len();
+            included_passages[index] = expanded;
             continue;
         }
         let is_pack = matches!(&item.source, GroundedSource::EnsuPack { .. });
@@ -321,8 +346,7 @@ pub(crate) fn build_followup_prompt_context(
             continue;
         }
         let prefix = format!("\n\n# {}\n", grounded_label(&item.source)?);
-        let Some(available) = max_utf8_bytes.checked_sub(text.len() + prefix.len() + footer.len())
-        else {
+        let Some(available) = max_utf8_bytes.checked_sub(used_bytes + prefix.len()) else {
             continue;
         };
         if !item.score.is_finite() || !item.locator.matches_source(&item.source) {
@@ -333,8 +357,8 @@ pub(crate) fn build_followup_prompt_context(
         if passage.is_empty() {
             continue;
         }
-        text.push_str(&prefix);
-        text.push_str(passage);
+        used_bytes += prefix.len() + passage.len();
+        sections.push(format!("{prefix}{passage}"));
         sources.push(item.source.clone());
         included_passages.push(super::IncludedPassage::prefix(
             item.locator.clone(),
@@ -345,6 +369,9 @@ pub(crate) fn build_followup_prompt_context(
         } else {
             notes += 1;
         }
+    }
+    for section in sections {
+        text.push_str(&section);
     }
     text.push_str(&footer);
     Ok(Some(GroundedPromptContext {
@@ -399,11 +426,13 @@ mod tests {
     }
 
     #[test]
-    fn mismatched_source_and_locator_are_rejected() {
-        let candidates = select_mixed_grounding_candidates(&[], &[note("one.md", 0.9)], 5).unwrap();
-        let mut wrong = candidates;
+    fn mismatched_passage_sources_and_text_are_rejected() {
+        let mut wrong = select_mixed_grounding_candidates(&[], &[note("one.md", 0.9)], 5).unwrap();
         wrong[0].locator = note("other.md", 0.9).locator;
         assert!(build_grounded_prompt_context(&wrong, 6000).is_err());
+        let mut old = previous();
+        old.passages[0] = "Cafe 🙂".into();
+        assert!(build_followup_prompt_context(&[old], &[], 6000).is_err());
     }
 
     #[test]
@@ -474,12 +503,7 @@ mod tests {
     }
 
     fn previous() -> ReferencedPassage {
-        let fixtures: serde_json::Value = serde_json::from_str(include_str!(
-            "../../tests/fixtures/passage-references-v1.json"
-        ))
-        .unwrap();
-        let reference: super::super::IncludedPassage =
-            serde_json::from_value(fixtures[0]["reference"].clone()).unwrap();
+        let (reference, raw) = super::super::passage_fixture();
         let source = GroundedSource::LocalNote {
             reference: NoteSourceReference {
                 collection_id: "123e4567-e89b-12d3-a456-426614174000".into(),
@@ -491,9 +515,7 @@ mod tests {
             },
         };
         ReferencedPassage {
-            passages: reference
-                .verified_spans(fixtures[0]["raw"].as_str().unwrap())
-                .unwrap(),
+            passages: reference.verified_spans(raw).unwrap(),
             reference,
             source,
         }
@@ -541,12 +563,54 @@ mod tests {
             assert!(packed.text.len() <= budget);
             assert_eq!(packed.included_passages[0], old.reference);
         }
+
+        let raw = super::super::passage_fixture().1;
+        let matching = GroundedExcerpt {
+            locator: old.reference.locator.clone(),
+            source: old.source.clone(),
+            score: 1.0,
+            text: raw.into(),
+        };
+        let expanded = build_followup_prompt_context(
+            std::slice::from_ref(&old),
+            std::slice::from_ref(&matching),
+            6000,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(expanded.sources, vec![old.source.clone()]);
+        assert_eq!(expanded.included_passages.len(), 1);
+        assert!(
+            expanded
+                .text
+                .contains(&super::super::clean_passage_text(raw))
+        );
+        assert_eq!(
+            expanded.included_passages[0].verified_spans(raw).unwrap(),
+            vec![super::super::clean_passage_text(raw)]
+        );
+
+        let mut prefix = old.clone();
+        prefix.reference.spans.truncate(1);
+        prefix.passages.truncate(1);
+        let required_prefix =
+            build_followup_prompt_context(std::slice::from_ref(&prefix), &[], 6000)
+                .unwrap()
+                .unwrap();
+        for budget in required_prefix.text.len()..=expanded.text.len() {
+            let packed = build_followup_prompt_context(
+                std::slice::from_ref(&prefix),
+                std::slice::from_ref(&matching),
+                budget,
+            )
+            .unwrap()
+            .unwrap();
+            assert!(packed.text.len() <= budget);
+            assert_eq!(packed.included_passages.len(), 1);
+            let spans = packed.included_passages[0].verified_spans(raw).unwrap();
+            assert!(spans[0].starts_with(&prefix.passages[0]));
+            assert!(packed.text.contains(&spans[0]));
+        }
         assert!(build_followup_prompt_context(&[old], &[], required.text.len() - 1).is_err());
-    }
-    #[test]
-    fn referenced_text_must_match_the_saved_digest() {
-        let mut old = previous();
-        old.passages[0] = "Changed text".into();
-        assert!(build_followup_prompt_context(&[old], &[], 6000).is_err());
     }
 }

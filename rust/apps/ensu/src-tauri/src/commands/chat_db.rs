@@ -172,8 +172,6 @@ pub struct ChatMessageDto {
     created_at: i64,
     attachments: Vec<ChatAttachmentDto>,
     sources: Vec<GroundedSourceDto>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    evidence_saved: Option<bool>,
 }
 
 impl From<db::Message> for ChatMessageDto {
@@ -191,7 +189,6 @@ impl From<db::Message> for ChatMessageDto {
             }
         };
         Self {
-            evidence_saved: None,
             message_uuid: message.uuid.to_string(),
             session_uuid: message.session_uuid.to_string(),
             parent_message_uuid: message.parent_message_uuid.map(|value| value.to_string()),
@@ -388,26 +385,20 @@ pub async fn chat_db_insert_message(
         let snapshot = prepared.as_ref().map(|(snapshot, _)| snapshot);
         let message =
             db.insert_message_guarded(session_uuid, sender, &text, parent, attachments, snapshot)?;
-        let evidence_saved =
-            prepared
-                .filter(|(_, passages)| !passages.is_empty())
-                .map(|(snapshot, passages)| {
-                    match db.save_answer_evidence(&snapshot, message.uuid, passages) {
-                        Ok(saved) => saved,
-                        Err(error) => {
-                            logging::log(
-                                "ChatDb",
-                                format!(
-                                    "Reply saved but source reference persistence failed: {error}"
-                                ),
-                            );
-                            false
-                        }
-                    }
-                });
-        let mut result = ChatMessageDto::from(message);
-        result.evidence_saved = evidence_saved;
-        Ok(result)
+        if let Some((snapshot, passages)) = prepared.filter(|(_, passages)| !passages.is_empty()) {
+            match db.save_answer_evidence(&snapshot, message.uuid, passages) {
+                Ok(true) => {}
+                Ok(false) => logging::log(
+                    "ChatDb",
+                    "Reply saved, but its source references could not be retained",
+                ),
+                Err(error) => logging::log(
+                    "ChatDb",
+                    format!("Reply saved but source reference persistence failed: {error}"),
+                ),
+            }
+        }
+        Ok(ChatMessageDto::from(message))
     })
     .await
 }

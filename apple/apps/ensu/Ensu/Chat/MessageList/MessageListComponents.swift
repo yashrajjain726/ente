@@ -246,7 +246,6 @@ struct AssistantMessageBubbleView: View {
     let isLastMessage: Bool
     let onCopy: () -> Void
     let onRetry: () -> Void
-    let onSearch: (() -> Void)?
     let onBranchChange: (Int) -> Void
     let onOpenAttachment: (ChatAttachment) -> Void
     let showsMetadata: Bool
@@ -290,12 +289,6 @@ struct AssistantMessageBubbleView: View {
                         Button("Retry") {
                             hapticMedium()
                             onRetry()
-                        }
-                        if let onSearch {
-                            Button("Search as written") {
-                                hapticMedium()
-                                onSearch()
-                            }
                         }
                     }
                 }

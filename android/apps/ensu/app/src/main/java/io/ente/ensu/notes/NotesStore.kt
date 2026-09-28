@@ -273,10 +273,7 @@ class NotesStore(
                 } catch (error: CancellationException) {
                     throw error
                 } catch (_: NotesException.RebuildRequired) {
-                    enqueue(record.id, rebuild = true, immediate = true)
-                    update(record.id) {
-                        it.copy(status = NotesStatus.Pending, indexAvailable = false)
-                    }
+                    requestRebuild(record.id)
                 } catch (error: Exception) {
                     fail(record.id, error)
                 }
@@ -292,10 +289,7 @@ class NotesStore(
                 val hit = provider.reload(locator) ?: return@withContext null
                 verify(selectMixedGroundingCandidates(emptyList(), listOf(hit), 1u)).singleOrNull()
             } catch (_: NotesException.RebuildRequired) {
-                enqueue(locator.collectionId, rebuild = true, immediate = true)
-                update(locator.collectionId) {
-                    it.copy(status = NotesStatus.Pending, indexAvailable = false)
-                }
+                requestRebuild(locator.collectionId)
                 null
             }
         }
@@ -363,6 +357,11 @@ class NotesStore(
                 _state.update { it.copy(error = error) }
             }
         }
+    }
+
+    private fun requestRebuild(id: String) {
+        enqueue(id, rebuild = true, immediate = true)
+        update(id) { it.copy(status = NotesStatus.Pending, indexAvailable = false) }
     }
 
     private fun enqueue(
@@ -544,13 +543,7 @@ class NotesStore(
                             }
                             is NotesException.RebuildRequired -> {
                                 if (snapshot == null) {
-                                    enqueue(id, rebuild = true, immediate = true)
-                                    update(id) {
-                                        it.copy(
-                                            status = NotesStatus.Pending,
-                                            indexAvailable = false,
-                                        )
-                                    }
+                                    requestRebuild(id)
                                 } else fail(id, failure)
                             }
                             is Exception -> fail(id, failure)

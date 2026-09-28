@@ -169,15 +169,11 @@ impl IndexCache {
         }
     }
 
-    fn search(
-        &mut self,
-        collection_id: &str,
-        query: &[f32],
-    ) -> Option<Result<Vec<ente_ensu::notes::NotesSearchHit>, NotesError>> {
+    fn get(&mut self, collection_id: &str) -> Option<&NotesCollectionIndex> {
         self.clock = self.clock.wrapping_add(1);
         let entry = self.entries.get_mut(collection_id)?;
         entry.last_used = self.clock;
-        Some(entry.index.search(query))
+        Some(&entry.index)
     }
 
     fn insert(&mut self, collection_id: String, index: NotesCollectionIndex) {
@@ -681,21 +677,7 @@ impl RetrievalHandle {
         collection_id: &str,
         query: &[f32],
     ) -> Result<Vec<ente_ensu::notes::NotesSearchHit>, NotesError> {
-        if let Some(result) = self
-            .cached_indexes
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .search(collection_id, query)
-        {
-            return result;
-        }
-        let index = NotesCollectionIndex::open(&self.index_root, collection_id.to_string())?;
-        let hits = index.search(query)?;
-        self.cached_indexes
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .insert(collection_id.to_string(), index);
-        Ok(hits)
+        self.with_index(collection_id, |index| index.search(query))
     }
 
     pub(crate) fn reload_passage(
@@ -705,25 +687,29 @@ impl RetrievalHandle {
         let ente_ensu::retrieval::PassageLocator::LocalNote { collection_id, .. } = locator else {
             return Ok(None);
         };
+        self.with_index(collection_id, |index| index.reload_passage(locator))
+    }
+
+    fn with_index<T>(
+        &self,
+        collection_id: &str,
+        read: impl FnOnce(&NotesCollectionIndex) -> Result<T, NotesError>,
+    ) -> Result<T, NotesError> {
+        if let Some(index) = self
+            .cached_indexes
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(collection_id)
         {
-            let mut cache = self
-                .cached_indexes
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner);
-            cache.clock = cache.clock.wrapping_add(1);
-            let clock = cache.clock;
-            if let Some(entry) = cache.entries.get_mut(collection_id) {
-                entry.last_used = clock;
-                return entry.index.reload_passage(locator);
-            }
+            return read(index);
         }
-        let index = NotesCollectionIndex::open(&self.index_root, collection_id.clone())?;
-        let hit = index.reload_passage(locator)?;
+        let index = NotesCollectionIndex::open(&self.index_root, collection_id.to_owned())?;
+        let result = read(&index)?;
         self.cached_indexes
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .insert(collection_id.clone(), index);
-        Ok(hit)
+            .insert(collection_id.to_owned(), index);
+        Ok(result)
     }
 
     pub(crate) fn verify_source_reference(&self, reference: &NoteSourceReference) -> bool {

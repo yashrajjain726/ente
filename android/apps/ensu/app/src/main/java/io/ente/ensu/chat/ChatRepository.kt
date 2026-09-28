@@ -138,7 +138,7 @@ class ChatRepository(
 
     internal fun startFollowup(sessionId: String, path: List<String>, userText: String) =
         withDbRecovery {
-            db.startConversationFollowup(sessionId, path, userText, userText)
+            db.startConversationFollowup(sessionId, path, userText)
         }
 
     internal fun prepareConversation(

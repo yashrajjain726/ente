@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BinaryHeap};
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::Path;
+use std::sync::OnceLock;
 
 use memmap2::{Mmap, MmapOptions};
 use serde::Deserialize;
@@ -56,7 +57,8 @@ struct MetadataRow {
 pub struct RetrievalIndex {
     dataset_identity: String,
     stable_id: String,
-    revision_sha256: String,
+    revision_sha256: OnceLock<String>,
+    manifest_bytes: Vec<u8>,
     count: usize,
     dim: usize,
     scale: f32,
@@ -165,6 +167,7 @@ impl RetrievalIndex {
             .collect::<Vec<_>>();
         validate_offsets(&offsets, metadata_len)?;
 
+        // Native callers prevent file swaps or deletion while mapped.
         #[expect(
             unsafe_code,
             reason = "File-backed memory mapping requires an unsafe call"
@@ -178,7 +181,8 @@ impl RetrievalIndex {
 
         Ok(Self {
             stable_id: expected_pack.stable_id.clone(),
-            revision_sha256: text_revision_digest(&manifest_bytes, &metadata, &offsets_raw),
+            revision_sha256: OnceLock::new(),
+            manifest_bytes,
             dataset_identity: manifest.dataset,
             count,
             dim,
@@ -194,6 +198,17 @@ impl RetrievalIndex {
 
     pub fn dataset_identity(&self) -> &str {
         &self.dataset_identity
+    }
+
+    fn revision_sha256(&self) -> &str {
+        self.revision_sha256.get_or_init(|| {
+            let offsets = self
+                .offsets
+                .iter()
+                .flat_map(|offset| offset.to_le_bytes())
+                .collect::<Vec<_>>();
+            text_revision_digest(&self.manifest_bytes, &self.metadata, &offsets)
+        })
     }
 
     pub fn search(
@@ -271,13 +286,13 @@ impl RetrievalIndex {
         else {
             return Ok(None);
         };
-        if dataset_id != &self.stable_id || revision_sha256 != &self.revision_sha256 {
-            return Ok(None);
-        }
         let Ok(row) = usize::try_from(*row) else {
             return Ok(None);
         };
-        if row >= self.count {
+        if dataset_id != &self.stable_id
+            || row >= self.count
+            || revision_sha256 != self.revision_sha256()
+        {
             return Ok(None);
         }
         Ok(self.load_hits(&[RankedRow { score: 0.0, row }])?.pop())
@@ -337,7 +352,7 @@ impl RetrievalIndex {
                 hits[rank] = Some(RetrievalHit {
                     locator: super::PassageLocator::EnsuPack {
                         dataset_id: self.stable_id.clone(),
-                        revision_sha256: self.revision_sha256.clone(),
+                        revision_sha256: self.revision_sha256().to_owned(),
                         row: selected.row as u64,
                     },
                     score: selected.score,
@@ -542,18 +557,18 @@ fn python_quote(value: &str) -> String {
 }
 
 fn text_revision_digest(manifest: &[u8], metadata: &[u8], offsets: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    let mut revision = Sha256::new();
-    revision.update(b"ensu-pack-text-revision-v1\0");
-    for bytes in [manifest, metadata, offsets] {
-        revision.update((bytes.len() as u64).to_le_bytes());
-        revision.update(bytes);
-    }
-    revision
-        .finalize()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    ente_ensu_crypto::sha256_parts(&[
+        b"ensu-pack-text-revision-v1\0",
+        &(manifest.len() as u64).to_le_bytes(),
+        manifest,
+        &(metadata.len() as u64).to_le_bytes(),
+        metadata,
+        &(offsets.len() as u64).to_le_bytes(),
+        offsets,
+    ])
+    .iter()
+    .map(|byte| format!("{byte:02x}"))
+    .collect()
 }
 
 fn sanitize_prompt_text(value: &str) -> String {
@@ -665,22 +680,25 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn passage_reload_survives_reopen_and_rejects_changed_text_artifacts() {
+    fn passage_revisions_are_lazy_and_reloads_reject_changed_artifacts() {
         use crate::retrieval::PassageLocator;
         let pack = synthetic_pack("simplewiki-test");
         let index = RetrievalIndex::open(&pack.revision, &pack.expected).unwrap();
+        assert!(index.revision_sha256.get().is_none());
         let mut query = vec![0.0; 512];
+        assert!(index.search(&query, 3, 1.0).unwrap().is_empty());
+        assert!(index.revision_sha256.get().is_none());
         query[0] = 1.0;
         let hits = index.search(&query, 3, 0.0).unwrap();
         assert_ne!(hits[0].locator, hits[1].locator);
+        let revision = text_revision_digest(
+            &fs::read(pack.revision.join(KNOWLEDGE_MANIFEST_FILE)).unwrap(),
+            &fs::read(pack.revision.join(KNOWLEDGE_META_FILE)).unwrap(),
+            &fs::read(pack.revision.join(KNOWLEDGE_OFFSETS_FILE)).unwrap(),
+        );
+        assert_eq!(index.revision_sha256.get(), Some(&revision));
         drop(index);
         let index = RetrievalIndex::open(&pack.revision, &pack.expected).unwrap();
-        for hit in &hits {
-            let reloaded = index.reload_passage(&hit.locator).unwrap().unwrap();
-            assert_eq!(reloaded.locator, hit.locator);
-            assert_eq!(reloaded.text, hit.text);
-            assert_eq!(reloaded.source_url, hit.source_url);
-        }
         let mut wrong = hits[0].locator.clone();
         if let PassageLocator::EnsuPack { row, .. } = &mut wrong {
             *row = u64::MAX;
@@ -691,6 +709,14 @@ pub(super) mod tests {
             *dataset_id = "wikibooks".to_string();
         }
         assert!(index.reload_passage(&wrong).unwrap().is_none());
+        assert!(index.revision_sha256.get().is_none());
+        for hit in &hits {
+            let reloaded = index.reload_passage(&hit.locator).unwrap().unwrap();
+            assert_eq!(reloaded.locator, hit.locator);
+            assert_eq!(reloaded.text, hit.text);
+            assert_eq!(reloaded.source_url, hit.source_url);
+        }
+        assert_eq!(index.revision_sha256.get(), Some(&revision));
         drop(index);
 
         let metadata_path = pack.revision.join(KNOWLEDGE_META_FILE);

@@ -51,7 +51,8 @@ pub(super) fn named_source_keys<'a>(
             retrieval::GroundedSource::LocalNote { reference } => &reference.title,
             retrieval::GroundedSource::EnsuPack { citation } => &citation.title,
         };
-        if !words(title).is_empty() {
+        let mut label_words = words(title);
+        if !label_words.is_empty() {
             let title = tokens(title);
             for (start, window) in query_tokens.windows(title.len()).enumerate() {
                 if window == title {
@@ -59,16 +60,13 @@ pub(super) fn named_source_keys<'a>(
                 }
             }
         }
-        let label = match source {
-            retrieval::GroundedSource::LocalNote { reference } => {
-                format!("{} {}", reference.title, reference.document_id)
-            }
-            retrieval::GroundedSource::EnsuPack { citation } => citation.title.clone(),
-        };
+        if let retrieval::GroundedSource::LocalNote { reference } = source {
+            label_words.extend(words(&reference.document_id));
+        }
         documents
             .entry(source_key(source))
             .or_default()
-            .extend(words(&label));
+            .extend(label_words);
     }
     let query_words = words(query);
     documents
@@ -95,7 +93,7 @@ pub(super) fn named_source_keys<'a>(
 }
 
 impl GroundingCandidates {
-    pub fn protect_named_sources(&mut self, query: &str) -> Result<(), PrepareError> {
+    pub(super) fn protect_named_sources(&mut self, query: &str) -> Result<(), PrepareError> {
         self.validate()?;
         if query.len() > super::lookup::LOOKUP_MAX_QUERY_BYTES {
             return Ok(());
@@ -107,34 +105,86 @@ impl GroundingCandidates {
                 .map(|r| &r.source)
                 .chain(self.searched.iter().map(|r| &r.source)),
         );
+        let fresh_index = if !self.referenced.is_empty() && named.is_empty() {
+            self.searched.iter().position(|hit| {
+                !hit.text.trim().is_empty()
+                    && !self
+                        .referenced
+                        .iter()
+                        .any(|r| r.reference.locator == hit.locator)
+            })
+        } else {
+            None
+        };
+        if let Some(index) = fresh_index {
+            self.searched[..=index].rotate_right(1);
+        }
         let mut required: std::collections::BTreeSet<_> = self
             .referenced
             .iter()
             .map(|r| source_key(&r.source))
             .collect();
-        for hit in &self.searched {
+        let mut promoted = Vec::new();
+        for (index, hit) in self.searched.iter().enumerate() {
+            let fresh = fresh_index.is_some() && index == 0;
             let id = source_key(&hit.source);
-            if !named.contains(&id) || !required.insert(id) {
+            if !fresh && (!named.contains(&id) || required.contains(&id)) {
                 continue;
             }
-            let Some(reference) =
-                retrieval::build_grounded_prompt_context(std::slice::from_ref(hit), usize::MAX)
+            let budgets = if fresh {
+                [self.max_utf8_bytes / 2, self.max_utf8_bytes]
+            } else {
+                [usize::MAX; 2]
+            };
+            let Some(reference) = budgets.into_iter().find_map(|budget| {
+                retrieval::build_grounded_prompt_context(std::slice::from_ref(hit), budget)
                     .ok()
-                    .flatten()
-                    .and_then(|context| context.included_passages.into_iter().next())
-            else {
+                    .flatten()?
+                    .included_passages
+                    .into_iter()
+                    .next()
+            }) else {
                 continue;
             };
             let Some(passages) = reference.verified_spans(&hit.text) else {
                 continue;
             };
-            self.referenced.push(ReferencedPassage {
+            required.insert(id);
+            promoted.push(ReferencedPassage {
                 reference,
                 source: hit.source.clone(),
                 passages,
             });
+        }
+
+        let (mut named_references, incidental): (Vec<_>, Vec<_>) =
+            std::mem::take(&mut self.referenced)
+                .into_iter()
+                .partition(|r| named.contains(&source_key(&r.source)));
+        named_references.extend(promoted);
+        let mut seen = std::collections::BTreeSet::new();
+        let (distinct, additional): (Vec<_>, Vec<_>) = named_references
+            .into_iter()
+            .partition(|r| seen.insert(source_key(&r.source)));
+        let mut packs = 0;
+        let mut notes = 0;
+        for reference in distinct.into_iter().chain(additional).chain(incidental) {
+            let (count, limit) = match &reference.source {
+                retrieval::GroundedSource::EnsuPack { .. } => {
+                    (&mut packs, retrieval::MAX_PACK_HITS)
+                }
+                retrieval::GroundedSource::LocalNote { .. } => {
+                    (&mut notes, retrieval::MAX_NOTES_GROUNDING_HITS)
+                }
+            };
+            if *count == limit {
+                continue;
+            }
+            self.referenced.push(reference);
             if self.validate().is_err() {
                 self.referenced.pop();
+            } else {
+                *count += 1;
             }
         }
         Ok(())

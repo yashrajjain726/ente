@@ -6,6 +6,7 @@ use super::manifest::{
 };
 use super::shard::{NotesShard, load_and_validate_shard_metadata, load_and_validate_vectors};
 use super::{NotesCollectionReadPin, NotesError, pinned_revision_key, validate_collection_id};
+use crate::retrieval::PassageLocator;
 
 const RELEVANCE_THRESHOLD: f32 = 0.50;
 const MAX_HITS_PER_COLLECTION: usize = 5;
@@ -13,7 +14,7 @@ const MAX_HITS_PER_DOCUMENT: usize = 3;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct NotesSearchHit {
-    pub locator: crate::retrieval::PassageLocator,
+    pub locator: PassageLocator,
     pub collection_id: String,
     pub document_id: String,
     pub revision: String,
@@ -166,25 +167,28 @@ impl NotesCollectionIndex {
             }))
     }
 
-    fn passage_locator(
-        &self,
-        document: &IndexedDocument,
-        chunk_index: usize,
-    ) -> crate::retrieval::PassageLocator {
-        crate::retrieval::PassageLocator::LocalNote {
-            collection_id: self.collection_id.clone(),
-            document_id: document.document_id.clone(),
-            indexed_revision: document.revision.clone(),
-            shard_sha256: document.shard_sha256.clone(),
-            chunk_index: chunk_index as u64,
-        }
+    fn load_shard(&self, document: &IndexedDocument) -> Result<NotesShard, NotesError> {
+        let directory = shard_directory(
+            self.read_pin.collection_directory(),
+            &document.document_id,
+            &document.revision,
+        );
+        load_and_validate_shard_metadata(
+            &directory,
+            &self.collection_id,
+            &document.document_id,
+            &document.revision,
+            document.chunk_count,
+            &document.shard_sha256,
+            None,
+        )
     }
 
     pub fn reload_passage(
         &self,
-        locator: &crate::retrieval::PassageLocator,
+        locator: &PassageLocator,
     ) -> Result<Option<NotesSearchHit>, NotesError> {
-        let crate::retrieval::PassageLocator::LocalNote {
+        let PassageLocator::LocalNote {
             collection_id,
             document_id,
             indexed_revision,
@@ -210,20 +214,7 @@ impl NotesCollectionIndex {
         if chunk_index >= document.chunk_count {
             return Ok(None);
         }
-        let directory = shard_directory(
-            self.read_pin.collection_directory(),
-            document_id,
-            indexed_revision,
-        );
-        let shard = load_and_validate_shard_metadata(
-            &directory,
-            collection_id,
-            document_id,
-            indexed_revision,
-            document.chunk_count,
-            shard_sha256,
-            None,
-        )?;
+        let shard = self.load_shard(document)?;
         let chunk = &shard.chunks[chunk_index];
         Ok(Some(NotesSearchHit {
             locator: locator.clone(),
@@ -295,28 +286,19 @@ impl NotesCollectionIndex {
             let document = &self.documents[candidate.document_index];
             let shard = match loaded_shards.entry(candidate.document_index) {
                 Entry::Occupied(entry) => entry.into_mut(),
-                Entry::Vacant(entry) => {
-                    let directory = shard_directory(
-                        self.read_pin.collection_directory(),
-                        &document.document_id,
-                        &document.revision,
-                    );
-                    entry.insert(load_and_validate_shard_metadata(
-                        &directory,
-                        &self.collection_id,
-                        &document.document_id,
-                        &document.revision,
-                        document.chunk_count,
-                        &document.shard_sha256,
-                        None,
-                    )?)
-                }
+                Entry::Vacant(entry) => entry.insert(self.load_shard(document)?),
             };
             let chunk = shard.chunks.get(candidate.chunk_index).ok_or_else(|| {
                 NotesError::InvalidIndex("selected shard chunk is missing".to_string())
             })?;
             hits.push(NotesSearchHit {
-                locator: self.passage_locator(document, candidate.chunk_index),
+                locator: PassageLocator::LocalNote {
+                    collection_id: self.collection_id.clone(),
+                    document_id: document.document_id.clone(),
+                    indexed_revision: document.revision.clone(),
+                    shard_sha256: document.shard_sha256.clone(),
+                    chunk_index: candidate.chunk_index as u64,
+                },
                 collection_id: self.collection_id.clone(),
                 document_id: document.document_id.clone(),
                 revision: document.revision.clone(),
@@ -419,7 +401,6 @@ mod tests {
 
     #[test]
     fn passage_reload_checks_revision_chunk_and_shard_integrity() {
-        use crate::retrieval::PassageLocator;
         let temp = tempfile::tempdir().unwrap();
         let doc = document("trip.md", 2);
         let mut writer = NotesIndexWriter::open(temp.path(), COLLECTION_ID.to_string()).unwrap();

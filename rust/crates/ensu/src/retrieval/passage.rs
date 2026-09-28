@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use super::{BEGIN_CONTEXT_SENTINEL, END_CONTEXT_SENTINEL, GroundedSource, RetrievalError};
 
@@ -129,35 +128,22 @@ impl IncludedPassage {
     }
 
     pub fn verified_spans(&self, reloaded_text: &str) -> Option<Vec<String>> {
-        if self.cleaning_version != PASSAGE_CLEANING_VERSION
-            || self.spans.is_empty()
-            || self.spans.len() > MAX_PASSAGE_SPANS
-            || reloaded_text.len() > MAX_PASSAGE_UTF8_BYTES
-        {
+        if !self.valid_metadata() || reloaded_text.len() > MAX_PASSAGE_UTF8_BYTES {
             return None;
         }
         let cleaned = clean_passage_text(reloaded_text);
-        let mut end = 0;
-        let mut texts = Vec::with_capacity(self.spans.len());
-        for span in &self.spans {
-            let start = usize::try_from(span.start_utf8).ok()?;
-            let next_end = usize::try_from(span.end_utf8).ok()?;
-            if start < end || start >= next_end {
-                return None;
-            }
-            let text = cleaned.get(start..next_end)?;
-            if digest(text.as_bytes()) != span.text_sha256 {
-                return None;
-            }
-            texts.push(text.to_owned());
-            end = next_end;
-        }
-        Some(texts)
+        self.spans
+            .iter()
+            .map(|span| {
+                let text = cleaned.get(span.start_utf8 as usize..span.end_utf8 as usize)?;
+                (digest(text.as_bytes()) == span.text_sha256).then(|| text.to_owned())
+            })
+            .collect()
     }
 }
 
 pub(super) fn digest(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
+    ente_ensu_crypto::sha256(bytes)
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
@@ -194,66 +180,95 @@ pub(crate) fn clean_passage_text(value: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
 
-    #[derive(Deserialize)]
-    struct Fixture {
-        name: String,
-        raw: String,
-        cleaned: String,
-        reference: IncludedPassage,
-        texts: Vec<String>,
+    pub(crate) fn passage_fixture() -> (IncludedPassage, &'static str) {
+        let reference = serde_json::from_value(serde_json::json!({
+            "locator": {
+                "type": "localNote",
+                "collectionId": "123e4567-e89b-12d3-a456-426614174000",
+                "documentId": "trip.md",
+                "indexedRevision": "a".repeat(64),
+                "shardSha256": "b".repeat(64),
+                "chunkIndex": 2
+            },
+            "cleaningVersion": 1,
+            "spans": [
+                {
+                    "startUtf8": 0,
+                    "endUtf8": 9,
+                    "textSha256": "894473efc373309a7c6d18cbe8504c8bb91e09cba4e1ab147ff97af12d481702"
+                },
+                {
+                    "startUtf8": 20,
+                    "endUtf8": 23,
+                    "textSha256": "361e48d0308f20e32dba5fb56328baf18d72ef0ccb43b84f5c262d2a6a1fc6c8"
+                }
+            ]
+        }))
+        .unwrap();
+        (reference, " \r\nCafé🙂\r\nबीच\tend \0\r\n")
     }
 
     #[test]
-    fn shared_passage_reference_fixtures() {
-        let fixtures: Vec<Fixture> = serde_json::from_str(include_str!(
-            "../../tests/fixtures/passage-references-v1.json"
-        ))
-        .unwrap();
-        for fixture in fixtures {
-            assert_eq!(
-                clean_passage_text(&fixture.raw),
-                fixture.cleaned,
-                "{}",
-                fixture.name
-            );
-            assert_eq!(
-                fixture.reference.verified_spans(&fixture.raw),
-                Some(fixture.texts),
-                "{}",
-                fixture.name
-            );
+    fn passage_references_verify_cleaned_text_and_reject_invalid_spans() {
+        let (fixture, raw) = passage_fixture();
+        for (raw, cleaned, spans, texts) in [
+            (
+                raw,
+                "Café🙂\nबीच\tend",
+                fixture.spans.clone(),
+                vec!["Café🙂", "end"],
+            ),
+            (
+                "\r\n----- BEGIN KNOWLEDGE CONTEXT -----\r\nx\r\n",
+                "[source] ----- BEGIN KNOWLEDGE CONTEXT -----\nx",
+                vec![PassageSpan {
+                    start_utf8: 0,
+                    end_utf8: 43,
+                    text_sha256: "73c093471df3c5f2f0e96999d8d5ebc745a803f55d3f36c4523c502c2e055e02"
+                        .into(),
+                }],
+                vec!["[source] ----- BEGIN KNOWLEDGE CONTEXT ----"],
+            ),
+            (
+                "  a\u{1}b\tc\rd  ",
+                "a b\tc\nd",
+                vec![PassageSpan {
+                    start_utf8: 0,
+                    end_utf8: 7,
+                    text_sha256: "1205bffe81cb4550cdf063c07e75e290c2ebaf60d77780a338e18eb99d26bd4c"
+                        .into(),
+                }],
+                vec!["a b\tc\nd"],
+            ),
+        ] {
+            let reference = IncludedPassage {
+                spans,
+                ..fixture.clone()
+            };
+            assert_eq!(clean_passage_text(raw), cleaned);
+            assert_eq!(reference.verified_spans(raw).unwrap(), texts);
         }
-    }
-
-    #[test]
-    fn refuses_changed_text_invalid_offsets_and_unknown_versions() {
-        let fixtures: Vec<Fixture> = serde_json::from_str(include_str!(
-            "../../tests/fixtures/passage-references-v1.json"
-        ))
-        .unwrap();
-        let fixture = &fixtures[0];
         assert!(
             fixture
-                .reference
-                .verified_spans(&fixture.raw.replace("Café", "Cafe"))
+                .verified_spans(&raw.replace("Café", "Cafe "))
                 .is_none()
         );
         for (start, end) in [(0, 4), (4, 9), (9, 0), (0, u32::MAX)] {
-            let mut reference = fixture.reference.clone();
+            let mut reference = fixture.clone();
             reference.spans[0].start_utf8 = start;
             reference.spans[0].end_utf8 = end;
-            assert!(reference.verified_spans(&fixture.raw).is_none());
+            assert!(reference.verified_spans(raw).is_none());
         }
-        let mut reference = fixture.reference.clone();
+        let mut reference = fixture.clone();
         reference.cleaning_version = 2;
-        assert!(reference.verified_spans(&fixture.raw).is_none());
-        reference = fixture.reference.clone();
+        assert!(reference.verified_spans(raw).is_none());
+        reference = fixture;
         reference.spans[1] = reference.spans[0].clone();
-        assert!(reference.verified_spans(&fixture.raw).is_none());
+        assert!(reference.verified_spans(raw).is_none());
         reference.spans = vec![reference.spans[0].clone(); 9];
-        assert!(reference.verified_spans(&fixture.raw).is_none());
+        assert!(reference.verified_spans(raw).is_none());
     }
 }

@@ -15,8 +15,6 @@ use lookup::{HistoryLookup, lookup_history, requested_history};
 pub use prepare::{Effects, Preparation, PreparationResult, PrepareError};
 pub use state::AnswerEvidence;
 pub(crate) use state::{ConversationEnvelope, valid_answer_passages};
-#[cfg(test)]
-pub(crate) use state::{MAX_ANSWER_PASSAGES, MAX_EVIDENCE_ANSWERS, MAX_EVIDENCE_BYTES};
 pub use turn::{PreparedTurn, TurnInput, prepare_turn};
 
 #[cfg(test)]

@@ -102,60 +102,6 @@ impl From<PassageLocator> for core::PassageLocator {
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
-pub struct PassageSpan {
-    pub start_utf8: u32,
-    pub end_utf8: u32,
-    pub text_sha256: String,
-}
-
-impl From<core::PassageSpan> for PassageSpan {
-    fn from(value: core::PassageSpan) -> Self {
-        Self {
-            start_utf8: value.start_utf8,
-            end_utf8: value.end_utf8,
-            text_sha256: value.text_sha256,
-        }
-    }
-}
-
-impl From<PassageSpan> for core::PassageSpan {
-    fn from(value: PassageSpan) -> Self {
-        Self {
-            start_utf8: value.start_utf8,
-            end_utf8: value.end_utf8,
-            text_sha256: value.text_sha256,
-        }
-    }
-}
-
-#[derive(Debug, Clone, uniffi::Record)]
-pub struct IncludedPassage {
-    pub locator: PassageLocator,
-    pub cleaning_version: u32,
-    pub spans: Vec<PassageSpan>,
-}
-
-impl From<core::IncludedPassage> for IncludedPassage {
-    fn from(value: core::IncludedPassage) -> Self {
-        Self {
-            locator: value.locator.into(),
-            cleaning_version: value.cleaning_version,
-            spans: value.spans.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-impl From<IncludedPassage> for core::IncludedPassage {
-    fn from(value: IncludedPassage) -> Self {
-        Self {
-            locator: value.locator.into(),
-            cleaning_version: value.cleaning_version,
-            spans: value.spans.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, uniffi::Record)]
 pub struct RetrievalHit {
     pub locator: PassageLocator,
     pub score: f32,

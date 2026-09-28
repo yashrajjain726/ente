@@ -61,3 +61,6 @@ pub use prompt::{KnowledgePromptContext, KnowledgePromptHit, build_knowledge_pro
 pub(crate) use grounded::{MAX_GROUNDING_HITS, MAX_PACK_HITS, build_followup_prompt_context};
 pub(crate) use passage::clean_passage_text;
 pub use passage::{IncludedPassage, PassageLocator, PassageSpan};
+
+#[cfg(test)]
+pub(crate) use passage::tests::passage_fixture;

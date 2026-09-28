@@ -54,7 +54,6 @@ import {
     prepareDesktopConversation,
     resolveDesktopSourceFollowup,
     type PreparedReply,
-    type ResolvedSourceFollowup,
 } from "@/services/llm/conversation";
 import { stripHiddenPartsText } from "@/services/llm/history-text";
 import {
@@ -2850,12 +2849,6 @@ const Page: React.FC = () => {
                               activeKnowledgeSources,
                           ));
 
-                    if (assistantMessage.evidenceSaved === false) {
-                        log.warn(
-                            "Reply saved, but its source references could not be retained",
-                        );
-                    }
-
                     await updateBranchSelectionState(
                         parentMessageUuid,
                         assistantMessage.messageUuid,
@@ -2940,7 +2933,6 @@ const Page: React.FC = () => {
             sessionUuid,
             imagePaths,
             mediaMarker,
-            searchAsWritten = false,
         }: {
             promptText: string;
             parentMessage: ChatMessage;
@@ -2950,7 +2942,6 @@ const Page: React.FC = () => {
             sessionUuid?: string;
             imagePaths?: string[];
             mediaMarker?: string;
-            searchAsWritten?: boolean;
         }): Promise<void> => {
             const parentMessageUuid = parentMessage.messageUuid;
             const activeSessionId =
@@ -3106,12 +3097,7 @@ const Page: React.FC = () => {
                     historyPath,
                     stopAtMessageUuid,
                 );
-                const selectedPath = selectedMessages.map(
-                    (message) => message.messageUuid,
-                );
-                if (selectedPath.at(-1) !== parentMessageUuid)
-                    selectedPath.push(parentMessageUuid);
-                let followup: ResolvedSourceFollowup | undefined;
+                let resolutionToken: string | undefined;
                 const remainingKnowledgeBytes = useConversationMemory
                     ? 6000
                     : Math.max(
@@ -3160,12 +3146,16 @@ const Page: React.FC = () => {
 
                 if (
                     useConversationMemory &&
-                    !searchAsWritten &&
                     selectedMessages.some((message) => message.sources?.length)
                 ) {
+                    const selectedPath = selectedMessages.map(
+                        (message) => message.messageUuid,
+                    );
+                    if (selectedPath.at(-1) !== parentMessageUuid)
+                        selectedPath.push(parentMessageUuid);
                     setConversationStatus("Finding sources");
                     try {
-                        followup = await provider.withKnowledgeRetrieval(
+                        resolutionToken = await provider.withKnowledgeRetrieval(
                             (cancellationEpoch) =>
                                 resolveDesktopSourceFollowup({
                                     sessionUuid: activeSessionId,
@@ -3178,11 +3168,6 @@ const Page: React.FC = () => {
                             isActiveGeneration,
                         );
                         if (!isActiveGeneration()) return;
-                        knowledgeContext = {
-                            text: "",
-                            sources: [],
-                            candidates: followup.candidates,
-                        };
                     } catch (error) {
                         const { name } = tauriCommandError(error);
                         if (
@@ -3265,10 +3250,14 @@ const Page: React.FC = () => {
                             ),
                             system: normalSystemPrompt,
                             current: promptText,
-                            historyQuery: knowledgeQuery,
+                            historyQuery: resolutionToken
+                                ? undefined
+                                : knowledgeQuery,
                             maxTokens,
-                            groundingCandidates: knowledgeContext?.candidates,
-                            resolutionToken: followup?.token,
+                            groundingCandidates: resolutionToken
+                                ? undefined
+                                : knowledgeContext?.candidates,
+                            resolutionToken,
                         },
                         provider,
                         {
@@ -3417,12 +3406,6 @@ const Page: React.FC = () => {
                       ));
 
                 if (!isActiveGeneration()) return;
-                if (assistantMessage.evidenceSaved === false) {
-                    log.warn(
-                        "Reply saved, but its source references could not be retained",
-                    );
-                }
-
                 void updateBranchSelectionState(
                     parentMessageUuid,
                     assistantMessage.messageUuid,
@@ -3506,7 +3489,7 @@ const Page: React.FC = () => {
     );
 
     const handleRetryMessage = useCallback(
-        async (message: ChatMessage, searchAsWritten = false) => {
+        async (message: ChatMessage) => {
             if (message.sender !== "assistant") return;
             if (!chatKey || !currentSessionId) return;
             if (isDownloading) {
@@ -3549,7 +3532,6 @@ const Page: React.FC = () => {
                 stopAtMessageUuid: parentUuid,
                 resetContext: true,
                 sessionUuid: currentSessionId,
-                searchAsWritten,
             });
         },
         [
@@ -4724,19 +4706,6 @@ const Page: React.FC = () => {
                             onEditMessage={handleEditMessage}
                             onCopyMessage={handleCopyMessage}
                             onRetryMessage={handleRetryMessage}
-                            canSearchSources={
-                                isTauriRuntime &&
-                                (notesCollections.length > 0 ||
-                                    knowledgePacks.some(
-                                        (pack) =>
-                                            enabledKnowledgePackIds.has(
-                                                pack.stableId,
-                                            ) &&
-                                            (pack.status === "ready" ||
-                                                pack.status ===
-                                                    "updateAvailable"),
-                                    ))
-                            }
                             onPrevBranch={handlePrevBranch}
                             onNextBranch={handleNextBranch}
                             onRequestPreview={loadAttachmentPreview}

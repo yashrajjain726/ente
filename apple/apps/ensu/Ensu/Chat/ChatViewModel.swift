@@ -980,11 +980,7 @@ final class ChatViewModel: ObservableObject {
         startModelDownload(userInitiated: true)
     }
 
-    var canSearchSources: Bool {
-        !knowledgeStore.enabledReadyDatasets.isEmpty || !notesStore.collections.isEmpty
-    }
-
-    func retryAssistantResponse(_ message: RenderedChatMessage, searchAsWritten: Bool = false) {
+    func retryAssistantResponse(_ message: RenderedChatMessage) {
         let priorGeneration = generationTask
         let priorSummary = sessionSummaryTask
         guard message.role == .assistant else { return }
@@ -1021,7 +1017,7 @@ final class ChatViewModel: ObservableObject {
             _ = await priorSummary?.result
             guard let self else { return }
             await provider.resetContext()
-            startGeneration(for: userNode, searchAsWritten: searchAsWritten)
+            startGeneration(for: userNode)
         }
     }
 
@@ -1064,7 +1060,7 @@ final class ChatViewModel: ObservableObject {
         return session.id
     }
 
-    private func startGeneration(for userNode: MessageNode, searchAsWritten: Bool = false) {
+    private func startGeneration(for userNode: MessageNode) {
         guard !isChatUnsupported else {
             showUnsupportedDeviceDialog = true
             return
@@ -1112,27 +1108,21 @@ final class ChatViewModel: ObservableObject {
             defer { followup?.cancel() }
             do {
                 if prompt.imageFiles.isEmpty {
-                    let history = Array(
-                        buildSelectedPath(
-                            for: userNode.sessionId,
-                            childrenMap: childrenByParent(sessionId: userNode.sessionId)
-                        ).prefix { $0.id != userNode.id })
-                    let path = history.map { $0.id.uuidString } + [userNode.id.uuidString]
-                    let assistantTexts = history.filter { $0.role == .assistant }.map { $0.text }
-                    let hasCurrentSources =
-                        searchAsWritten || !enabledDatasets.isEmpty
-                        || !notesStore.collections.isEmpty
+                    let path = buildConversationPath(for: userNode)
+                    let pathIds = Set(path)
+                    let assistantTexts = (messageStore[userNode.sessionId] ?? [])
+                        .filter { pathIds.contains($0.id.uuidString) && $0.role == .assistant }
+                        .map { $0.text }
                     followup = try await Task.detached {
                         [chatDb] () throws -> ConversationFollowup? in
                         guard
-                            hasCurrentSources
-                                || assistantTexts.contains(where: {
-                                    !parseGroundedAssistantText(storedText: $0).sources.isEmpty
-                                })
+                            assistantTexts.contains(where: {
+                                !parseGroundedAssistantText(storedText: $0).sources.isEmpty
+                            })
                         else { return nil }
                         return try chatDb.startConversationFollowup(
                             sessionUuid: userNode.sessionId.uuidString, path: path,
-                            question: userNode.text, expectedUserText: userNode.text
+                            question: userNode.text
                         )
                     }.value
                     try Task.checkCancellation()
@@ -1183,15 +1173,16 @@ final class ChatViewModel: ObservableObject {
             do {
                 if let turn = followup {
                     let searched = knowledgeHits
-                    let resolution = try await Task.detached {
-                        try searchAsWritten
-                            ? turn.searchAsWritten() : turn.searchWithHistory(searched: searched)
+                    let locators = try await Task.detached {
+                        try turn.searchWithHistory(searched: searched)
                     }.value
                     try Task.checkCancellation()
                     guard activeGenerationId == generationId else { return }
-                    for reference in resolution.referencedPassages {
+                    for locator in locators {
                         do {
-                            if let hit = try await reloadPassage(reference) { reloaded.append(hit) }
+                            if let hit = try await reloadPassage(locator) {
+                                reloaded.append(hit)
+                            }
                         } catch {
                             if isCancellation(error) { throw error }
                             logger.warning("Source reload failed", details: "\(error)")
@@ -1518,13 +1509,13 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
-    private func reloadPassage(_ reference: IncludedPassage) async throws -> GroundedExcerpt? {
-        switch reference.locator {
+    private func reloadPassage(_ locator: PassageLocator) async throws -> GroundedExcerpt? {
+        switch locator {
         case .ensuPack:
             return try await knowledgeProvider.reload(
-                reference.locator, datasets: knowledgeStore.enabledReadyDatasets)
+                locator, datasets: knowledgeStore.enabledReadyDatasets)
         case .localNote:
-            return try await notesStore.reload(reference.locator)
+            return try await notesStore.reload(locator)
         }
     }
 

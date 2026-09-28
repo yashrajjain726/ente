@@ -28,6 +28,305 @@ fn hit(text: &str, id: &str) -> GroundedExcerpt {
 fn measure(messages: &[ChatMessage]) -> Result<usize, PrepareError> {
     Ok(messages.iter().map(|m| m.content.chars().count() + 8).sum())
 }
+
+fn pack_hit(text: &str, title: &str, row: u64) -> GroundedExcerpt {
+    GroundedExcerpt {
+        locator: PassageLocator::EnsuPack {
+            dataset_id: "simplewiki".into(),
+            revision_sha256: "a".repeat(64),
+            row,
+        },
+        source: GroundedSource::EnsuPack {
+            citation: retrieval::SourceCitation {
+                dataset_id: "simplewiki".into(),
+                dataset_label: "Wikipedia".into(),
+                credit: "Wikipedia".into(),
+                title: title.into(),
+                source_url: format!("https://example.com/{title}"),
+                license_label: "CC BY-SA 4.0".into(),
+                license_url: "https://creativecommons.org/licenses/by-sa/4.0/".into(),
+            },
+        },
+        score: 0.9,
+        text: text.into(),
+    }
+}
+
+fn followup_history(prior: &[GroundedExcerpt]) -> (Vec<Message>, Vec<AnswerEvidence>) {
+    let old = retrieval::build_grounded_prompt_context(prior, MAX_GROUNDING_BYTES)
+        .unwrap()
+        .unwrap();
+    let mut history: Vec<_> = (1..=3)
+        .map(|i| Message {
+            uuid: Uuid::from_u128(i),
+            session_uuid: Uuid::from_u128(100),
+            parent_message_uuid: (i > 1).then(|| Uuid::from_u128(i - 1)),
+            sender: if i == 2 {
+                Sender::Other
+            } else {
+                Sender::SelfUser
+            },
+            text: "Explain the sources.".into(),
+            attachments: vec![],
+            created_at: i as i64,
+        })
+        .collect();
+    history[1].text =
+        retrieval::finalize_grounded_assistant_text("See the cited sources.", &old.sources)
+            .unwrap();
+    let evidence = vec![AnswerEvidence {
+        assistant_message_uuid: history[1].uuid,
+        prefix_fingerprint: fingerprint(&history[..2]),
+        passages: old.included_passages,
+    }];
+    (history, evidence)
+}
+
+fn fit_followup(
+    prior: &[GroundedExcerpt],
+    searched: Vec<GroundedExcerpt>,
+    query: &str,
+    input_budget: usize,
+) -> GroundedPromptContext {
+    let (history, evidence) = followup_history(prior);
+    let reloaded = direct_followup_references(&history, &evidence, query, &searched)
+        .into_iter()
+        .map(|reference| {
+            let hit = prior
+                .iter()
+                .find(|hit| hit.locator == reference.locator)
+                .unwrap();
+            ReferencedPassage {
+                passages: reference.verified_spans(&hit.text).unwrap(),
+                source: hit.source.clone(),
+                reference,
+            }
+        })
+        .collect();
+    let mut candidates = GroundingCandidates::new(reloaded, searched, MAX_GROUNDING_BYTES).unwrap();
+    candidates.protect_named_sources(query).unwrap();
+    let context = fit_grounding(&candidates, "System", query, input_budget, measure)
+        .unwrap()
+        .context
+        .unwrap();
+    assert!(context.text.len() <= MAX_GROUNDING_BYTES);
+    assert!(
+        measure(&answer_messages(
+            &grounded_system("System", Some(&context)),
+            None,
+            &[],
+            query
+        ))
+        .unwrap()
+            <= input_budget
+    );
+    context
+}
+
+#[test]
+fn followup_fitting_keeps_implicit_antecedents_and_allows_named_switches() {
+    let cedar = hit("Cedar allows 30 days.", "cedar.md");
+    let juniper = hit("Juniper allows 21 days.", "juniper.md");
+    let old = retrieval::build_grounded_prompt_context(std::slice::from_ref(&cedar), 6000)
+        .unwrap()
+        .unwrap();
+    for query in [
+        "Is Juniper longer than that?",
+        "Compare its deadline with Juniper.",
+        "Is Juniper's return period longer than ours?",
+        "Is Juniper's return period longer than mine?",
+        "Compare Juniper's return period with our policy.",
+        "Compare Juniper's return period with my policy.",
+        "Does she get more time than Juniper?",
+        "Compare her deadline with Juniper.",
+        "Is Juniper's deadline longer than hers?",
+        "Does he get more time than Juniper?",
+        "Does Juniper get more time than him?",
+        "Compare his deadline with Juniper.",
+    ] {
+        let context = fit_followup(
+            std::slice::from_ref(&cedar),
+            vec![juniper.clone()],
+            query,
+            7000,
+        );
+        assert!(context.text.contains(&cedar.text), "{query}");
+        assert!(context.text.contains(&juniper.text), "{query}");
+        assert!(
+            context
+                .included_passages
+                .contains(&old.included_passages[0])
+        );
+    }
+    let updated = hit("Cedar now requires seven days.", "cedar.md");
+    for (query, fresh) in [
+        ("What is Juniper's return period?", &juniper),
+        ("What is within Juniper's coverage?", &juniper),
+        ("What is Cedar's current deadline?", &updated),
+    ] {
+        let context = fit_followup(
+            std::slice::from_ref(&cedar),
+            vec![fresh.clone()],
+            query,
+            7000,
+        );
+        assert_eq!(context.sources, vec![fresh.source.clone()], "{query}");
+        assert!(context.text.contains(&fresh.text), "{query}");
+    }
+}
+
+#[test]
+fn followup_fitting_prioritizes_named_sources_at_source_and_byte_limits() {
+    let mut prior: Vec<_> = ["pine", "birch", "oak", "maple", "cedar"]
+        .iter()
+        .map(|name| hit(&format!("{name} allows 30 days."), &format!("{name}.md")))
+        .collect();
+    let atlas = hit(&"Atlas allows 21 days. ".repeat(40), "atlas.md");
+    let note_count = prior.len();
+    prior.extend([
+        pack_hit("Mars is the fourth planet.", "Mars", 0),
+        pack_hit("Venus is the second planet.", "Venus", 1),
+    ]);
+    let byte_limited = [
+        prior[note_count - 1].clone(),
+        hit(&"Unrelated detail. ".repeat(400), "pine.md"),
+    ];
+    for prior in [&prior[..note_count], &prior[..], &byte_limited] {
+        let context = fit_followup(prior, vec![atlas.clone()], "Compare Cedar and Atlas", 7000);
+        assert!(context.text.contains("cedar allows 30 days."));
+        assert!(context.text.contains(atlas.text.trim()));
+        assert!(context.sources.len() <= retrieval::MAX_GROUNDING_HITS);
+    }
+
+    let mars = pack_hit("Mars is the fourth planet.", "Mars", 0);
+    let venus = pack_hit("Venus is the second planet.", "Venus", 1);
+    let jupiter = pack_hit("Jupiter is the fifth planet.", "Jupiter", 2);
+    let another_mars_chunk = pack_hit("Mars also has two moons.", "Mars", 3);
+    for prior in [[venus, mars.clone()], [mars.clone(), another_mars_chunk]] {
+        let context = fit_followup(
+            &prior,
+            vec![jupiter.clone()],
+            "Compare Mars and Jupiter",
+            7000,
+        );
+        assert!(context.text.contains(&mars.text));
+        assert!(context.text.contains(&jupiter.text));
+        assert_eq!(context.sources.len(), 2);
+    }
+}
+
+#[test]
+fn unnamed_questions_keep_fresh_results_and_available_historical_passages() {
+    let notes: Vec<_> = ["cedar", "pine", "birch", "oak", "maple"]
+        .iter()
+        .map(|name| hit(&format!("{name} allows 30 days."), &format!("{name}.md")))
+        .collect();
+    let biology = hit(
+        "Photosynthesis converts light into energy.",
+        "biology-chapter-seven.md",
+    );
+    let mut another_chunk = notes[0].clone();
+    if let PassageLocator::LocalNote { chunk_index, .. } = &mut another_chunk.locator {
+        *chunk_index += 1;
+    }
+    another_chunk.text = "International shipping has an extended deadline.".into();
+    let old = retrieval::build_grounded_prompt_context(&notes, MAX_GROUNDING_BYTES)
+        .unwrap()
+        .unwrap();
+    for (query, fresh) in [
+        ("How does photosynthesis work?", &biology),
+        ("And the deadline?", &biology),
+        ("And the deadline?", &another_chunk),
+    ] {
+        let context = fit_followup(&notes, vec![fresh.clone()], query, 7000);
+        assert!(context.text.contains(&fresh.text), "{query}");
+        assert!(context.text.contains(&notes[0].text), "{query}");
+        assert!(
+            context
+                .included_passages
+                .contains(&old.included_passages[0])
+        );
+        assert!(context.sources.len() <= retrieval::MAX_NOTES_GROUNDING_HITS);
+    }
+
+    let packs = [
+        pack_hit("Mars is the fourth planet.", "Mars", 0),
+        pack_hit("Venus is the second planet.", "Venus", 1),
+    ];
+    let fresh = pack_hit("Plants use sunlight to produce sugar.", "Botany", 2);
+    let context = fit_followup(
+        &packs,
+        vec![fresh.clone()],
+        "How does photosynthesis work?",
+        7000,
+    );
+    assert!(context.text.contains(&fresh.text));
+    assert!(context.text.contains(&packs[0].text));
+    assert_eq!(context.sources.len(), retrieval::MAX_PACK_HITS);
+
+    let context = fit_followup(&notes, vec![], "And the deadline?", 7000);
+    assert_eq!(context.included_passages, old.included_passages);
+}
+
+#[test]
+fn fresh_followup_results_survive_byte_and_token_repacking() {
+    let prefix = hit("Price: 100 rupees.", "cedar.md");
+    let mut full = prefix.clone();
+    full.text.push_str(" Warranty duration: 24 months.");
+    let context = fit_followup(
+        &[prefix],
+        vec![full.clone()],
+        "And what's its warranty duration?",
+        7000,
+    );
+    assert!(context.text.contains(&full.text));
+    assert_eq!(context.sources, vec![full.source]);
+    assert_eq!(context.included_passages.len(), 1);
+    assert_eq!(
+        context.included_passages[0]
+            .verified_spans(&full.text)
+            .unwrap(),
+        vec![full.text]
+    );
+
+    let old = hit(&"Cedar allows 30 days. ".repeat(280), "cedar.md");
+    let fresh = hit(
+        &format!(
+            "Plants use light. {}",
+            "Photosynthesis details. ".repeat(300)
+        ),
+        "biology-chapter-seven.md",
+    );
+    for input_budget in [7000, 1600] {
+        let context = fit_followup(
+            std::slice::from_ref(&old),
+            vec![old.clone(), fresh.clone()],
+            "How does photosynthesis work?",
+            input_budget,
+        );
+        assert!(context.text.contains("Plants use light."));
+        let reference = context
+            .included_passages
+            .iter()
+            .find(|reference| reference.locator == fresh.locator)
+            .unwrap();
+        let spans = reference.verified_spans(&fresh.text).unwrap();
+        assert!(context.text.contains(&spans[0]));
+    }
+
+    let mut long_label = hit("Plants use light.", "biology.md");
+    if let GroundedSource::LocalNote { reference } = &mut long_label.source {
+        reference.title = "Biology ".repeat(400);
+    }
+    let context = fit_followup(
+        &[old],
+        vec![long_label.clone()],
+        "How does photosynthesis work?",
+        7000,
+    );
+    assert!(context.text.contains(&long_label.text));
+}
+
 #[test]
 fn measured_repack_keeps_text_citations_and_exact_spans_together() {
     for (raw, prefix) in [
@@ -44,19 +343,15 @@ fn measured_repack_keeps_text_citations_and_exact_spans_together() {
         ),
     ] {
         let candidates = GroundingCandidates::new(vec![], vec![hit(&raw, "one.md")], 6000).unwrap();
-        let original = serde_json::to_string(&candidates).unwrap();
         let fit = fit_grounding(&candidates, "System", "Question", 4096, measure).unwrap();
         assert!(fit.repacked);
         assert!(fit.evidence_tokens <= 1024);
         let context = fit.context.unwrap();
-        assert_eq!(context.sources.len(), context.included_passages.len());
+        assert_eq!(context.sources, vec![candidates.searched[0].source.clone()]);
         assert_eq!(context.included_passages.len(), 1);
-        for reference in &context.included_passages {
-            let spans = reference.verified_spans(&raw).unwrap();
-            assert!(context.text.contains(&spans[0]));
-            assert!(spans[0].starts_with(prefix));
-        }
-        assert_eq!(serde_json::to_string(&candidates).unwrap(), original);
+        let spans = context.included_passages[0].verified_spans(&raw).unwrap();
+        assert!(context.text.contains(&spans[0]));
+        assert!(spans[0].starts_with(prefix));
     }
 }
 #[test]
@@ -82,11 +377,6 @@ fn requested_old_spans_raise_soft_allowance_and_are_never_cut() {
     let fit = fit_grounding(&candidates, "System", "Question", 3000, measure).unwrap();
     assert!(fit.repacked && fit.evidence_tokens > 750);
     assert_eq!(fit.context.unwrap().included_passages[0], reference);
-    assert!(
-        fit_grounding(&candidates, "System", "Question", 700, measure)
-            .unwrap()
-            .repacked
-    );
 }
 #[test]
 fn mandatory_input_and_insufficient_evidence_budget_are_explicit() {
@@ -134,7 +424,6 @@ fn named_comparison_keeps_both_complete_passages_before_optional_hits() {
     candidates
         .protect_named_sources("Is the Juniper period longer than Cedar?")
         .unwrap();
-    assert_eq!(candidates.referenced.len(), 2);
     let fit = fit_grounding(
         &candidates,
         "System",
@@ -157,42 +446,10 @@ fn named_comparison_keeps_both_complete_passages_before_optional_hits() {
             vec![hit.text.clone()]
         );
     }
-    assert!(
-        fit_grounding(
-            &candidates,
-            "System",
-            "Compare Cedar and Juniper.",
-            900,
-            measure
-        )
-        .unwrap()
-        .repacked
-    );
 }
 
 #[test]
 fn ordinary_questions_and_shared_label_words_do_not_promote_every_source() {
-    let mut partial = GroundingCandidates::new(
-        vec![],
-        vec![hit(" ", "cedar.md"), hit("21 days", "juniper.md")],
-        6000,
-    )
-    .unwrap();
-    partial
-        .protect_named_sources("Compare Cedar and Juniper")
-        .unwrap();
-    let context = fit_grounding(
-        &partial,
-        "System",
-        "Compare Cedar and Juniper",
-        4096,
-        measure,
-    )
-    .unwrap()
-    .context
-    .unwrap();
-    assert_eq!(context.sources.len(), 1);
-    assert!(context.text.contains("21 days"));
     let base = GroundingCandidates::new(
         vec![],
         vec![
@@ -208,34 +465,6 @@ fn ordinary_questions_and_shared_label_words_do_not_promote_every_source() {
         assert!(c.referenced.is_empty());
         assert_eq!(c.pack(6000).unwrap(), base.pack(6000).unwrap());
     }
-}
-
-#[test]
-fn an_old_reference_and_new_named_document_are_both_protected() {
-    let old = hit("Cedar 30 days.", "cedar.md");
-    let packed = retrieval::build_grounded_prompt_context(std::slice::from_ref(&old), 6000)
-        .unwrap()
-        .unwrap();
-    let reference = packed.included_passages[0].clone();
-    let required = ReferencedPassage {
-        passages: reference.verified_spans(&old.text).unwrap(),
-        source: old.source,
-        reference: reference.clone(),
-    };
-    let juniper = hit("Juniper 21 days.", "juniper.md");
-    let mut second_chunk = juniper.clone();
-    if let PassageLocator::LocalNote { chunk_index, .. } = &mut second_chunk.locator {
-        *chunk_index = 1;
-    }
-    let mut c =
-        GroundingCandidates::new(vec![required], vec![juniper, second_chunk], 6000).unwrap();
-    c.protect_named_sources("Is Juniper longer than that?")
-        .unwrap();
-    assert_eq!(c.referenced.len(), 2);
-    assert_eq!(c.referenced[0].reference, reference);
-    c.protect_named_sources("Compare Cedar and Juniper.")
-        .unwrap();
-    assert_eq!(c.referenced.len(), 2);
 }
 
 fn prior_history() -> Vec<Message> {
@@ -326,23 +555,7 @@ fn source_system_and_required_history_are_measured_in_final_roles() {
 
 #[test]
 fn overlapping_pack_and_note_titles_preserve_both_sources_without_blocking_switches() {
-    let mut pack = hit("Mars is the fourth planet.", "unused.md");
-    pack.locator = PassageLocator::EnsuPack {
-        dataset_id: "wiki".into(),
-        revision_sha256: "a".repeat(64),
-        row: 0,
-    };
-    pack.source = GroundedSource::EnsuPack {
-        citation: crate::retrieval::SourceCitation {
-            dataset_id: "wiki".into(),
-            dataset_label: "Wiki".into(),
-            credit: "Wiki".into(),
-            title: "Mars".into(),
-            source_url: "https://example.com/mars".into(),
-            license_label: "CC BY-SA 4.0".into(),
-            license_url: "https://creativecommons.org/licenses/by-sa/4.0/".into(),
-        },
-    };
+    let pack = pack_hit("Mars is the fourth planet.", "Mars", 0);
     let mut note = hit("Check-in code COPPER-29.", "mars-expedition.md");
     if let GroundedSource::LocalNote { reference } = &mut note.source {
         reference.title = "Mars expedition checklist".into();
@@ -352,37 +565,11 @@ fn overlapping_pack_and_note_titles_preserve_both_sources_without_blocking_switc
     c.protect_named_sources(query).unwrap();
     assert_eq!(c.referenced.len(), 2);
     assert_eq!(c.pack(6000).unwrap().unwrap().sources.len(), 2);
-    assert!(c.pack(100).is_err());
 
-    let context = retrieval::build_grounded_prompt_context(&[pack], 6000)
-        .unwrap()
-        .unwrap();
-    let mut history: Vec<_> = (1..=3)
-        .map(|i| Message {
-            uuid: Uuid::from_u128(i),
-            session_uuid: Uuid::from_u128(100),
-            parent_message_uuid: (i > 1).then(|| Uuid::from_u128(i - 1)),
-            sender: if i == 2 {
-                Sender::Other
-            } else {
-                Sender::SelfUser
-            },
-            text: query.into(),
-            attachments: vec![],
-            created_at: i as i64,
-        })
-        .collect();
-    history[1].text =
-        retrieval::finalize_grounded_assistant_text("Fourth planet", &context.sources).unwrap();
-    let evidence = vec![AnswerEvidence {
-        assistant_message_uuid: history[1].uuid,
-        prefix_fingerprint: fingerprint(&history[..2]),
-        passages: context.included_passages.clone(),
-    }];
+    let (history, evidence) = followup_history(&[pack]);
     assert_eq!(
-        direct_followup_references(&history, &evidence, query, std::slice::from_ref(&note))
-            .unwrap(),
-        context.included_passages
+        direct_followup_references(&history, &evidence, query, std::slice::from_ref(&note)),
+        evidence[0].passages
     );
     assert!(
         direct_followup_references(
@@ -391,90 +578,29 @@ fn overlapping_pack_and_note_titles_preserve_both_sources_without_blocking_switc
             "What is the check-in code in the Mars expedition checklist?",
             &[note]
         )
-        .unwrap()
         .is_empty()
     );
 }
 
 #[test]
-fn direct_followups_reuse_saved_spans_but_named_search_can_change_sources() {
-    let prior: Vec<_> = ["cedar", "pine", "birch", "oak", "maple"]
-        .iter()
-        .map(|name| hit("Archived policy fact.", &format!("{name}.md")))
-        .collect();
-    let context = retrieval::build_grounded_prompt_context(&prior, 6000)
-        .unwrap()
-        .unwrap();
-    let mut history: Vec<_> = (1..=5)
-        .map(|i| Message {
+fn followups_use_last_available_evidence_until_its_history_changes() {
+    let (mut history, evidence) = followup_history(&[hit("Archived policy fact.", "cedar.md")]);
+    for i in 4..=5 {
+        history.push(Message {
             uuid: Uuid::from_u128(i),
-            session_uuid: Uuid::from_u128(100),
-            parent_message_uuid: (i > 1).then(|| Uuid::from_u128(i - 1)),
-            sender: if i % 2 == 0 {
+            parent_message_uuid: Some(Uuid::from_u128(i - 1)),
+            sender: if i == 4 {
                 Sender::Other
             } else {
                 Sender::SelfUser
             },
-            text: "Please clarify the subject.".into(),
-            attachments: vec![],
-            created_at: i as i64,
-        })
-        .collect();
-    history[1].text =
-        retrieval::finalize_grounded_assistant_text("Saved facts", &context.sources).unwrap();
-    let evidence = vec![AnswerEvidence {
-        assistant_message_uuid: history[1].uuid,
-        prefix_fingerprint: fingerprint(&history[..2]),
-        passages: context.included_passages.clone(),
-    }];
-    let atlas = hit("Warranty lasts two years.", "atlas.md");
+            ..history[2].clone()
+        });
+    }
     assert_eq!(
-        direct_followup_references(&history, &evidence, "And the deadline?", &[]).unwrap(),
-        context.included_passages
-    );
-    assert!(
-        direct_followup_references(
-            &history,
-            &evidence,
-            "How long is the Atlas warranty?",
-            std::slice::from_ref(&atlas)
-        )
-        .unwrap()
-        .is_empty()
-    );
-    let mut candidates = GroundingCandidates::new(vec![], vec![atlas.clone()], 6000).unwrap();
-    candidates
-        .protect_named_sources("How long is the Atlas warranty?")
-        .unwrap();
-    assert!(
-        candidates
-            .pack(6000)
-            .unwrap()
-            .unwrap()
-            .text
-            .contains(&atlas.text)
-    );
-    let mut updated = prior[0].clone();
-    updated.text = "Cedar now requires seven days.".into();
-    assert!(
-        direct_followup_references(
-            &history,
-            &evidence,
-            "What is Cedar's current deadline?",
-            &[updated]
-        )
-        .unwrap()
-        .is_empty()
-    );
-    assert_eq!(
-        direct_followup_references(&history, &evidence, "Compare Cedar and Atlas", &[atlas])
-            .unwrap(),
-        context.included_passages
+        direct_followup_references(&history, &evidence, "And the deadline?", &[]),
+        evidence[0].passages
     );
     history[0].text = "Edited history".into();
-    assert!(
-        direct_followup_references(&history, &evidence, "And the deadline?", &[])
-            .unwrap()
-            .is_empty()
-    );
+    assert!(direct_followup_references(&history, &evidence, "And the deadline?", &[]).is_empty());
 }

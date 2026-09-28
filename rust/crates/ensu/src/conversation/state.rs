@@ -19,7 +19,7 @@ pub struct AnswerEvidence {
 }
 
 impl AnswerEvidence {
-    pub fn matches(&self, history: &[Message]) -> bool {
+    pub(crate) fn matches(&self, history: &[Message]) -> bool {
         history
             .iter()
             .position(|m| m.uuid == self.assistant_message_uuid)
@@ -30,14 +30,13 @@ impl AnswerEvidence {
     }
 
     fn valid(&self) -> bool {
-        self.prefix_fingerprint.len() == 64
-            && !self.passages.is_empty()
-            && valid_answer_passages(&self.passages)
+        self.prefix_fingerprint.len() == 64 && valid_answer_passages(&self.passages)
     }
 }
 
 pub(crate) fn valid_answer_passages(passages: &[IncludedPassage]) -> bool {
-    passages.len() <= MAX_ANSWER_PASSAGES
+    !passages.is_empty()
+        && passages.len() <= MAX_ANSWER_PASSAGES
         && passages.iter().all(IncludedPassage::valid_metadata)
         && serde_json::to_vec(passages).is_ok_and(|bytes| bytes.len() <= MAX_EVIDENCE_BYTES)
 }
@@ -117,7 +116,6 @@ impl ConversationEnvelope {
         if history.len() < 2
             || answer.sender != Sender::Other
             || answer.session_uuid != self.session_uuid
-            || passages.is_empty()
             || !valid_answer_passages(&passages)
             || super::validate_path(history).is_err()
         {

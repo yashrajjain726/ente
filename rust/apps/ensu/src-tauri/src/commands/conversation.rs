@@ -23,7 +23,7 @@ struct Slot {
     token: String,
     snapshot: ConversationSnapshot,
     db: Arc<ChatDb<SqliteBackend>>,
-    grounded: Option<ente_ensu::retrieval::GroundedPromptContext>,
+    passages: Vec<IncludedPassage>,
     model_epoch: u64,
     cancel_epoch: u64,
 }
@@ -80,14 +80,7 @@ impl State {
         }
         slots
             .remove(window)
-            .map(|slot| {
-                (
-                    slot.snapshot,
-                    slot.grounded
-                        .map(|context| context.included_passages)
-                        .unwrap_or_default(),
-                )
-            })
+            .map(|slot| (slot.snapshot, slot.passages))
             .ok_or_else(|| error("Preparation has expired"))
     }
 }
@@ -253,9 +246,6 @@ pub async fn conversation_prepare(
         ));
     }
     let model_epoch = llm_state.model_state_epoch();
-    if let Some(candidates) = &input.grounding_candidates {
-        candidates.validate().map_err(|e| error(e.to_string()))?;
-    }
     state
         .slots
         .lock()
@@ -268,19 +258,21 @@ pub async fn conversation_prepare(
             .conversation_snapshot(input.session_uuid, &input.path)
             .map_err(ApiError::from)?;
         if let Some(token) = &input.resolution_token {
-            app.state::<super::followup::State>().validate(
+            let selection = app.state::<super::followup::State>().take_selection(
                 work_window.label(),
                 token,
                 &db,
                 &snapshot,
-                input.grounding_candidates.as_ref(),
             )?;
+            input.history_query = Some(selection.question);
+            input.grounding_candidates = Some(selection.candidates);
         }
         let candidates = match input.grounding_candidates.take() {
             Some(candidates) => candidates,
             None => conversation::GroundingCandidates::new(vec![], vec![], conversation::MAX_GROUNDING_BYTES)
                 .map_err(preparation_error)?,
         };
+        candidates.validate().map_err(|e| error(e.to_string()))?;
         let turn = conversation::TurnInput {
             session: input.session_uuid,
             messages: snapshot.messages().to_vec(),
@@ -312,18 +304,21 @@ pub async fn conversation_prepare(
         ));
         let result = prepared.preparation.run(&mut effects).map_err(preparation_error)?;
         effects.check_current().map_err(preparation_error)?;
-        let grounded = prepared.grounding.context;
+        let mut grounded = prepared.grounding.context;
+        let passages = grounded.as_mut()
+            .map(|context| std::mem::take(&mut context.included_passages))
+            .unwrap_or_default();
         Ok((
             Response {
                 preparation_token: token.clone(),
                 messages: result.messages,
-                grounded_context: grounded.clone().map(Into::into),
+                grounded_context: grounded.map(Into::into),
             },
             Slot {
                 token,
                 snapshot,
                 db,
-                grounded,
+                passages,
                 model_epoch,
                 cancel_epoch: expected_epoch,
             },

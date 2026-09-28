@@ -264,12 +264,24 @@ impl ConversationPreparation {
             )
             .map_err(error)?;
         work.saved = true;
-        if let Some(grounded) = &work.grounded {
-            let _ = self.db.save_answer_evidence(
+        if let Some(grounded) = work.grounded.take()
+            && !grounded.included_passages.is_empty()
+        {
+            match self.db.save_answer_evidence(
                 &work.snapshot,
                 answer.uuid,
-                grounded.included_passages.clone(),
-            );
+                grounded.included_passages,
+            ) {
+                Ok(true) => {}
+                Ok(false) => ente_uniffi_log::warn!(
+                    target: "Conversation",
+                    "Reply saved, but its source references could not be retained"
+                ),
+                Err(error) => ente_uniffi_log::warn!(
+                    target: "Conversation",
+                    "Reply saved but source reference persistence failed: {error}"
+                ),
+            }
         }
         Ok(to_message(answer))
     }

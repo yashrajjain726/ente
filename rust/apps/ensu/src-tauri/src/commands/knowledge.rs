@@ -662,14 +662,14 @@ pub async fn knowledge_retrieve(
         check_cancelled()?;
 
         let candidates = ente_ensu::conversation::GroundingCandidates::new(vec![], excerpts, context_budget as usize)
-            .map_err(|error| ApiError::new("followup", error.to_string()))?;
+            .map_err(|error| ApiError::new("conversation", error.to_string()))?;
         candidates.pack(context_budget as usize)
             .map(|context| context.map(|context| {
                 let mut result = GroundedPromptContextDto::from(context);
                 result.candidates = Some(candidates);
                 result
             }))
-            .map_err(|error| ApiError::new("followup", error.to_string()))
+            .map_err(|error| ApiError::new("conversation", error.to_string()))
     })
     .await
     .map_err(|_| ApiError::new("llm_thread", "Knowledge retrieval task failed"))?

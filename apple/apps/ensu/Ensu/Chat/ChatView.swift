@@ -302,10 +302,6 @@ struct ChatView: View {
                     onRetry: { message in
                         viewModel.retryAssistantResponse(message)
                     },
-                    onSearch: viewModel.canSearchSources
-                        ? { message in
-                            viewModel.retryAssistantResponse(message, searchAsWritten: true)
-                        } : nil,
                     onBranchChange: { message, delta in
                         viewModel.changeBranch(for: message, delta: delta)
                     },

@@ -188,11 +188,7 @@ final class NotesStore: ObservableObject, ModelMaintenance {
             do {
                 hits += try await provider.search(collection.id, query: query)
             } catch NotesError.RebuildRequired {
-                enqueue(collection.id, rebuild: true, due: .distantPast)
-                update(collection.id) {
-                    $0.status = .pending
-                    $0.indexAvailable = false
-                }
+                requestRebuild(collection.id)
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
@@ -212,11 +208,7 @@ final class NotesStore: ObservableObject, ModelMaintenance {
                 selectMixedGroundingCandidates(packHits: [], notesHits: [hit], notesLimit: 1)
             ).first
         } catch NotesError.RebuildRequired {
-            enqueue(collectionId, rebuild: true, due: .distantPast)
-            update(collectionId) {
-                $0.status = .pending
-                $0.indexAvailable = false
-            }
+            requestRebuild(collectionId)
             return nil
         }
     }
@@ -268,6 +260,14 @@ final class NotesStore: ObservableObject, ModelMaintenance {
             } catch {
                 operationError = "Could not open this note. Check folder access and try again."
             }
+        }
+    }
+
+    private func requestRebuild(_ id: String) {
+        enqueue(id, rebuild: true, due: .distantPast)
+        update(id) {
+            $0.status = .pending
+            $0.indexAvailable = false
         }
     }
 
@@ -409,11 +409,7 @@ final class NotesStore: ObservableObject, ModelMaintenance {
                 }
             } catch NotesError.RebuildRequired {
                 if snapshot == nil {
-                    enqueue(id, rebuild: true, due: .distantPast)
-                    update(id) {
-                        $0.status = .pending
-                        $0.indexAvailable = false
-                    }
+                    requestRebuild(id)
                 } else {
                     fail(id, NotesError.RebuildRequired)
                 }
