@@ -2519,6 +2519,10 @@
   "@mediaManagementHintTitle": {
     "description": "Title of a sheet prompting Android users to enable media management permission."
   },
+  "meetEnteLocker": "Meet Ente Locker",
+  "@meetEnteLocker": {
+    "description": "Button in the Photos changelog that opens the Ente Locker website"
+  },
   "members": "Members",
   "memberStorageUsed": "{amount} used",
   "@memberStorageUsed": {
