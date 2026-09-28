@@ -23,6 +23,17 @@ const randomPrefix = () => {
 const isValidExtension = (extension: string) =>
     /^[a-z0-9]{1,244}$/i.test(extension);
 
+export const imageInputExtension = (
+    detectedExtension: string | undefined,
+    fileName: string,
+) => {
+    const fileNameExtension = path.extname(fileName).slice(1);
+    const mayBeTIFFBasedRAW = detectedExtension === "tif";
+    return mayBeTIFFBasedRAW && isValidExtension(fileNameExtension)
+        ? fileNameExtension
+        : detectedExtension;
+};
+
 export const makeTempFilePath = async (extension?: string) => {
     if (extension && !isValidExtension(extension))
         throw new Error("Invalid temporary file extension");
@@ -70,12 +81,8 @@ export const makeFileForStreamOrPathOrZipItem = async (
         filePath = item;
         isFileTemporary = false;
     } else {
-        const fileNameExtension =
-            Array.isArray(item) && detectedExtension === "tif"
-                ? path.extname(item[1]).slice(1)
-                : "";
-        const extension = isValidExtension(fileNameExtension)
-            ? fileNameExtension
+        const extension = Array.isArray(item)
+            ? imageInputExtension(detectedExtension, item[1])
             : detectedExtension;
         filePath = await makeTempFilePath(extension);
         isFileTemporary = true;

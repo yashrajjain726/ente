@@ -218,8 +218,14 @@ export const attachIPCHandlers = () => {
 
     handle("fsFindFiles", (_, folderPath: string) => fsFindFiles(folderPath));
 
-    handle("convertToJPEG", (_, imageData: Uint8Array, extension: string) =>
-        convertToJPEG(imageData, extension),
+    handle(
+        "convertToJPEG",
+        (
+            _,
+            imageData: Uint8Array,
+            detectedExtension: string,
+            fileName: string,
+        ) => convertToJPEG(imageData, detectedExtension, fileName),
     );
 
     handle(

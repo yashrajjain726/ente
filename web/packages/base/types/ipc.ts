@@ -76,7 +76,8 @@ export interface Electron {
 
     convertToJPEG: (
         imageData: Uint8Array,
-        extension: string,
+        detectedExtension: string,
+        fileName: string,
     ) => Promise<Uint8Array<ArrayBuffer>>;
     generateImageThumbnail: (
         pathOrZipItem: string | ZipItem,

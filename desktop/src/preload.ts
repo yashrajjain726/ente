@@ -161,9 +161,10 @@ const fsStatMtime = (path: string) => ipcRenderer.invoke("fsStatMtime", path);
 
 const convertToJPEG = (
     imageData: Uint8Array,
-    extension: string,
+    detectedExtension: string,
+    fileName: string,
 ): Promise<Uint8Array<ArrayBuffer>> =>
-    ipcRenderer.invoke("convertToJPEG", imageData, extension);
+    ipcRenderer.invoke("convertToJPEG", imageData, detectedExtension, fileName);
 
 const generateImageThumbnail = (
     pathOrZipItem: string | ZipItem,
