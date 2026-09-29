@@ -14,6 +14,7 @@ import {
     createDocumentIconConfig,
     lockerItemIconConfig,
 } from "@/components/items/locker-item-icons";
+import { LockerConfirmDialog } from "@/components/ui/LockerConfirmDialog";
 import type { LockerUploadLimitState } from "@/services/locker-limits";
 import type { LockerUploadProgress } from "@/services/uploads";
 import {
@@ -135,6 +136,7 @@ export const CreateItemDialog: React.FC<CreateItemDialogProps> = ({
         canSave,
         canUpload,
         completedFileKeys,
+        collectionName,
         customCollectionNames,
         displayCollections,
         error,
@@ -143,6 +145,8 @@ export const CreateItemDialog: React.FC<CreateItemDialogProps> = ({
         formType,
         handleClose,
         handleDialogClose,
+        handleDiscard,
+        handleKeepEditing,
         handleFieldChange,
         handleFileSelect,
         handleSave,
@@ -151,6 +155,7 @@ export const CreateItemDialog: React.FC<CreateItemDialogProps> = ({
         handleUpload,
         isEditMode,
         isFileMode,
+        pendingExit,
         saving,
         savedUploadCount,
         selectedCollectionIDs,
@@ -159,6 +164,7 @@ export const CreateItemDialog: React.FC<CreateItemDialogProps> = ({
         selectedType,
         selectedUploadItems,
         setCustomCollectionNames,
+        setCollectionName,
         setSelectedCollectionIDs,
         setSelectedCollectionNamesByFileKey,
         setSelectedUploadItems,
@@ -189,355 +195,381 @@ export const CreateItemDialog: React.FC<CreateItemDialogProps> = ({
     });
 
     return (
-        <Dialog
-            open={open}
-            onClose={handleDialogClose}
-            fullWidth
-            maxWidth="sm"
-            sx={(theme) => ({
-                "& .MuiBackdrop-root": { backgroundColor: "rgba(0 0 0 / 0.6)" },
-                "& .MuiDialogTitle-root": { padding: 0 },
-                "& .MuiDialogContent-root": {
-                    padding: 0,
-                    paddingTop: "16px",
-                    paddingRight: isFileMode ? 0 : "14px",
-                    marginRight: isFileMode ? 0 : "-14px",
-                },
-                [theme.breakpoints.down("sm")]: {
-                    "& .MuiDialog-container": { alignItems: "flex-end" },
-                },
-            })}
-            slotProps={{
-                paper: {
-                    sx: (theme) => ({
-                        display: "flex",
-                        flexDirection: "column",
-                        maxHeight: "min(720px, 90vh)",
-                        width: "min(100%, 440px)",
-                        borderRadius: "24px",
-                        backgroundColor: theme.vars.palette.background.default,
-                        padding: "20px",
-                        margin: "16px",
-                        [theme.breakpoints.down("sm")]: {
-                            width: "100%",
-                            maxWidth: "100%",
-                            margin: 0,
-                            borderRadius: "20px 20px 0 0",
-                            paddingBottom:
-                                "max(34px, env(safe-area-inset-bottom))",
-                            maxHeight: "90vh",
-                        },
-                    }),
-                },
-            }}
-        >
-            <Box
-                sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    minHeight: 38,
-                    flexShrink: 0,
+        <>
+            <Dialog
+                open={open}
+                onClose={handleDialogClose}
+                fullWidth
+                maxWidth="sm"
+                sx={(theme) => ({
+                    "& .MuiBackdrop-root": {
+                        backgroundColor: "rgba(0 0 0 / 0.6)",
+                    },
+                    "& .MuiDialogTitle-root": { padding: 0 },
+                    "& .MuiDialogContent-root": {
+                        padding: 0,
+                        paddingTop: "16px",
+                        paddingRight: isFileMode ? 0 : "14px",
+                        marginRight: isFileMode ? 0 : "-14px",
+                    },
+                    [theme.breakpoints.down("sm")]: {
+                        "& .MuiDialog-container": { alignItems: "flex-end" },
+                    },
+                })}
+                slotProps={{
+                    paper: {
+                        sx: (theme) => ({
+                            display: "flex",
+                            flexDirection: "column",
+                            maxHeight: "min(720px, 90vh)",
+                            width: "min(100%, 440px)",
+                            borderRadius: "24px",
+                            backgroundColor:
+                                theme.vars.palette.background.default,
+                            padding: "20px",
+                            margin: "16px",
+                            [theme.breakpoints.down("sm")]: {
+                                width: "100%",
+                                maxWidth: "100%",
+                                margin: 0,
+                                borderRadius: "20px 20px 0 0",
+                                paddingBottom:
+                                    "max(34px, env(safe-area-inset-bottom))",
+                                maxHeight: "90vh",
+                            },
+                        }),
+                    },
                 }}
             >
-                {!isEditMode &&
-                    selectedOption !== null &&
-                    !(isFileMode && selectedUploadItems.length > 0) && (
-                        <IconButton
-                            onClick={handleStepBackToOptions}
-                            disabled={saving || uploading}
-                            aria-label={t("go_back")}
-                            sx={lockerHeaderIconButtonSx}
-                        >
-                            <HugeiconsIcon
-                                icon={ArrowLeft01Icon}
-                                size={18}
-                                strokeWidth={1.5}
-                            />
-                        </IconButton>
-                    )}
-                <DialogTitle
+                <Box
                     sx={{
-                        flex: 1,
-                        minWidth: 0,
-                        fontSize: 18,
-                        lineHeight: "24px",
-                        fontWeight: 600,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        minHeight: 38,
+                        flexShrink: 0,
                     }}
                 >
-                    {isEditMode
-                        ? t("editItem")
-                        : isFileMode
-                          ? selectedUploadItems.length > 1
-                              ? t("saveDocumentsTitle")
-                              : t("saveDocumentTitle")
-                          : selectedType
-                            ? typeDisplayName(selectedType)
-                            : t("saveToLocker")}
-                </DialogTitle>
-                <IconButton
-                    onClick={handleClose}
-                    disabled={saving || uploading}
-                    aria-label={t("close")}
-                    sx={lockerHeaderIconButtonSx}
-                >
-                    <HugeiconsIcon
-                        icon={Cancel01Icon}
-                        size={18}
-                        strokeWidth={1.5}
-                    />
-                </IconButton>
-            </Box>
-
-            <DialogContent
-                sx={(theme) => ({
-                    ...(isFileMode
-                        ? {
-                              display: "flex",
-                              flexDirection: "column",
-                              flex: 1,
-                              minHeight: 0,
-                              overflow: "hidden",
-                          }
-                        : lockerScrollAreaSx(theme)),
-                })}
-            >
-                {shouldShowDialogErrorCard && (
-                    <Box
+                    {!isEditMode &&
+                        selectedOption !== null &&
+                        !(isFileMode && selectedUploadItems.length > 0) && (
+                            <IconButton
+                                onClick={handleStepBackToOptions}
+                                disabled={saving || uploading}
+                                aria-label={t("go_back")}
+                                sx={lockerHeaderIconButtonSx}
+                            >
+                                <HugeiconsIcon
+                                    icon={ArrowLeft01Icon}
+                                    size={18}
+                                    strokeWidth={1.5}
+                                />
+                            </IconButton>
+                        )}
+                    <DialogTitle
                         sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "16px",
-                            minHeight: 66,
-                            px: "16px",
-                            py: "12px",
-                            mb: "16px",
-                            borderRadius: "20px",
-                            backgroundColor: "background.paper",
-                            flexShrink: 0,
+                            flex: 1,
+                            minWidth: 0,
+                            fontSize: 18,
+                            lineHeight: "24px",
+                            fontWeight: 600,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
                         }}
                     >
+                        {isEditMode
+                            ? t("editItem")
+                            : isFileMode
+                              ? selectedUploadItems.length > 1
+                                  ? t("saveDocumentsTitle")
+                                  : t("saveDocumentTitle")
+                              : selectedType
+                                ? typeDisplayName(selectedType)
+                                : t("saveToLocker")}
+                    </DialogTitle>
+                    <IconButton
+                        onClick={handleClose}
+                        disabled={saving || uploading}
+                        aria-label={t("close")}
+                        sx={lockerHeaderIconButtonSx}
+                    >
+                        <HugeiconsIcon
+                            icon={Cancel01Icon}
+                            size={18}
+                            strokeWidth={1.5}
+                        />
+                    </IconButton>
+                </Box>
+
+                <DialogContent
+                    sx={(theme) => ({
+                        ...(isFileMode
+                            ? {
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  flex: 1,
+                                  minHeight: 0,
+                                  overflow: "hidden",
+                              }
+                            : lockerScrollAreaSx(theme)),
+                    })}
+                >
+                    {shouldShowDialogErrorCard && (
                         <Box
                             sx={{
-                                color: "critical.main",
-                                flexShrink: 0,
                                 display: "flex",
+                                alignItems: "center",
+                                gap: "16px",
+                                minHeight: 66,
+                                px: "16px",
+                                py: "12px",
+                                mb: "16px",
+                                borderRadius: "20px",
+                                backgroundColor: "background.paper",
+                                flexShrink: 0,
                             }}
                         >
-                            <HugeiconsIcon
-                                icon={CancelCircleIcon}
-                                size={24}
-                                strokeWidth={1.5}
-                            />
-                        </Box>
-                        <Typography
-                            variant="mini"
-                            sx={{ color: "text.muted", minWidth: 0 }}
-                        >
-                            {upgradeCTAType === "fileCountLimit" ? (
-                                <Trans
-                                    i18nKey="uploadFileCountLimitErrorBodyWithUpgrade"
-                                    components={{
-                                        cta: (
-                                            <Link
-                                                href="https://photos.ente.com"
-                                                target="_blank"
-                                                rel="noopener"
-                                                underline="always"
-                                                sx={{
-                                                    color: "accent.main",
-                                                    fontWeight: 600,
-                                                }}
-                                            />
-                                        ),
-                                    }}
-                                />
-                            ) : (
-                                error
-                            )}
-                        </Typography>
-                    </Box>
-                )}
-
-                {!isEditMode && !selectedOption && (
-                    <Stack sx={{ gap: "24px" }}>
-                        <Typography
-                            variant="small"
-                            sx={{ color: "text.muted" }}
-                        >
-                            {t("informationDescription")}
-                        </Typography>
-                        <Stack sx={{ gap: "16px" }}>
-                            {CREATABLE_TYPES.map((option) => (
-                                <TypeCard
-                                    key={option.type}
-                                    label={t(option.labelKey)}
-                                    description={t(option.descriptionKey)}
-                                    icon={option.icon}
-                                    onClick={() =>
-                                        handleSelectOption(option.type)
-                                    }
-                                />
-                            ))}
-                        </Stack>
-                    </Stack>
-                )}
-
-                {isFileMode && !isEditMode && (
-                    <>
-                        {showUploadCounter && (
-                            <Typography
-                                variant="small"
+                            <Box
                                 sx={{
-                                    color: "text.muted",
-                                    mb: "16px",
+                                    color: "critical.main",
                                     flexShrink: 0,
+                                    display: "flex",
                                 }}
                             >
-                                {savedUploadCount} / {totalUploadCount}{" "}
-                                {t("saved")}
+                                <HugeiconsIcon
+                                    icon={CancelCircleIcon}
+                                    size={24}
+                                    strokeWidth={1.5}
+                                />
+                            </Box>
+                            <Typography
+                                variant="mini"
+                                sx={{ color: "text.muted", minWidth: 0 }}
+                            >
+                                {upgradeCTAType === "fileCountLimit" ? (
+                                    <Trans
+                                        i18nKey="uploadFileCountLimitErrorBodyWithUpgrade"
+                                        components={{
+                                            cta: (
+                                                <Link
+                                                    href="https://photos.ente.com"
+                                                    target="_blank"
+                                                    rel="noopener"
+                                                    underline="always"
+                                                    sx={{
+                                                        color: "accent.main",
+                                                        fontWeight: 600,
+                                                    }}
+                                                />
+                                            ),
+                                        }}
+                                    />
+                                ) : (
+                                    error
+                                )}
                             </Typography>
-                        )}
-                        <FileUploadSection
-                            fileInputRef={fileInputRef}
-                            selectedUploadItems={selectedUploadItems}
-                            collections={displayCollections}
-                            availableCollectionNames={customCollectionNames}
-                            selectedCollectionNamesByFileKey={
-                                selectedCollectionNamesByFileKey
-                            }
-                            completedFileKeys={completedFileKeys}
-                            failedFileKeys={failedFileKeys}
-                            uploadingFileKeys={uploadingFileKeys}
-                            uploadProgressByFileKey={uploadProgressByFileKey}
-                            uploadCapByFileKey={uploadCapByFileKey}
-                            uploading={uploading}
-                            canUpload={canUpload}
-                            onFileSelect={handleFileSelect}
-                            onToggleCollectionName={(fileKey, name) =>
-                                setSelectedCollectionNamesByFileKey(
-                                    (current) => ({
-                                        ...current,
-                                        [fileKey]: toggleCollectionName(
-                                            current[fileKey] ?? [],
-                                            name,
-                                        ),
-                                    }),
-                                )
-                            }
-                            onAddCollectionName={(fileKey, name) => {
-                                setCustomCollectionNames((current) =>
-                                    addCollectionName(current, name),
-                                );
-                                setSelectedCollectionNamesByFileKey(
-                                    (current) => ({
-                                        ...current,
-                                        [fileKey]: addCollectionName(
-                                            current[fileKey] ?? [],
-                                            name,
-                                        ),
-                                    }),
-                                );
-                            }}
-                            onAddAvailableCollectionName={(name) =>
-                                setCustomCollectionNames((current) =>
-                                    addCollectionName(current, name),
-                                )
-                            }
-                            onSetCollectionNamesForAllItems={(names) =>
-                                setSelectedCollectionNamesByFileKey(
-                                    Object.fromEntries(
-                                        selectedUploadItems.map((item) => [
-                                            uploadQueueItemKey(item),
-                                            names,
-                                        ]),
-                                    ),
-                                )
-                            }
-                            onRemoveItem={(fileKey) => {
-                                setSelectedUploadItems((current) =>
-                                    current.filter(
-                                        (item) =>
-                                            uploadQueueItemKey(item) !==
-                                            fileKey,
-                                    ),
-                                );
-                                setSelectedCollectionNamesByFileKey((current) =>
-                                    Object.fromEntries(
-                                        Object.entries(current).filter(
-                                            ([key]) => key !== fileKey,
-                                        ),
-                                    ),
-                                );
-                            }}
-                            onUpload={handleUpload}
-                        />
-                    </>
-                )}
+                        </Box>
+                    )}
 
-                {formType && (!isFileMode || isEditMode) && (
-                    <Stack sx={{ gap: "24px" }}>
-                        <ItemFormFields
-                            type={formType}
-                            data={formData}
-                            onChange={handleFieldChange}
-                            showPassword={showPassword}
-                            onTogglePassword={() =>
-                                setShowPassword((value) => !value)
-                            }
-                        />
-
-                        <CollectionSelector
-                            key={`${open ? "open" : "closed"}:${
-                                editItem?.id ?? "create"
-                            }:${formType}`}
-                            collections={displayCollections}
-                            selectedIDs={selectedCollectionIDs}
-                            initialSelectedIDs={
-                                isEditMode ? editItem?.collectionIDs : undefined
-                            }
-                            onToggle={(collectionID) =>
-                                setSelectedCollectionIDs((current) =>
-                                    current.includes(collectionID)
-                                        ? current.filter(
-                                              (id) => id !== collectionID,
-                                          )
-                                        : [...current, collectionID],
-                                )
-                            }
-                            onCreateCollection={onCreateCollection}
-                        />
-
-                        {error && upgradeCTAType !== "fileCountLimit" && (
+                    {!isEditMode && !selectedOption && (
+                        <Stack sx={{ gap: "24px" }}>
                             <Typography
                                 variant="small"
-                                sx={{ color: "critical.main" }}
+                                sx={{ color: "text.muted" }}
                             >
-                                {error}
+                                {t("informationDescription")}
                             </Typography>
-                        )}
+                            <Stack sx={{ gap: "16px" }}>
+                                {CREATABLE_TYPES.map((option) => (
+                                    <TypeCard
+                                        key={option.type}
+                                        label={t(option.labelKey)}
+                                        description={t(option.descriptionKey)}
+                                        icon={option.icon}
+                                        onClick={() =>
+                                            handleSelectOption(option.type)
+                                        }
+                                    />
+                                ))}
+                            </Stack>
+                        </Stack>
+                    )}
 
-                        <LoadingButton
-                            fullWidth
-                            color="accent"
-                            loading={saving}
-                            disabled={!canSave}
-                            onClick={() => void handleSave()}
-                            sx={(theme) =>
-                                lockerPrimaryButtonSx(theme, {
-                                    loading: saving,
-                                })
-                            }
-                        >
-                            {t("saveRecord")}
-                        </LoadingButton>
-                    </Stack>
+                    {isFileMode && !isEditMode && (
+                        <>
+                            {showUploadCounter && (
+                                <Typography
+                                    variant="small"
+                                    sx={{
+                                        color: "text.muted",
+                                        mb: "16px",
+                                        flexShrink: 0,
+                                    }}
+                                >
+                                    {savedUploadCount} / {totalUploadCount}{" "}
+                                    {t("saved")}
+                                </Typography>
+                            )}
+                            <FileUploadSection
+                                fileInputRef={fileInputRef}
+                                selectedUploadItems={selectedUploadItems}
+                                collections={displayCollections}
+                                availableCollectionNames={customCollectionNames}
+                                selectedCollectionNamesByFileKey={
+                                    selectedCollectionNamesByFileKey
+                                }
+                                completedFileKeys={completedFileKeys}
+                                failedFileKeys={failedFileKeys}
+                                uploadingFileKeys={uploadingFileKeys}
+                                uploadProgressByFileKey={
+                                    uploadProgressByFileKey
+                                }
+                                uploadCapByFileKey={uploadCapByFileKey}
+                                uploading={uploading}
+                                canUpload={canUpload}
+                                onFileSelect={handleFileSelect}
+                                onToggleCollectionName={(fileKey, name) =>
+                                    setSelectedCollectionNamesByFileKey(
+                                        (current) => ({
+                                            ...current,
+                                            [fileKey]: toggleCollectionName(
+                                                current[fileKey] ?? [],
+                                                name,
+                                            ),
+                                        }),
+                                    )
+                                }
+                                onAddCollectionName={(fileKey, name) => {
+                                    setCustomCollectionNames((current) =>
+                                        addCollectionName(current, name),
+                                    );
+                                    setSelectedCollectionNamesByFileKey(
+                                        (current) => ({
+                                            ...current,
+                                            [fileKey]: addCollectionName(
+                                                current[fileKey] ?? [],
+                                                name,
+                                            ),
+                                        }),
+                                    );
+                                }}
+                                onAddAvailableCollectionName={(name) =>
+                                    setCustomCollectionNames((current) =>
+                                        addCollectionName(current, name),
+                                    )
+                                }
+                                onSetCollectionNamesForAllItems={(names) =>
+                                    setSelectedCollectionNamesByFileKey(
+                                        Object.fromEntries(
+                                            selectedUploadItems.map((item) => [
+                                                uploadQueueItemKey(item),
+                                                names,
+                                            ]),
+                                        ),
+                                    )
+                                }
+                                onRemoveItem={(fileKey) => {
+                                    setSelectedUploadItems((current) =>
+                                        current.filter(
+                                            (item) =>
+                                                uploadQueueItemKey(item) !==
+                                                fileKey,
+                                        ),
+                                    );
+                                    setSelectedCollectionNamesByFileKey(
+                                        (current) =>
+                                            Object.fromEntries(
+                                                Object.entries(current).filter(
+                                                    ([key]) => key !== fileKey,
+                                                ),
+                                            ),
+                                    );
+                                }}
+                                onUpload={handleUpload}
+                            />
+                        </>
+                    )}
+
+                    {formType && (!isFileMode || isEditMode) && (
+                        <Stack sx={{ gap: "24px" }}>
+                            <ItemFormFields
+                                type={formType}
+                                data={formData}
+                                onChange={handleFieldChange}
+                                showPassword={showPassword}
+                                onTogglePassword={() =>
+                                    setShowPassword((value) => !value)
+                                }
+                            />
+
+                            <CollectionSelector
+                                createName={collectionName}
+                                onCreateNameChange={setCollectionName}
+                                key={`${open ? "open" : "closed"}:${
+                                    editItem?.id ?? "create"
+                                }:${formType}`}
+                                collections={displayCollections}
+                                selectedIDs={selectedCollectionIDs}
+                                initialSelectedIDs={
+                                    isEditMode
+                                        ? editItem?.collectionIDs
+                                        : undefined
+                                }
+                                onToggle={(collectionID) =>
+                                    setSelectedCollectionIDs((current) =>
+                                        current.includes(collectionID)
+                                            ? current.filter(
+                                                  (id) => id !== collectionID,
+                                              )
+                                            : [...current, collectionID],
+                                    )
+                                }
+                                onCreateCollection={onCreateCollection}
+                            />
+
+                            {error && upgradeCTAType !== "fileCountLimit" && (
+                                <Typography
+                                    variant="small"
+                                    sx={{ color: "critical.main" }}
+                                >
+                                    {error}
+                                </Typography>
+                            )}
+
+                            <LoadingButton
+                                fullWidth
+                                color="accent"
+                                loading={saving}
+                                disabled={!canSave}
+                                onClick={() => void handleSave()}
+                                sx={(theme) =>
+                                    lockerPrimaryButtonSx(theme, {
+                                        loading: saving,
+                                    })
+                                }
+                            >
+                                {t("saveRecord")}
+                            </LoadingButton>
+                        </Stack>
+                    )}
+                </DialogContent>
+            </Dialog>
+            <LockerConfirmDialog
+                open={open && pendingExit !== null}
+                illustration="/images/warning-grey.png"
+                title={t("discardUnsavedChangesTitle")}
+                body={t(
+                    isFileMode && !isEditMode
+                        ? "discardPendingUploadsBody"
+                        : "discardUnsavedChangesBody",
                 )}
-            </DialogContent>
-        </Dialog>
+                confirmLabel={t("discard")}
+                cancelLabel={t("keepEditing")}
+                onClose={handleKeepEditing}
+                onConfirm={handleDiscard}
+            />
+        </>
     );
 };
 

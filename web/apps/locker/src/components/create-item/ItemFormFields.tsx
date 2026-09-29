@@ -195,17 +195,20 @@ export const CollectionSelector: React.FC<{
     collections: LockerCollection[];
     selectedIDs: number[];
     initialSelectedIDs?: number[];
+    createName: string;
+    onCreateNameChange: (name: string) => void;
     onToggle: (id: number) => void;
     onCreateCollection?: (name: string) => Promise<number>;
 }> = ({
     collections,
     selectedIDs,
     initialSelectedIDs,
+    createName,
+    onCreateNameChange: setCreateName,
     onToggle,
     onCreateCollection,
 }) => {
     const [createOpen, setCreateOpen] = useState(false);
-    const [createName, setCreateName] = useState("");
     const [creating, setCreating] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
     const [newlyCreatedCollectionIDs, setNewlyCreatedCollectionIDs] = useState<
@@ -267,7 +270,7 @@ export const CollectionSelector: React.FC<{
         } finally {
             setCreating(false);
         }
-    }, [createName, onCreateCollection, onToggle]);
+    }, [createName, onCreateCollection, onToggle, setCreateName]);
 
     return (
         <Box>
