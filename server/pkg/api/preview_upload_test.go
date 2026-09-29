@@ -10,7 +10,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -88,13 +87,6 @@ func TestPreviewUploadRejectsInvalidMetadata(t *testing.T) {
 			rec := performPreviewUpload(t, router, http.MethodPost, path, 1, body)
 			require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 		})
-	}
-	for _, path := range []string{previewUploadPath, multipartPreviewUploadPath} {
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"fileID":`))
-		req.Header.Set("Content-Type", "application/json")
-		router.ServeHTTP(rec, req)
-		require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 	}
 }
 

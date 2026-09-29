@@ -58,8 +58,7 @@ const (
 	CastSessionsV2             int64 = 1 << 5
 	DeferredMultipartChecksums int64 = 1 << 6
 	LibrarySharing             int64 = 1 << 7
-	// PreviewUploadV2 supports single and multipart preview uploads with required size and MD5 metadata.
-	PreviewUploadV2 int64 = 1 << 8
+	PreviewUploadV2            int64 = 1 << 8
 )
 
 type FlagKey string

@@ -1171,7 +1171,6 @@ func (c *FileController) GetMultipartUploadURLWithMetadata(ctx context.Context, 
 		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "partMd5s must not be empty")
 	}
 	if err := ente.ValidateMultipartPartLength(req.ContentLength, req.PartLength); err != nil {
-		// Preserve the regular upload API's generic bad-request response.
 		return ente.MultipartUploadURLs{}, stacktrace.Propagate(ente.ErrBadRequest, "%v", err)
 	}
 	partCount := calculateMultipartPartCount(req.ContentLength, req.PartLength)
