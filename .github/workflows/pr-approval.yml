@@ -50,7 +50,7 @@ jobs:
                           // laurens-pilot
                           239996999: { allowPrefixes: ["mobile/", "rust/"] },
                           // AswinAsok
-                          64626875: { allowPrefixes: ["web/", "desktop/"] },
+                          64626875: { allowPrefixes: ["web/", "desktop/", "docs/"] },
                           // ashil-pilot
                           293300083: { allowPrefixes: ["mobile/"] },
                           // anandbaburajan
@@ -112,6 +112,7 @@ jobs:
                                   !path.includes("/") ||
                                   excludePrefixes.some((prefix) => path.startsWith(prefix)) ||
                                   (rule.allowPrefixes &&
+                                      !path.startsWith("docs/docs/") &&
                                       !rule.allowPrefixes.some((prefix) => path.startsWith(prefix))),
                           )
                       ) {
