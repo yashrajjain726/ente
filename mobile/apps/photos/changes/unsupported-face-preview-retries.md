@@ -1,1 +1,0 @@
-- Reduced repeated attempts to generate face previews from unsupported image formats, allowing thumbnail fallback to load sooner.
