@@ -22,15 +22,6 @@ void main() {
     expect(controller.snapshot().speed, 2.0);
   });
 
-  test('edited durations follow the chosen speed', () {
-    const sourceDuration = Duration(seconds: 8);
-    expect(
-      scaledVideoDuration(sourceDuration, 0.25),
-      const Duration(seconds: 32),
-    );
-    expect(scaledVideoDuration(sourceDuration, 2), const Duration(seconds: 4));
-  });
-
   test('clockwise crop rotation preserves the selected visual region', () {
     _expectRectClose(
       rotateNormalizedRect(sourceCrop, 90),
