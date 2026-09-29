@@ -1,7 +1,6 @@
 import { lockerSheetContainerSx, lockerSheetPaperSx } from "@/styles/dialog";
 import {
     lockerColorSx,
-    lockerTextBodyBoldSx,
     lockerTextBodySx,
     lockerTextH2Sx,
     lockerTextMiniSx,
@@ -179,7 +178,6 @@ export function LockerConfirmDialog({
                     loading={loading}
                     onClick={onConfirm}
                     sx={(theme) => ({
-                        ...lockerTextBodyBoldSx,
                         mt: 3,
                         minHeight: 52,
                         borderRadius: "20px",
@@ -215,7 +213,6 @@ export function LockerConfirmDialog({
                         disabled={loading}
                         onClick={handleClose}
                         sx={{
-                            ...lockerTextBodyBoldSx,
                             mt: 1,
                             minHeight: 52,
                             borderRadius: "20px",
