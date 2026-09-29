@@ -251,14 +251,58 @@ jobs:
                   sudo apt-get install -y libsecret-1-dev libsodium-dev libfuse2 ninja-build libgtk-3-dev dpkg-dev pkg-config rpm patchelf libsqlite3-dev locate libayatana-appindicator3-dev libffi-dev libtiff5 xz-utils libarchive-tools libcurl4-openssl-dev
                   sudo updatedb --localpaths='/usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu'
 
-            - name: Install fpm for RPM packaging
-              run: sudo gem install fpm
-
-            - name: Install appimagetool
+            - name: Install verified Linux packaging tools
               run: |
-                  wget -O appimagetool "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
-                  chmod +x appimagetool
-                  mv appimagetool /usr/local/bin/
+                  set -euo pipefail
+
+                  gem_lock="$GITHUB_WORKSPACE/mobile/apps/auth/linux/packaging/fpm-gems.sha256"
+                  tools_dir="$(mktemp -d "${RUNNER_TEMP:?}/auth-linux-tools.XXXXXX")"
+                  mkdir "$tools_dir/bin" "$tools_dir/downloads"
+                  cd "$tools_dir/downloads"
+
+                  while read -r _checksum gem_file; do
+                      curl --fail --location --silent --show-error \
+                          "https://rubygems.org/downloads/$gem_file" --output "$gem_file"
+                  done < "$gem_lock"
+                  sha256sum --check "$gem_lock"
+
+                  # An isolated gem home and --local keep the entire dependency closure offline.
+                  export GEM_HOME="$tools_dir/gems"
+                  export GEM_PATH="$GEM_HOME"
+                  gem install --local --no-document --env-shebang ./*.gem
+                  cat > "$tools_dir/bin/fpm" <<'EOF'
+                  #!/usr/bin/env bash
+                  set -euo pipefail
+                  tools_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+                  export GEM_HOME="$tools_dir/gems"
+                  export GEM_PATH="$GEM_HOME"
+                  exec "$GEM_HOME/bin/fpm" "$@"
+                  EOF
+
+                  curl --fail --location --silent --show-error \
+                      https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage \
+                      --output appimagetool.AppImage
+                  curl --fail --location --silent --show-error \
+                      https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64 \
+                      --output runtime-x86_64
+                  sha256sum --check <<'EOF'
+                  ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  appimagetool.AppImage
+                  2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d  runtime-x86_64
+                  EOF
+                  mv appimagetool.AppImage runtime-x86_64 "$tools_dir/"
+
+                  # Both Fastforge and post_process_appimage.sh must use the verified runtime.
+                  cat > "$tools_dir/bin/appimagetool" <<'EOF'
+                  #!/usr/bin/env bash
+                  set -euo pipefail
+                  tools_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+                  export APPIMAGE_EXTRACT_AND_RUN=1
+                  exec "$tools_dir/appimagetool.AppImage" --runtime-file "$tools_dir/runtime-x86_64" "$@"
+                  EOF
+                  chmod +x "$tools_dir/appimagetool.AppImage" "$tools_dir/bin/"*
+                  "$tools_dir/bin/fpm" --version
+                  "$tools_dir/bin/appimagetool" --version
+                  printf '%s\n' "$tools_dir/bin" >> "${GITHUB_PATH:?}"
 
             - name: Build Linux app
               run: |
@@ -366,8 +410,34 @@ jobs:
               shell: bash
               run: |
                   flutter config --enable-windows-desktop
-                  choco install innosetup -y
                   flutter build windows --release
+
+            - name: Install verified Inno Setup
+              shell: pwsh
+              run: |
+                  $ErrorActionPreference = "Stop"
+
+                  $toolsDir = Join-Path $env:RUNNER_TEMP ("auth-innosetup-" + [guid]::NewGuid())
+                  New-Item -ItemType Directory -Path $toolsDir | Out-Null
+                  $installer = Join-Path $toolsDir "innosetup-6.7.3.exe"
+                  Invoke-WebRequest `
+                      -Uri "https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe" `
+                      -OutFile $installer
+                  if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash -ne "9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732") {
+                      throw "Inno Setup installer checksum mismatch"
+                  }
+
+                  $installDir = Join-Path $toolsDir "compiler"
+                  $process = Start-Process -FilePath $installer -Wait -PassThru -ArgumentList `
+                      "/PORTABLE=1", "/CURRENTUSER", "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/NOICONS", "/DIR=`"$installDir`""
+                  if ($process.ExitCode -ne 0) {
+                      throw "Inno Setup installation failed with exit code $($process.ExitCode)"
+                  }
+                  $compiler = Join-Path $installDir "ISCC.exe"
+                  if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) {
+                      throw "Inno Setup compiler not found: $compiler"
+                  }
+                  "INNO_SETUP_COMPILER=$compiler" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
             - name: Verify Windows PE allowlist
               shell: pwsh
@@ -402,7 +472,8 @@ jobs:
               run: |
                   & ./scripts/build_windows_installer.ps1 `
                     -SourceDir "build/windows/x64/runner/Release" `
-                    -InstallerPath "artifacts/${{ env.ARTIFACT_STEM }}-installer.exe"
+                    -InstallerPath "artifacts/${{ env.ARTIFACT_STEM }}-installer.exe" `
+                    -CompilerPath $env:INNO_SETUP_COMPILER
 
             - name: Sign Windows installer with Trusted Signing
               uses: azure/trusted-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
@@ -518,7 +589,19 @@ jobs:
             - run: flutter pub get --enforce-lockfile
 
             - name: Install code signing dependencies
-              run: pip3 install codemagic-cli-tools --break-system-packages
+              run: |
+                  set -euo pipefail
+
+                  venv="$(mktemp -d "${RUNNER_TEMP:?}/auth-codemagic.XXXXXX")"
+                  python3 -m venv "$venv"
+                  "$venv/bin/python" -m pip --isolated install \
+                      --disable-pip-version-check --no-cache-dir \
+                      --index-url https://pypi.org/simple \
+                      --require-hashes --only-binary=:all: \
+                      --requirement macos/packaging/codemagic-requirements.txt
+                  "$venv/bin/python" -m pip check
+                  "$venv/bin/codemagic-cli-tools" --version
+                  printf '%s\n' "$venv/bin" >> "${GITHUB_PATH:?}"
 
             - name: Add provisioning profiles
               run: |
