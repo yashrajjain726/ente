@@ -1,4 +1,6 @@
+mod conversation;
 mod migrations;
+pub use conversation::ConversationSnapshot;
 #[cfg(feature = "sqlite")]
 mod retired_storage;
 mod schema;
@@ -173,6 +175,18 @@ impl<B: Backend> ChatDb<B> {
         parent: Option<Uuid>,
         attachments: Vec<AttachmentMeta>,
     ) -> Result<Message> {
+        self.insert_message_guarded(session_uuid, sender, text, parent, attachments, None)
+    }
+
+    pub fn insert_message_guarded(
+        &self,
+        session_uuid: Uuid,
+        sender: &str,
+        text: &str,
+        parent: Option<Uuid>,
+        attachments: Vec<AttachmentMeta>,
+        snapshot: Option<&ConversationSnapshot>,
+    ) -> Result<Message> {
         let sender: Sender = sender.parse()?;
         let created_at = self.clock.now_us();
         let uuid = self.uuid_gen.new_uuid();
@@ -180,6 +194,15 @@ impl<B: Backend> ChatDb<B> {
         let attachments_json = self.serialize_attachments(&attachments)?;
 
         self.backend.transaction(|tx| {
+            if let Some(snapshot) = snapshot
+                && (snapshot.session_uuid != session_uuid
+                    || snapshot.messages.last().map(|m| m.uuid) != parent
+                    || !conversation::snapshot_matches(tx, snapshot, false)?)
+            {
+                return Err(Error::UnsupportedOperation(
+                    "Conversation changed while generating the reply; retry the reply".into(),
+                ));
+            }
             tx.execute(
                 "INSERT INTO messages (
                    message_uuid, session_uuid, parent_message_uuid, sender,
@@ -274,6 +297,7 @@ impl<B: Backend> ChatDb<B> {
                 &[Value::Blob(encrypted_text), Value::Text(uuid.to_string())],
             )?;
             ensure_row_updated(affected, EntityType::Message, uuid)?;
+            self.invalidate_conversation_for_edit(tx, session_uuid, uuid)?;
             self.touch_session(tx, session_uuid, updated_at)
         })
     }

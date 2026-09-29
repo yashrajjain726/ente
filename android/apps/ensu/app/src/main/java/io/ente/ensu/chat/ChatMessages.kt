@@ -93,6 +93,7 @@ internal fun MessageList(
     modifier: Modifier,
     messages: List<ChatMessage>,
     streamingResponse: String,
+    preparationStatus: String?,
     streamingParentId: String?,
     isGenerating: Boolean,
     isModelDownloaded: Boolean,
@@ -329,6 +330,7 @@ internal fun MessageList(
                 item(key = "streaming") {
                     StreamingMessageBubble(
                         text = streamingResponse,
+                        preparationStatus = preparationStatus,
                         isGenerating = true,
                     )
                 }
@@ -339,6 +341,7 @@ internal fun MessageList(
             item(key = "streaming") {
                 StreamingMessageBubble(
                     text = streamingResponse,
+                    preparationStatus = preparationStatus,
                     isGenerating = true,
                 )
             }
@@ -902,6 +905,7 @@ private fun MessageActionsMenu(
 @Composable
 private fun StreamingMessageBubble(
     text: String,
+    preparationStatus: String?,
     isGenerating: Boolean,
 ) {
     var renderedText by remember { mutableStateOf(text) }
@@ -952,7 +956,15 @@ private fun StreamingMessageBubble(
             )
         }
 
-        GeneratingDotsIndicator()
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(EnsuSpacing.sm.dp),
+        ) {
+            GeneratingDotsIndicator()
+            preparationStatus?.let {
+                Text(text = it, style = EnsuTypography.small, color = EnsuColor.textMuted())
+            }
+        }
     }
 }
 

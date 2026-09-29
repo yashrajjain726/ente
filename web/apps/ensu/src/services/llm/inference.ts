@@ -23,18 +23,18 @@ const CDN_BASE = `https://cdn.jsdelivr.net/npm/@wllama/wllama@${wllamaPackage.ve
 const MIN_GGUF_BYTES = 1024 * 1024;
 const DEFAULT_GENERATION_MAX_TOKENS = 8_192;
 
-export type WasmProgressCallback = (event: {
+type WasmProgressCallback = (event: {
     loaded: number;
     total?: number;
     status?: string;
 }) => void;
 
-export const defaultWasmPaths: AssetsPathConfig = {
+const defaultWasmPaths: AssetsPathConfig = {
     "single-thread/wllama.wasm": `${CDN_BASE}/single-thread/wllama.wasm`,
     "multi-thread/wllama.wasm": `${CDN_BASE}/multi-thread/wllama.wasm`,
 };
 
-export type BackendType = "tauri" | "wasm";
+type BackendType = "tauri" | "wasm";
 
 export interface InferenceOptions {
     backend?: "auto" | BackendType;
@@ -45,14 +45,14 @@ export interface InferenceOptions {
     };
 }
 
-export interface LoadModelParams {
+interface LoadModelParams {
     modelPath: string;
     nGpuLayers?: number | null;
     useMmap?: boolean | null;
     useMlock?: boolean | null;
 }
 
-export interface ContextParams {
+interface ContextParams {
     contextSize?: number | null;
     nThreads?: number | null;
     nBatch?: number | null;
@@ -65,7 +65,7 @@ export interface InferenceBackend {
     createContext(
         model: { modelPath: string },
         params?: ContextParams,
-    ): Promise<void>;
+    ): Promise<number>;
     generateChatStream(
         request: GenerateChatRequest,
         onEvent?: (event: GenerateEvent) => void,
@@ -127,6 +127,7 @@ class WasmInference implements InferenceBackend {
         const modelUrl = ensureUrl(model.modelPath);
         try {
             await this.ensureModelLoaded(modelUrl, params);
+            return this.wllama.getLoadedContextInfo().n_ctx;
         } catch (error) {
             throw normalizeWllamaError(error, "Model failed to start");
         }
@@ -580,7 +581,7 @@ class TauriInference implements InferenceBackend {
             nBatch: params.nBatch ?? null,
         });
         try {
-            await invoke("llm_create_context", {
+            return await invoke<number>("llm_create_context", {
                 params: {
                     context_size: params.contextSize ?? null,
                     n_threads: params.nThreads ?? null,
@@ -653,7 +654,10 @@ class TauriInference implements InferenceBackend {
             });
             const summary = await invoke<GenerateSummary>(
                 "llm_generate_chat_stream",
-                { request: buildGenerateChatRequest(request) },
+                {
+                    request: buildGenerateChatRequest(request),
+                    preparationToken: request.preparationToken,
+                },
             );
             await done;
             return summary;

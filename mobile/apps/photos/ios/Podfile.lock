@@ -228,7 +228,7 @@ PODS:
     - sqlite3/perf-threadsafe
     - sqlite3/rtree
     - sqlite3/session
-  - ua_client_hints (1.4.1):
+  - ua_client_hints (1.5.0):
     - Flutter
   - url_launcher_ios (0.0.1):
     - Flutter
@@ -442,14 +442,14 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   app_links: 3dbc685f76b1693c66a6d9dd1e9ab6f73d97dc0a
   audio_session: 9bb7f6c970f21241b19f5a3658097ae459681ba0
-  backup_exclusion: 7aa8535339e746fb217cfdfe8fb8f8a718e4cb0b
+  backup_exclusion: 4d22d4efd0f5bc0190c41502ed47ffa84eca0edb
   camera_avfoundation: 5675ca25298b6f81fa0a325188e7df62cc217741
   connectivity_plus: cb623214f4e1f6ef8fe7403d580fdad517d2f7dd
   device_info_plus: 21fcca2080fbcd348be798aa36c3e5ed849eefbe
   ente_background_manager: f10e3bd64ccd32a3232f0fbacabdd5545af8d81e
   ente_cast: a25feb3127397e5fc6aff03a12120916707757d4
   ente_mail: f0569c7ea17e8324ef28f36a93c49fa1f3de724f
-  ente_panorama_viewer: 87bb22e7868c3005314f80c05ee0787aa07edcd8
+  ente_panorama_viewer: 16357cfb314c3f3f6abc0374ce17bfe371e528c2
   ente_photos_frb: c693c36243f0f65df25e7674552879cc74588fea
   ente_photos_platform: 08757c7e4977863732f75ce0f85cc6144600e3d2
   ente_qr: 86beaf5d2644705db9b565b32dd8b82c05fb36af
@@ -510,7 +510,7 @@ SPEC CHECKSUMS:
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
   sqlite3: 8d708bc63e9f4ce48f0ad9d6269e478c5ced1d9b
   sqlite3_flutter_libs: d13b8b3003f18f596e542bcb9482d105577eff41
-  ua_client_hints: 92fe0d139619b73ec9fcb46cc7e079a26178f586
+  ua_client_hints: 64dff09b3f846e425fc1a8d174f264a64c5b76c6
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
   video_player_avfoundation: 33f12ee023e354af9d062d2c366503424a914d10
   wakelock_plus: e29112ab3ef0b318e58cfa5c32326458be66b556

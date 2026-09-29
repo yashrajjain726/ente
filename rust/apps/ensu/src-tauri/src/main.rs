@@ -24,6 +24,7 @@ fn main() {
         .manage(commands::llm::State::default())
         .manage(commands::chat_db::ChatDbState::default())
         .manage(commands::knowledge::State::default())
+        .manage(commands::conversation::State::default())
         .setup(|app| {
             logging::init_logging(app.handle());
             logging::log("App", "setup started");
@@ -81,7 +82,6 @@ fn main() {
             commands::chat_db::chat_db_delete_session,
             commands::chat_db::chat_db_get_messages,
             commands::chat_db::chat_db_insert_message,
-            commands::chat_db::chat_db_update_message_text,
             commands::chat_db::chat_db_upsert_session,
             commands::chat_db::chat_db_insert_message_with_uuid,
             commands::chat_db::chat_db_compress_attachment_image_file,
@@ -94,6 +94,7 @@ fn main() {
             commands::llm::llm_free_model,
             commands::llm::llm_prewarm_multimodal_context,
             commands::llm::llm_generate_chat_stream,
+            commands::conversation::conversation_prepare,
             commands::llm::llm_cancel,
             commands::llm::llm_retrieval_epoch,
             commands::llm::llm_model_state_epoch,

@@ -1,7 +1,7 @@
 import { appendFileSync } from "node:fs";
 
 export function writeReport({
-    files: { binaries, large, guardrails, configs },
+    files: { binaries, large, guardrails, configs, readmes },
     dependencies,
     rust,
     swift,
@@ -40,6 +40,11 @@ export function writeReport({
             singular: "config file",
             plural: "config files",
             count: configs.length,
+        },
+        {
+            singular: "README file",
+            plural: "README files",
+            count: readmes.length,
         },
         {
             singular: "Rust lint policy file",
@@ -92,6 +97,8 @@ export function writeReport({
         sections.push(
             `## Toolchain and registry config\n\n${list(configs.map(code))}`,
         );
+    if (readmes.length)
+        sections.push(`## README files\n\n${list(readmes.map(code))}`);
     if (rust.length)
         sections.push(
             `## Rust lint declarations and files containing unsafe\n\n${list(rust.map(({ path, reasons }) => `${code(path)}: ${reasons.map(code).join("; ")}`))}`,

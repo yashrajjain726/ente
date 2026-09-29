@@ -114,7 +114,7 @@ const generateVideoThumbnailWeb = async (blob: Blob) => {
     }
 };
 
-export const generateVideoThumbnailUsingCanvas = async (blob: Blob) => {
+const generateVideoThumbnailUsingCanvas = async (blob: Blob) => {
     const canvas = document.createElement("canvas");
     const canvasCtx = canvas.getContext("2d")!;
 
@@ -161,6 +161,7 @@ export const generateThumbnailNative = async (
               toPathOrZipEntry(fsUploadItem),
               maxThumbnailDimension,
               maxThumbnailSize,
+              fileTypeInfo.extension,
           )
         : ffmpeg.generateVideoThumbnailNative(electron, fsUploadItem);
 

@@ -203,6 +203,8 @@ impl From<GroundedSourceDto> for retrieval::GroundedSource {
 pub struct GroundedPromptContextDto {
     text: String,
     sources: Vec<GroundedSourceDto>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    candidates: Option<ente_ensu::conversation::GroundingCandidates>,
 }
 
 impl From<retrieval::GroundedPromptContext> for GroundedPromptContextDto {
@@ -210,6 +212,7 @@ impl From<retrieval::GroundedPromptContext> for GroundedPromptContextDto {
         Self {
             text: value.text,
             sources: value.sources.into_iter().map(Into::into).collect(),
+            candidates: None,
         }
     }
 }
@@ -658,9 +661,15 @@ pub async fn knowledge_retrieve(
         }
         check_cancelled()?;
 
-        retrieval::build_grounded_prompt_context(&excerpts, context_budget as usize)
-            .map(|context| context.map(Into::into))
-            .map_err(retrieval_error)
+        let candidates = ente_ensu::conversation::GroundingCandidates::new(excerpts, context_budget as usize)
+            .map_err(|error| ApiError::new("conversation", error.to_string()))?;
+        candidates.pack(context_budget as usize)
+            .map(|context| context.map(|context| {
+                let mut result = GroundedPromptContextDto::from(context);
+                result.candidates = Some(candidates);
+                result
+            }))
+            .map_err(|error| ApiError::new("conversation", error.to_string()))
     })
     .await
     .map_err(|_| ApiError::new("llm_thread", "Knowledge retrieval task failed"))?

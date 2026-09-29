@@ -3,13 +3,11 @@ package io.ente.ensu.llm
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -75,15 +73,22 @@ fun ModelSettingsScreen(
     var selectedModelId by
         remember(state) { mutableStateOf(initialSelectionId(state, modelChoices)) }
     var contextLength by remember(state) { mutableStateOf(state.contextLength) }
-    var maxTokens by remember(state) { mutableStateOf(state.maxTokens) }
     var temperature by remember(state) { mutableStateOf(state.temperature) }
+    val contextError =
+        contextLength
+            .takeIf { it.isNotBlank() }
+            ?.let { raw ->
+                val value = raw.toIntOrNull()
+                when {
+                    value == null -> "Enter a valid integer"
+                    value <= 256 + automaticMaxOutputTokens(value) ->
+                        "Increase context length to leave room for the conversation and response."
+                    else -> null
+                }
+            }
     var showAdvancedLimits by
         remember(state) {
-            mutableStateOf(
-                state.contextLength.isNotBlank() ||
-                    state.maxTokens.isNotBlank() ||
-                    state.temperature.isNotBlank()
-            )
+            mutableStateOf(state.contextLength.isNotBlank() || state.temperature.isNotBlank())
         }
     var isModelMenuExpanded by remember { mutableStateOf(false) }
 
@@ -139,45 +144,32 @@ fun ModelSettingsScreen(
         ExpandButton(
             title = "Advanced limits",
             expanded = showAdvancedLimits,
-            collapsedHint = "Context length, output, temperature",
+            collapsedHint = "Context length and temperature",
             onToggle = { showAdvancedLimits = !showAdvancedLimits },
         )
         AnimatedVisibility(showAdvancedLimits) {
             Column {
                 Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
-                Row {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Context length",
-                            style = EnsuTypography.small,
-                            color = EnsuColor.textMuted(),
-                        )
-                        Spacer(modifier = Modifier.height(EnsuSpacing.xs.dp))
-                        OutlinedTextField(
-                            value = contextLength,
-                            onValueChange = { contextLength = it },
-                            placeholder = { Text(text = "8192") },
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(EnsuSpacing.md.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Max output",
-                            style = EnsuTypography.small,
-                            color = EnsuColor.textMuted(),
-                        )
-                        Spacer(modifier = Modifier.height(EnsuSpacing.xs.dp))
-                        OutlinedTextField(
-                            value = maxTokens,
-                            onValueChange = { maxTokens = it },
-                            placeholder = { Text(text = "2048") },
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        )
-                    }
-                }
+                Text(
+                    text = "Context length",
+                    style = EnsuTypography.small,
+                    color = EnsuColor.textMuted(),
+                )
+                Spacer(modifier = Modifier.height(EnsuSpacing.xs.dp))
+                OutlinedTextField(
+                    value = contextLength,
+                    onValueChange = { contextLength = it },
+                    placeholder = { Text(text = "8192") },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = contextError != null,
+                    supportingText = { contextError?.let { Text(it) } },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+                Text(
+                    text = "Response length adjusts automatically to the context length.",
+                    style = EnsuTypography.small,
+                    color = EnsuColor.textMuted(),
+                )
 
                 Spacer(modifier = Modifier.height(EnsuSpacing.md.dp))
                 Text(
@@ -214,12 +206,12 @@ fun ModelSettingsScreen(
         Spacer(modifier = Modifier.height(EnsuSpacing.lg.dp))
 
         Button(
+            enabled = contextError == null,
             onClick = {
                 val savedState =
                     state.copy(
                         modelId = selectedModel.id.takeUnless { selectedModel.isDefault }.orEmpty(),
                         contextLength = contextLength,
-                        maxTokens = maxTokens,
                         temperature = temperature,
                     )
                 onSave(savedState)
@@ -238,7 +230,6 @@ fun ModelSettingsScreen(
                 onReset()
                 selectedModelId = DEFAULT_OPTION_ID
                 contextLength = ""
-                maxTokens = ""
                 temperature = ""
                 Toast.makeText(context, "Model settings reset", Toast.LENGTH_SHORT).show()
             }

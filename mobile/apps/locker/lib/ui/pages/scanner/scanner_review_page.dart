@@ -85,10 +85,14 @@ class ScannerReviewPage extends StatefulWidget {
     super.key,
     required this.session,
     required this.onUploadFiles,
+    required this.onRetake,
+    this.initialPageIndex,
   });
 
   final ScanSessionController session;
   final Future<bool> Function(List<File> files) onUploadFiles;
+  final void Function(String pageId, int index) onRetake;
+  final int? initialPageIndex;
 
   @override
   State<ScannerReviewPage> createState() => _ScannerReviewPageState();
@@ -119,8 +123,10 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
   void initState() {
     super.initState();
     widget.session.addListener(_onSessionChanged);
-    _index = widget.session.pageCount - 1;
-    if (_index < 0) _index = 0;
+    _index = (widget.initialPageIndex ?? widget.session.pageCount - 1).clamp(
+      0,
+      widget.session.pageCount > 0 ? widget.session.pageCount - 1 : 0,
+    );
     _pageController = PageController(initialPage: _index);
   }
 
@@ -144,7 +150,9 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
   void _onSessionChanged() {
     if (!mounted) return;
     if (widget.session.pageCount == 0 && !widget.session.isProcessing) {
-      Navigator.of(context).pop(false);
+      if (ModalRoute.of(context)?.isCurrent == true) {
+        Navigator.of(context).pop(false);
+      }
       return;
     }
     setState(() {
@@ -160,8 +168,14 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
     return pages[_index.clamp(0, pages.length - 1)];
   }
 
-  Future<File> _buildPdf() async {
+  bool get _canExport =>
+      mounted &&
+      ModalRoute.of(context)?.isCurrent == true &&
+      widget.session.pageCount > 0;
+
+  Future<File?> _buildPdf() async {
     await widget.session.waitForPending();
+    if (!_canExport) return null;
     return widget.session.buildPdf();
   }
 
@@ -177,9 +191,9 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
 
   Future<void> _saveToEnte() => _runExclusive(() async {
     final pdf = await _buildPdf();
-    if (!mounted) return;
+    if (!_canExport || pdf == null) return;
     final didUpload = await widget.onUploadFiles([pdf]);
-    if (!mounted) return;
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
     if (didUpload) {
       showShortToast(context, context.strings.scanSaved);
       Navigator.of(context).pop(true);
@@ -188,6 +202,7 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
 
   Future<void> _share() => _runExclusive(() async {
     final pdf = await _buildPdf();
+    if (!_canExport || pdf == null) return;
     await SharePlus.instance.share(ShareParams(files: [XFile(pdf.path)]));
   });
 
@@ -218,6 +233,14 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
       ),
     );
   });
+
+  void _retake() {
+    if (_operationInFlight) return;
+    final page = _currentPage;
+    if (page == null) return;
+    widget.onRetake(page.id, _index);
+    Navigator.of(context).pop(false);
+  }
 
   Future<void> _rotate() => _runExclusive(() async {
     final page = _currentPage;
@@ -592,6 +615,20 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      IconButtonComponent(
+                        icon: Transform.scale(
+                          scale: 1.15,
+                          child: HugeIcon(
+                            icon: HugeIcons.strokeRoundedCameraRotated01,
+                            color: colors.textBase,
+                          ),
+                        ),
+                        onTap: pageCount == 0 || _operationInFlight
+                            ? null
+                            : _retake,
+                        tooltip: l10n.retake,
+                      ),
+                      const SizedBox(width: Spacing.lg),
                       IconButtonComponent(
                         icon: HugeIcon(
                           icon: HugeIcons.strokeRoundedCrop,

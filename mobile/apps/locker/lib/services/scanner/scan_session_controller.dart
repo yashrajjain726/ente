@@ -88,12 +88,15 @@ class ScanSessionController extends ChangeNotifier {
   ) =>
       _service.detectLiveBgra(bytes, rowStride, width, height, rotationDegrees);
 
-  void addCapture(Uint8List capturedJpeg) {
+  void addCapture(Uint8List capturedJpeg, {ScanCaptureRegion? region}) {
     _pendingCount++;
     notifyListeners();
     _queue = _queue.then((_) async {
       try {
-        final page = await _service.processCapture(capturedJpeg);
+        final page = await _service.processCapture(
+          capturedJpeg,
+          region: region,
+        );
         if (_disposed) {
           await _service.disposePage(page);
           return;
@@ -107,6 +110,46 @@ class ScanSessionController extends ChangeNotifier {
         if (!_disposed) notifyListeners();
       }
     });
+  }
+
+  Future<ScannedPage?> replaceCapture(
+    String pageId,
+    Uint8List capturedJpeg, {
+    ScanCaptureRegion? region,
+  }) {
+    _pendingCount++;
+    notifyListeners();
+    final task = _queue.then<ScannedPage?>((_) async {
+      try {
+        final replacement = await _service.processCapture(
+          capturedJpeg,
+          region: region,
+        );
+        final index = _pages.indexWhere((page) => page.id == pageId);
+        if (_disposed || index < 0) {
+          await _service.disposePage(replacement);
+          return null;
+        }
+        final previous = _pages[index];
+        _pages[index] = replacement;
+        notifyListeners();
+        try {
+          await _service.disposePage(previous);
+        } catch (e) {
+          _logger.warning('Failed to dispose replaced page', e);
+        }
+        return replacement;
+      } catch (e, s) {
+        _logger.severe('Failed to replace capture', e, s);
+        _lastError = e;
+        return null;
+      } finally {
+        _pendingCount--;
+        if (!_disposed) notifyListeners();
+      }
+    });
+    _queue = task.then((_) {});
+    return task;
   }
 
   Future<void> waitForPending() async {
@@ -162,12 +205,14 @@ class ScanSessionController extends ChangeNotifier {
   }
 
   Future<File> buildPdf() async {
+    await waitForPending();
+    final pages = List.of(_pages);
     final fileName = _fileName;
     if (fileName == null) {
       throw StateError('fileName has not been set');
     }
     final specs = <PdfPageSpec>[];
-    for (final page in List.of(_pages)) {
+    for (final page in pages) {
       final jpeg = await page.processedJpeg.readAsBytes();
       specs.add(
         PdfPageSpec(

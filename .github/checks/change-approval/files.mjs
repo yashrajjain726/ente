@@ -73,5 +73,8 @@ export function checkFiles({ files }) {
     const configs = files
         .filter(({ path }) => configFile.test(path))
         .map(({ path }) => path);
-    return { binaries, large, guardrails, configs };
+    const readmes = files
+        .filter(({ path }) => /^readme/i.test(basename(path)))
+        .map(({ path }) => path);
+    return { binaries, large, guardrails, configs, readmes };
 }

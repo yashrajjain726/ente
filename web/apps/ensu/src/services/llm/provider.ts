@@ -1,5 +1,10 @@
 import { namedError } from "ente-base/error";
 import log from "ente-base/log";
+import {
+    DEFAULT_TAURI_CONTEXT_SIZE,
+    DEFAULT_WEB_CONTEXT_SIZE,
+    resolveGenerationBudget,
+} from "./budget";
 import { createInferenceBackend } from "./inference";
 import type {
     DownloadProgress,
@@ -9,11 +14,6 @@ import type {
     ModelInfo,
     ModelSettings,
 } from "./types";
-
-const DEFAULT_WEB_CONTEXT_SIZE = 4096;
-const DEFAULT_TAURI_CONTEXT_SIZE = 12000;
-const DEFAULT_GENERATION_MAX_TOKENS = 8_192;
-const OVERFLOW_SAFETY_TOKENS = 256;
 
 // These fallback values must stay in sync with rust/crates/ensu/src/config.rs.
 export const DEFAULT_MODEL: ModelInfo = {
@@ -148,6 +148,7 @@ export class LlmProvider {
     private currentModelPath?: string;
     private currentMmprojPath?: string;
     private currentContextKey?: string;
+    private loadedContextSize?: number;
     private defaultModel = DEFAULT_MODEL;
     private modelPolicy?: ResolvedModelPolicy;
 
@@ -160,6 +161,7 @@ export class LlmProvider {
         emitsProgress: boolean;
     };
     private modelOperationTail: Promise<void> = Promise.resolve();
+    private generationEpoch = 0;
 
     private async withExclusiveModelOperation<T>(
         operation: () => Promise<T>,
@@ -217,7 +219,10 @@ export class LlmProvider {
         return this.currentMmprojPath;
     }
 
-    public resolveRuntimeSettings(settings: ModelSettings) {
+    public resolveRuntimeSettings(
+        settings: ModelSettings,
+        useLoadedContext = true,
+    ) {
         const model = this.resolveTargetModel(settings);
         const defaultContextSize =
             this.backend.kind === "tauri"
@@ -229,26 +234,26 @@ export class LlmProvider {
             this.backend.kind === "tauri"
                 ? requestedContextSize
                 : Math.min(requestedContextSize, DEFAULT_WEB_CONTEXT_SIZE);
-        const configuredMaxTokens = settings.maxTokens ?? model.maxTokens;
-        const maxAllowedTokens = Math.max(
-            1,
-            contextSize - OVERFLOW_SAFETY_TOKENS,
-        );
-        const implicitMaxTokens = Math.min(
-            DEFAULT_GENERATION_MAX_TOKENS,
-            Math.max(1, Math.floor(contextSize / 2)),
-        );
-        const maxTokens = configuredMaxTokens ?? implicitMaxTokens;
+        resolveGenerationBudget(contextSize, 1);
+        const loadedContextSize =
+            useLoadedContext &&
+            this.modelReady &&
+            this.currentModel?.id === model.id &&
+            this.currentContextKey === JSON.stringify({ contextSize })
+                ? this.loadedContextSize
+                : undefined;
         return {
             model,
-            contextSize,
-            maxTokens: Math.min(maxTokens, maxAllowedTokens),
+            ...resolveGenerationBudget(loadedContextSize ?? contextSize),
         };
     }
 
     public async checkModelAvailability(settings: ModelSettings) {
         await this.initialize();
-        const { model, contextSize } = this.resolveRuntimeSettings(settings);
+        const { model, contextSize } = this.resolveRuntimeSettings(
+            settings,
+            false,
+        );
         const contextKey = JSON.stringify({ contextSize });
 
         if (this.backend.kind !== "tauri") {
@@ -293,7 +298,10 @@ export class LlmProvider {
         await this.initialize();
         const emitProgress = options.emitProgress ?? true;
         const downloadIfMissing = options.downloadIfMissing ?? false;
-        const { model, contextSize } = this.resolveRuntimeSettings(settings);
+        const { model, contextSize } = this.resolveRuntimeSettings(
+            settings,
+            false,
+        );
         const contextKey = JSON.stringify({ contextSize });
 
         const modelId = this.backend.kind === "tauri" ? model.id : undefined;
@@ -361,10 +369,7 @@ export class LlmProvider {
             });
             await this.backend.freeContext();
             await this.backend.freeModel();
-            this.currentModel = undefined;
-            this.currentModelPath = undefined;
-            this.currentMmprojPath = undefined;
-            this.currentContextKey = undefined;
+            this.invalidateModelState();
 
             if (modelId) {
                 const isDownloaded = (await this.modelStatus(modelId))
@@ -383,7 +388,10 @@ export class LlmProvider {
             log.info("LLM load model", { modelPath });
             await this.backend.loadModel({ modelPath });
             log.info("LLM create context", { modelPath, contextSize });
-            await this.backend.createContext({ modelPath }, { contextSize });
+            this.loadedContextSize = await this.backend.createContext(
+                { modelPath },
+                { contextSize },
+            );
 
             this.currentModel = model;
             this.currentModelPath = modelPath;
@@ -415,7 +423,25 @@ export class LlmProvider {
         request: GenerateChatRequest,
         onEvent?: (event: GenerateEvent) => void,
     ): Promise<GenerateSummary> {
-        return this.backend.generateChatStream(request, onEvent);
+        if (this.backend.kind !== "tauri") {
+            return this.backend.generateChatStream(request, onEvent);
+        }
+        const epoch = this.generationEpoch;
+        return this.withExclusiveModelOperation(async () => {
+            if (epoch !== this.generationEpoch) {
+                throw namedError("cancelled", "Generation cancelled");
+            }
+            if (this.loadedContextSize !== undefined) {
+                request = {
+                    ...request,
+                    maxTokens: resolveGenerationBudget(
+                        this.loadedContextSize,
+                        request.maxTokens,
+                    ).maxTokens,
+                };
+            }
+            return this.backend.generateChatStream(request, onEvent);
+        });
     }
 
     public async prewarmImageInferenceIfAvailable(settings: ModelSettings) {
@@ -438,29 +464,36 @@ export class LlmProvider {
     }
 
     public cancelGeneration(jobId: number) {
+        if (jobId <= 0) this.generationEpoch++;
         return this.backend.cancel(jobId);
     }
 
     public async resetContext(contextSize?: number) {
-        await this.backend.freeContext();
-        this.currentContextKey = undefined;
-        if (this.currentModel && this.currentModelPath) {
-            const resolvedContext =
-                contextSize ??
-                (this.backend.kind === "tauri"
-                    ? DEFAULT_TAURI_CONTEXT_SIZE
-                    : DEFAULT_WEB_CONTEXT_SIZE);
-            await this.backend.createContext(
-                { modelPath: this.currentModelPath },
-                { contextSize: resolvedContext },
-            );
-            this.currentContextKey = JSON.stringify({
-                contextSize: resolvedContext,
-            });
-        }
+        return this.withExclusiveModelOperation(async () => {
+            this.modelReady = false;
+            await this.backend.freeContext();
+            this.currentContextKey = undefined;
+            this.loadedContextSize = undefined;
+            if (this.currentModel && this.currentModelPath) {
+                const resolvedContext =
+                    contextSize ??
+                    (this.backend.kind === "tauri"
+                        ? DEFAULT_TAURI_CONTEXT_SIZE
+                        : DEFAULT_WEB_CONTEXT_SIZE);
+                this.loadedContextSize = await this.backend.createContext(
+                    { modelPath: this.currentModelPath },
+                    { contextSize: resolvedContext },
+                );
+                this.currentContextKey = JSON.stringify({
+                    contextSize: resolvedContext,
+                });
+                this.modelReady = true;
+            }
+        });
     }
 
     private invalidateModelState() {
+        this.loadedContextSize = undefined;
         this.currentModel = undefined;
         this.currentModelPath = undefined;
         this.currentMmprojPath = undefined;
@@ -492,6 +525,7 @@ export class LlmProvider {
                 currentModelPath: this.currentModelPath,
                 currentMmprojPath: this.currentMmprojPath,
                 currentContextKey: this.currentContextKey,
+                loadedContextSize: this.loadedContextSize,
                 modelReady: this.modelReady,
             };
             this.invalidateModelState();
@@ -510,6 +544,8 @@ export class LlmProvider {
                             previousModelState.currentMmprojPath;
                         this.currentContextKey =
                             previousModelState.currentContextKey;
+                        this.loadedContextSize =
+                            previousModelState.loadedContextSize;
                         this.modelReady = previousModelState.modelReady;
                     }
                 } catch (error) {

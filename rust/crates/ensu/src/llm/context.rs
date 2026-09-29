@@ -79,6 +79,10 @@ unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
 
 impl Context {
+    pub fn context_size(&self) -> u32 {
+        lock(&self.state).cell.borrow_dependent().n_ctx()
+    }
+
     fn try_new(
         owner: ModelRef,
         embedding_params: Option<EmbeddingContextParams>,

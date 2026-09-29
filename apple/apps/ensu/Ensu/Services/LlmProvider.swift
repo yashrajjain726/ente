@@ -1,10 +1,13 @@
 import Foundation
 import os
 
+func automaticMaxOutputTokens(contextLength: Int) -> Int {
+    min(2048, max(1, contextLength / 4))
+}
+
 struct LlmModelSelection: Equatable {
     let id: String
     let contextLength: Int?
-    let maxTokens: Int?
 }
 
 struct DownloadProgress: Equatable {
@@ -133,7 +136,10 @@ actor LlmProvider {
     private var currentModelKey: LoadedModelKey?
     private var currentContextLength: Int?
     private var backendInitialized = false
+    private var chatWarmupOwner: UUID?
     private nonisolated let currentJobId = OSAllocatedUnfairLock<Int64?>(initialState: nil)
+    private nonisolated let generationControl = OSAllocatedUnfairLock<ChatGenerationControl?>(
+        initialState: nil)
     private let modelLoadGate = AsyncSerialGate()
     @MainActor weak var modelMaintenance: (any ModelMaintenance)?
 
@@ -240,12 +246,39 @@ actor LlmProvider {
         }
     }
 
+    func prewarmChatModelIfDownloaded(
+        _ selection: LlmModelSelection, owner: UUID
+    ) async throws {
+        try await withModelLock {
+            guard isChatModelReady(selection) else { return }
+            unloadTranscriptionModelIfLoaded()
+            try Task.checkCancellation()
+            guard loadedContextLength(selection) == nil else { return }
+            do {
+                try await ensureModelReadyLocked(
+                    selection, onProgress: { _ in }, allowRecovery: false, shouldDownload: false)
+                try Task.checkCancellation()
+                chatWarmupOwner = owner
+            } catch {
+                unloadModel()
+                throw error
+            }
+        }
+    }
+
+    func releaseChatWarmup(owner: UUID) async {
+        try? await modelLoadGate.withLock {
+            if chatWarmupOwner == owner { unloadModel() }
+        }
+    }
+
     private func ensureModelReadyLocked(
         _ selection: LlmModelSelection,
         onProgress: @escaping @Sendable (DownloadProgress) -> Void,
         allowRecovery: Bool,
         shouldDownload: Bool = true
     ) async throws {
+        chatWarmupOwner = nil
         let capability = currentChatDeviceCapability()
         if !capability.isChatSupported {
             throw UnsupportedDeviceMemoryError(capability: capability)
@@ -312,7 +345,9 @@ actor LlmProvider {
         try await withModelLock {
             try await generateChatLocked(
                 selection,
-                messages: messages,
+                messages: messages.map {
+                    LlmChatMessage(role: $0.role.roleString, content: $0.text)
+                },
                 imageFiles: imageFiles,
                 temperature: temperature,
                 maxTokens: maxTokens,
@@ -321,28 +356,112 @@ actor LlmProvider {
         }
     }
 
-    private func generateChatLocked(
+    func generateTitle(
         _ selection: LlmModelSelection,
         messages: [LlmMessage],
+        onToken: @escaping @Sendable (String) -> Void
+    ) async throws {
+        let control = ChatGenerationControl()
+        try await withTaskCancellationHandler {
+            try await withModelLock {
+                try control.checkCancellation()
+                try await ensureModelReadyLocked(
+                    selection, onProgress: { _ in }, allowRecovery: true)
+                try control.checkCancellation()
+                unloadTranscriptionModelIfLoaded()
+                guard let model = loadedModel, let loadedContext else { throw CancellationError() }
+                generationControl.withLock { $0 = control }
+                defer { generationControl.withLock { $0 = nil } }
+                let context = try model.newContext(
+                    params: LlmContextParams(
+                        contextSize: Int32(min(2048, loadedContext.contextSize())),
+                        nThreads: Int32(max(1, ProcessInfo.processInfo.activeProcessorCount - 1)),
+                        nBatch: 128
+                    ))
+                let outputTokens = 48
+                let inputTokens = max(0, min(2000, Int(context.contextSize()) - outputTokens))
+                let titleMessages = try context.truncateTextChatMessages(
+                    messages: messages.map {
+                        LlmChatMessage(role: $0.role.roleString, content: $0.text)
+                    },
+                    maxTokens: UInt32(inputTokens)
+                )
+                _ = try await generateChatLocked(
+                    selection,
+                    messages: titleMessages,
+                    imageFiles: [], temperature: 0.2, maxTokens: outputTokens,
+                    contextOverride: context, control: control, onToken: onToken
+                )
+            }
+        } onCancel: {
+            control.cancel(invalidatePreparation: false)
+        }
+    }
+
+    func withConversationContext<T: Sendable>(
+        _ selection: LlmModelSelection,
+        _ operation: @MainActor (LlmContext, ChatGenerationControl) async throws -> T
+    ) async throws -> T {
+        let control = ChatGenerationControl()
+        return try await withTaskCancellationHandler {
+            try await withModelLock {
+                try control.checkCancellation()
+                generationControl.withLock { $0 = control }
+                defer { generationControl.withLock { $0 = nil } }
+                try await ensureModelReadyLocked(
+                    selection, onProgress: { _ in }, allowRecovery: true)
+                try control.checkCancellation()
+                guard let context = loadedContext else {
+                    throw CancellationError()
+                }
+                unloadTranscriptionModelIfLoaded()
+                try control.checkCancellation()
+                return try await operation(context, control)
+            }
+        } onCancel: {
+            control.cancel(invalidatePreparation: false)
+        }
+    }
+
+    func generatePreparedChat(
+        _ selection: LlmModelSelection,
+        messages: [LlmChatMessage],
+        temperature: Float,
+        maxTokens: UInt32,
+        control: ChatGenerationControl,
+        onToken: @escaping @Sendable (String) -> Void
+    ) async throws -> GenerationSummary {
+        try await generateChatLocked(
+            selection,
+            messages: messages,
+            imageFiles: [],
+            temperature: temperature,
+            maxTokens: Int(maxTokens),
+            control: control,
+            onToken: onToken
+        )
+    }
+
+    private func generateChatLocked(
+        _ selection: LlmModelSelection,
+        messages: [LlmChatMessage],
         imageFiles: [URL],
         temperature: Float,
         maxTokens: Int?,
+        contextOverride: LlmContext? = nil,
+        control: ChatGenerationControl? = nil,
         onToken: @escaping @Sendable (String) -> Void
     ) async throws -> GenerationSummary {
         let capability = currentChatDeviceCapability()
         if !capability.isChatSupported {
             throw UnsupportedDeviceMemoryError(capability: capability)
         }
-        guard let context = loadedContext else {
+        guard let context = contextOverride ?? loadedContext else {
             throw NSError(
                 domain: "LlmProvider", code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
         currentJobId.withLock { $0 = nil }
-
-        let nativeMessages = messages.map {
-            LlmChatMessage(role: $0.role.roleString, content: $0.text)
-        }
 
         let asset = chatAsset(selection)
         let mmprojPath =
@@ -352,7 +471,7 @@ actor LlmProvider {
         let clampedTemperature = min(max(temperature, 0.35), 0.7)
 
         let request = LlmChatRequest(
-            messages: nativeMessages,
+            messages: messages,
             templateOverride: nil,
             addAssistant: true,
             imagePaths: imageFiles.map { $0.path },
@@ -374,6 +493,7 @@ actor LlmProvider {
             switch event {
             case let .text(jobId, text, _):
                 currentJobId.withLock { $0 = jobId }
+                control?.setJob(jobId)
                 onToken(text)
             case .done:
                 currentJobId.withLock { $0 = nil }
@@ -383,7 +503,8 @@ actor LlmProvider {
         unloadTranscriptionModelIfLoaded()
         defer { currentJobId.withLock { $0 = nil } }
         let summary = try await Task.detached {
-            try context.generateChatStream(request: request, callback: sink)
+            try control?.checkCancellation()
+            return try context.generateChatStream(request: request, callback: sink)
         }.value
 
         return GenerationSummary(
@@ -456,7 +577,11 @@ actor LlmProvider {
         }
     }
 
-    nonisolated func stopGeneration() {
+    nonisolated func stopGeneration(invalidatePreparation: Bool = false) {
+        if let control = generationControl.withLock({ $0 }) {
+            control.cancel(invalidatePreparation: invalidatePreparation)
+            return
+        }
         if let jobId = currentJobId.withLock({ $0 }) {
             llmCancel(jobId: jobId)
         } else {
@@ -514,6 +639,7 @@ actor LlmProvider {
     }
 
     private func unloadModel() {
+        chatWarmupOwner = nil
         loadedContext = nil
         loadedModel = nil
         currentModelKey = nil
@@ -569,5 +695,52 @@ private final class CallbackSink: LlmGenerationEventCallback {
 
     func onEvent(event: LlmGenerationEvent) {
         handler(event)
+    }
+}
+
+final class ChatGenerationControl: Sendable {
+    private struct State {
+        var cancelled = false
+        var cancelPreparation: (@Sendable () -> Void)?
+        var preparing = true
+        var jobId: Int64?
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    func checkCancellation() throws {
+        if state.withLock({ $0.cancelled }) { throw CancellationError() }
+    }
+
+    func setPreparationCancellation(_ cancel: @escaping @Sendable () -> Void) {
+        let shouldCancel = state.withLock {
+            $0.cancelPreparation = cancel
+            return $0.cancelled
+        }
+        if shouldCancel { cancel() }
+    }
+
+    func beginAnswer() throws {
+        try state.withLock {
+            if $0.cancelled { throw CancellationError() }
+            $0.preparing = false
+        }
+    }
+
+    func setJob(_ jobId: Int64) {
+        let shouldCancel = state.withLock {
+            $0.jobId = jobId
+            return $0.cancelled
+        }
+        if shouldCancel { llmCancel(jobId: jobId) }
+    }
+
+    func cancel(invalidatePreparation: Bool) {
+        let (cancelPreparation, jobId) = state.withLock {
+            $0.cancelled = true
+            return ($0.preparing || invalidatePreparation ? $0.cancelPreparation : nil, $0.jobId)
+        }
+        cancelPreparation?()
+        if let jobId { llmCancel(jobId: jobId) }
     }
 }

@@ -36,8 +36,16 @@ impl State {
         self.retrieval_epoch.fetch_add(1, Ordering::Relaxed);
     }
 
-    fn model_state_epoch(&self) -> u64 {
+    pub(crate) fn model_state_epoch(&self) -> u64 {
         self.model_state_epoch.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn context_ref(&self) -> Result<llm::ContextRef, ApiError> {
+        self.context
+            .lock()
+            .map_err(|_| ApiError::new("lock", "Failed to lock model context"))?
+            .clone()
+            .ok_or_else(|| ApiError::new("llm_not_ready", "Model context not loaded"))
     }
 
     fn mark_model_state_changed(&self) {
@@ -492,7 +500,7 @@ pub async fn llm_load_model(
 pub async fn llm_create_context(
     state: TauriState<'_, State>,
     params: llm::ContextParams,
-) -> Result<(), ApiError> {
+) -> Result<u32, ApiError> {
     let _lifecycle = state.lifecycle.lock().await;
     let model = state
         .model
@@ -532,6 +540,7 @@ pub async fn llm_create_context(
         llm_thread_error()
     })??;
 
+    let context_size = context.context_size();
     let mut context_guard = state
         .context
         .lock()
@@ -540,8 +549,11 @@ pub async fn llm_create_context(
     state.mark_model_state_changed();
     drop(context_guard);
 
-    logging::log("LLM", "create context succeeded");
-    Ok(())
+    logging::log(
+        "LLM",
+        format!("create context succeeded context_size={context_size}"),
+    );
+    Ok(context_size)
 }
 
 #[tauri::command]
@@ -608,10 +620,21 @@ pub async fn llm_prewarm_multimodal_context(
 #[tauri::command]
 pub async fn llm_generate_chat_stream(
     state: TauriState<'_, State>,
+    conversation_state: TauriState<'_, super::conversation::State>,
     window: WebviewWindow,
     request: llm::ChatRequest,
+    preparation_token: Option<String>,
 ) -> Result<llm::GenerationSummary, ApiError> {
     let _lifecycle = state.lifecycle.lock().await;
+    if let Some(token) = preparation_token.as_deref() {
+        conversation_state.validate_answer(
+            window.app_handle(),
+            window.label(),
+            token,
+            state.model_state_epoch(),
+            state.retrieval_epoch.load(Ordering::Relaxed),
+        )?;
+    }
     let context = state
         .context
         .lock()

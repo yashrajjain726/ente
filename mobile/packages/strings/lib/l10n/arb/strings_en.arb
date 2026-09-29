@@ -1672,6 +1672,10 @@
   "fileDeletedSuccessfully": "Item deleted successfully",
   "fileInfoAddDescHint": "Add a description...",
   "fileMarkedAsImportant": "Item marked as important",
+  "fileNameTooLong": "File name is too long. Try a shorter name.",
+  "@fileNameTooLong": {
+    "description": "Validation error when a renamed file exceeds the filesystem filename length limit"
+  },
   "fileNotUploadedYet": "File not uploaded yet",
   "fileRemovedFromImportant": "Item removed from important",
   "files": "Files",
@@ -1989,6 +1993,7 @@
   "importInstruction": "Please select a file that contains a list of your codes in the following format",
   "importLabel": "Import",
   "importLastpassGuide": "Use the \"Transfer accounts\" option within Lastpass Authenticator Settings and press \"Export accounts to file\". Import the JSON downloaded.",
+  "importOpenAuthenticatorGuide": "Use the options under \"Backups\" in Open Authenticator's Settings to create a backup, then share or export it.\n\nYou will need to enter the backup password you set when creating it.",
   "importOtpAuthGuide": "Export an encrypted backup from OTP Auth, then select the .otpauthdb or .otpauthdp file. Single-account .otpauth exports are also supported.",
   "importProtonAuthGuide": "Use the \"Export\" option in Proton Authenticator Settings to export your codes.\n\nIf your export is password protected, you will need to enter the password to decrypt it.",
   "importRaivoGuide": "Use the \"Export OTPs to Zip archive\" option in Raivo's Settings.\n\nExtract the zip file and import the JSON file.",
@@ -3565,6 +3570,7 @@
   "restoringFiles": "Restoring files...",
   "restoringItems": "Restoring...",
   "resumableUploads": "Resumable uploads",
+  "retake": "Retake",
   "retry": "Retry",
   "review": "Review",
   "reviewSuggestions": "Review suggestions",

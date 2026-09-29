@@ -5,6 +5,7 @@ struct MessageListView: View {
     let streamingResponse: String
     let streamingParentId: UUID?
     let isGenerating: Bool
+    let conversationStatus: String?
     let sessionId: UUID?
     let keyboardHeight: CGFloat
     let inputBarHeight: CGFloat
@@ -270,7 +271,14 @@ struct MessageListView: View {
                     }
                 }
 
-                StreamingDotsView()
+                HStack(spacing: EnsuSpacing.sm) {
+                    StreamingDotsView()
+                    if let conversationStatus {
+                        Text(conversationStatus)
+                            .font(.footnote)
+                            .foregroundStyle(EnsuColor.textMuted)
+                    }
+                }
             }
             .padding(.vertical, hasText ? EnsuSpacing.md : 0)
             .padding(.horizontal, EnsuSpacing.sm)

@@ -1,7 +1,7 @@
 // Keep this bridge in sync with desktop/src/types/ipc.ts and desktop/src/preload.ts.
-export type ThemeMode = "light" | "dark" | "system";
+type ThemeMode = "light" | "dark" | "system";
 
-export type NativeDeviceLockProvider = "touchid" | "none";
+type NativeDeviceLockProvider = "touchid" | "none";
 
 export type NativeDeviceLockUnavailableReason =
     | "unsupported-platform"
@@ -74,11 +74,16 @@ export interface Electron {
         findFiles: (folderPath: string) => Promise<string[]>;
     };
 
-    convertToJPEG: (imageData: Uint8Array) => Promise<Uint8Array<ArrayBuffer>>;
+    convertToJPEG: (
+        imageData: Uint8Array,
+        detectedExtension: string,
+        fileName: string,
+    ) => Promise<Uint8Array<ArrayBuffer>>;
     generateImageThumbnail: (
         pathOrZipItem: string | ZipItem,
         maxDimension: number,
         maxSize: number,
+        extension: string,
     ) => Promise<Uint8Array<ArrayBuffer>>;
     ffmpegExec: (
         command: FFmpegCommand,
@@ -153,7 +158,7 @@ export interface MLWorkerAnalyzeImageRequest {
     generateFaceCrops: boolean;
 }
 
-export interface MLWorkerFaceResult {
+interface MLWorkerFaceResult {
     faceId: string;
     detection: { score: number; boxXyxy: number[]; keypoints: number[][] };
     blurValue: number;
@@ -199,7 +204,7 @@ export interface PreUploadSkippedFile {
     type: "hiddenFile" | "failedZip";
 }
 
-export interface PendingUploads {
+interface PendingUploads {
     collectionName?: string;
     filePaths: string[];
     zipItems: ZipItem[];

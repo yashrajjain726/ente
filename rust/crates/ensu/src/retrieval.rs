@@ -56,3 +56,5 @@ pub use pack::{
     reconcile_knowledge_pack,
 };
 pub use prompt::{KnowledgePromptContext, KnowledgePromptHit, build_knowledge_prompt_context};
+
+pub(crate) use grounded::{MAX_GROUNDING_HITS, MAX_PACK_HITS, sanitize_excerpt};

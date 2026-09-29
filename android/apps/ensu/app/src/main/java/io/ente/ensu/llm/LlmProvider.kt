@@ -26,6 +26,9 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -54,6 +57,7 @@ class LlmProvider(
     private val modelLoadMutex = Mutex()
     private val activeDownloads = AtomicInteger()
     private val embeddingAsset = knowledgeEmbeddingModelAsset()
+    private var chatWarmupOwner: String? = null
     internal var modelMaintenance: ModelMaintenance? = null
 
     private suspend fun <T> withModelContext(block: suspend () -> T): T =
@@ -85,6 +89,32 @@ class LlmProvider(
             modelLoadMutex.withLock { ensureModelReadyLocked(selection, onProgress) }
         }
     }
+
+    internal suspend fun prewarmChatModelIfDownloaded(
+        selection: LlmModelSelection,
+        owner: String,
+    ): Unit = withModelContext {
+        modelLoadMutex.withLock {
+            currentCoroutineContext().ensureActive()
+            if (!isChatModelReady(selection)) return@withLock
+            unloadTranscriptionModelIfLoaded()
+            currentCoroutineContext().ensureActive()
+            if (loadedContextLength(selection) != null) return@withLock
+            try {
+                ensureModelReadyLocked(selection, {}, allowRecovery = false, shouldDownload = false)
+                currentCoroutineContext().ensureActive()
+                chatWarmupOwner = owner
+            } catch (error: Throwable) {
+                unloadModel()
+                throw error
+            }
+        }
+    }
+
+    internal suspend fun releaseChatWarmup(owner: String) =
+        withContext(ioDispatcher) {
+            modelLoadMutex.withLock { if (chatWarmupOwner == owner) unloadModel() }
+        }
 
     suspend fun ensureRequiredModelsReady(
         selection: LlmModelSelection,
@@ -146,27 +176,13 @@ class LlmProvider(
                 } else {
                     assetStore.llmMmprojPath(chatAsset(selection))?.absolutePath
                 }
-            val clampedTemperature = temperature.coerceIn(0.35f, 0.7f)
-
             val request =
-                LlmChatRequest(
-                    messages =
-                        messages.map { msg -> NativeChatMessage(msg.roleString(), msg.text) },
-                    templateOverride = null,
-                    addAssistant = true,
-                    imagePaths = imageFiles.map { it.absolutePath },
-                    mmprojPath = mmprojPath,
-                    mediaMarker = null,
-                    maxTokens = maxTokens,
-                    temperature = clampedTemperature,
-                    topP = 0.9f,
-                    topK = 50,
-                    repeatPenalty = 1.18f,
-                    frequencyPenalty = 0f,
-                    presencePenalty = 0f,
-                    seed = null,
-                    stopSequences = null,
-                    grammar = null,
+                chatRequest(
+                    messages.map { NativeChatMessage(it.roleString(), it.text) },
+                    imageFiles.map { it.absolutePath },
+                    mmprojPath,
+                    temperature,
+                    maxTokens,
                 )
 
             unloadTranscriptionModelIfLoaded()
@@ -174,6 +190,103 @@ class LlmProvider(
             GenerationSummary(summary.jobId, summary.generatedTokens ?: 0, summary.totalTimeMs)
         }
     }
+
+    internal suspend fun generateTitle(
+        selection: LlmModelSelection,
+        messages: List<LlmMessage>,
+        onToken: (String) -> Unit,
+    ): Unit = withModelContext {
+        modelLoadMutex.withLock {
+            val coroutine = currentCoroutineContext()
+            coroutine.ensureActive()
+            ensureModelReadyLocked(selection, onProgress = {})
+            coroutine.ensureActive()
+            unloadTranscriptionModelIfLoaded()
+            val model = checkNotNull(loadedModel) { "Model not loaded" }
+            model
+                .newContext(
+                    LlmContextParams(
+                        contextSize = minOf(2048, checkNotNull(currentContextLength)),
+                        nThreads = max(1, Runtime.getRuntime().availableProcessors() - 1),
+                        nBatch = 128,
+                    )
+                )
+                .use { context ->
+                    coroutine.ensureActive()
+                    val titleMessages =
+                        context.truncateTextChatMessages(
+                            messages.map { NativeChatMessage(it.roleString(), it.text) },
+                            (context.contextSize().toInt() - 48).coerceIn(0, 2000).toUInt(),
+                        )
+                    coroutine.ensureActive()
+                    generateStreamWithCallback(
+                        context,
+                        chatRequest(
+                            titleMessages,
+                            emptyList(),
+                            null,
+                            0.2f,
+                            48,
+                        ),
+                        onToken,
+                        isCancelled = { !coroutine.isActive },
+                    )
+                }
+        }
+    }
+
+    internal suspend fun <T> withConversationContext(
+        selection: LlmModelSelection,
+        block: suspend (LlmContext) -> T,
+    ): T = withModelContext {
+        modelLoadMutex.withLock {
+            ensureModelReadyLocked(selection, onProgress = {})
+            unloadTranscriptionModelIfLoaded()
+            block(requireNotNull(loadedContext))
+        }
+    }
+
+    internal fun generatePreparedChat(
+        context: LlmContext,
+        messages: List<NativeChatMessage>,
+        maxTokens: UInt,
+        temperature: Float,
+        onToken: (String) -> Unit,
+    ): GenerationSummary {
+        val summary =
+            generateStreamWithCallback(
+                context,
+                chatRequest(messages, emptyList(), null, temperature, maxTokens.toInt()),
+                onToken,
+            )
+        return GenerationSummary(summary.jobId, summary.generatedTokens ?: 0, summary.totalTimeMs)
+    }
+
+    private fun chatRequest(
+        messages: List<NativeChatMessage>,
+        imagePaths: List<String>,
+        mmprojPath: String?,
+        temperature: Float,
+        maxTokens: Int?,
+    ) =
+        LlmChatRequest(
+            messages = messages,
+            templateOverride = null,
+            addAssistant = true,
+            imagePaths = imagePaths,
+            mmprojPath = mmprojPath,
+            mediaMarker = null,
+            maxTokens = maxTokens,
+            temperature = temperature.coerceIn(0.35f, 0.7f),
+            topP = 0.9f,
+            topK = 50,
+            repeatPenalty = 1.18f,
+            frequencyPenalty = 0f,
+            presencePenalty = 0f,
+            seed = null,
+            stopSequences = null,
+            grammar = null,
+        )
 
     suspend fun <T> withChatModelReleasedForRetrieval(
         block: suspend (embed: (String) -> List<Float>) -> T
@@ -269,6 +382,7 @@ class LlmProvider(
                     )
                 loadedContext?.destroy()
                 loadedContext = model.newContext(contextParams)
+                currentContextLength = loadedContext?.contextSize()?.toInt()
             }
         }
     }
@@ -282,6 +396,7 @@ class LlmProvider(
     }
 
     private fun unloadModel() {
+        chatWarmupOwner = null
         loadedContext?.destroy()
         loadedContext = null
         loadedModel?.destroy()
@@ -305,6 +420,7 @@ class LlmProvider(
         allowRecovery: Boolean = true,
         shouldDownload: Boolean = true,
     ) {
+        chatWarmupOwner = null
         deviceCapabilityProvider.chatCapability().requireChatSupported()
         val modelKey = LoadedModelKey(selection.id, selection.contextLength)
         if (!backendInitialized) {
@@ -393,7 +509,7 @@ class LlmProvider(
                     )
                 loadedContext = model.newContext(contextParams)
                 currentModelKey = LoadedModelKey(selection.id, selection.contextLength)
-                currentContextLength = ctx
+                currentContextLength = loadedContext?.contextSize()?.toInt()
                 return
             } catch (err: Throwable) {
                 lastError = err
@@ -407,6 +523,7 @@ class LlmProvider(
         context: LlmContext,
         request: LlmChatRequest,
         onToken: (String) -> Unit,
+        isCancelled: () -> Boolean = { false },
     ): NativeSummary {
         val callback =
             object : LlmGenerationEventCallback {
@@ -414,6 +531,7 @@ class LlmProvider(
                     when (event) {
                         is LlmGenerationEvent.Text -> {
                             currentJobId = event.jobId
+                            if (isCancelled()) llmCancel(event.jobId)
                             if (event.text.isNotEmpty()) {
                                 onToken(event.text)
                             }

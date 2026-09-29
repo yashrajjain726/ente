@@ -23,6 +23,7 @@ import io.ente.ensu.notes.NotesStore
 import io.ente.ensu.settings.DeveloperSettingsState
 import io.ente.ensu.settings.SessionPreferencesDataStore
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,7 +59,14 @@ class AppStore(
             logRepository = logRepository,
         )
     private val modelSettingsActions =
-        ModelSettingsActions(_state, sessionPreferences, llmProvider, logRepository)
+        ModelSettingsActions(
+            state = _state,
+            sessionPreferences = sessionPreferences,
+            llmProvider = llmProvider,
+            logRepository = logRepository,
+            notesStore = notesStore,
+            awaitKnowledgeReady = knowledgeStore::awaitEnabledPacksReady,
+        )
     private val chatActions =
         ChatStoreActions(
             state = _state,
@@ -79,13 +87,19 @@ class AppStore(
     fun bootstrap(scope: CoroutineScope) {
         notesStore.bootstrap(scope)
         chatActions.setScope(scope)
-        modelSettingsActions.setScope(scope)
+        modelSettingsActions.bootstrap(scope)
         refreshDeviceCapability(scope)
         chatActions.bootstrap(scope)
         modelSettingsActions.refreshModelDownloadInfo()
         knowledgeStore.bootstrap(scope)
         _state.value = _state.value.copy(chat = _state.value.chat.copy(isModelStateKnown = true))
     }
+
+    fun setChatActive(active: Boolean) = modelSettingsActions.setChatActive(active)
+
+    fun suppressChatWarmup() = modelSettingsActions.suppressChatWarmup()
+
+    fun trackVoiceInput(job: Job) = modelSettingsActions.trackVoiceInput(job)
 
     fun refreshDeviceCapability(scope: CoroutineScope? = null) {
         val capability = deviceCapabilityProvider.chatCapability()
@@ -201,12 +215,20 @@ class AppStore(
 
     fun cancelOverflowDialog() = chatActions.cancelOverflowDialog()
 
-    fun updateModelSettings(state: ModelSettingsState) =
+    fun updateModelSettings(state: ModelSettingsState) {
+        chatActions.cancelGenerationForDownload()
         modelSettingsActions.updateModelSettings(state)
+    }
 
-    fun resetModelSettings() = modelSettingsActions.resetModelSettings()
+    fun resetModelSettings() {
+        chatActions.cancelGenerationForDownload()
+        modelSettingsActions.resetModelSettings()
+    }
 
     fun updateDeveloperSettings(state: DeveloperSettingsState) {
+        if (state.systemPrompt != _state.value.developerSettings.systemPrompt) {
+            chatActions.cancelGenerationForDownload()
+        }
         _state.value = _state.value.copy(developerSettings = state)
     }
 

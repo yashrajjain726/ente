@@ -22,10 +22,7 @@
     ],
     "rust/bindings/uniffi/ensu/src/assets.rs": ["clippy::expect_used"],
     "rust/bindings/wasm/lib/src/logging.rs": ["clippy::expect_used"],
-    "rust/crates/accounts/src/flow.rs": [
-        "clippy::expect_used",
-        "clippy::large_enum_variant"
-    ],
+    "rust/crates/accounts/src/lifecycle.rs": ["clippy::large_enum_variant"],
     "rust/crates/assets/src/download.rs": ["clippy::expect_used"],
     "rust/crates/assets/src/store.rs": ["clippy::expect_used"],
     "rust/crates/core/examples/ping.rs": ["clippy::expect_used"],
@@ -35,6 +32,7 @@
     "rust/crates/core/src/crypto/types.rs": ["clippy::expect_used"],
     "rust/crates/ensu/src/config.rs": ["clippy::expect_used"],
     "rust/crates/ensu/src/config/knowledge.rs": ["clippy::expect_used"],
+    "rust/crates/ensu/src/conversation/lookup.rs": ["clippy::expect_used"],
     "rust/crates/ensu/src/llm/context.rs": ["unsafe_code"],
     "rust/crates/ensu/src/llm/generate.rs": ["clippy::expect_used"],
     "rust/crates/ensu/src/model/mod.rs": ["clippy::expect_used"],

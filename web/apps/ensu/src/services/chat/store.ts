@@ -15,7 +15,7 @@ import {
 
 const CHAT_DB_NAME = "ensu-chat";
 
-export type AttachmentKind = "image" | "document";
+type AttachmentKind = "image" | "document";
 
 export interface ChatAttachment {
     id: string;
@@ -449,6 +449,7 @@ const addMessageNative = async (
     parentMessageUuid?: string,
     attachments: ChatAttachment[] = [],
     sources: GroundedSource[] = [],
+    preparationToken?: string,
 ): Promise<ChatMessage> => {
     const message = await invokeChat<NativeMessage>("chat_db_insert_message", {
         input: {
@@ -457,6 +458,7 @@ const addMessageNative = async (
             text,
             parentMessageUuid,
             sources,
+            preparationToken,
             attachments: attachments.map((attachment) => ({
                 id: attachment.id,
                 kind: attachment.kind,
@@ -499,10 +501,6 @@ const addMessageNative = async (
         })),
         sources: message.sources,
     };
-};
-
-const updateMessageNative = async (messageUuid: string, text: string) => {
-    await invokeChat("chat_db_update_message_text", { messageUuid, text });
 };
 
 const deleteSessionNative = async (sessionUuid: string) => {
@@ -637,6 +635,27 @@ export const createSession = async (chatKey: string) => {
     return sessionUuid;
 };
 
+export interface PreparedAnswer {
+    token: string;
+    sessionUuid: string;
+    parentMessageUuid: string;
+    sources: GroundedSource[];
+}
+
+export const addPreparedAnswer = (
+    preparation: PreparedAnswer,
+    text: string,
+): Promise<ChatMessage> =>
+    addMessageNative(
+        preparation.sessionUuid,
+        "assistant",
+        text,
+        preparation.parentMessageUuid,
+        [],
+        preparation.sources,
+        preparation.token,
+    );
+
 export const addMessage = async (
     sessionUuid: string,
     sender: "self" | "assistant",
@@ -731,40 +750,6 @@ export const updateSessionTitle = async (
     await tx.done;
 };
 
-export const updateMessage = async (
-    messageUuid: string,
-    text: string,
-    chatKey: string,
-) => {
-    if (isTauriRuntime()) {
-        await updateMessageNative(messageUuid, text);
-        return;
-    }
-
-    const db = await chatDb();
-    const tx = db.transaction(["sessions", "messages"], "readwrite");
-    const messageStore = tx.objectStore("messages");
-    const message = await messageStore.get(messageUuid);
-    if (!message) {
-        await tx.done;
-        return;
-    }
-
-    const encrypted = await encryptChatPayload({ text }, chatKey);
-    message.encryptedData = encrypted.encryptedData;
-    message.header = encrypted.header;
-    await messageStore.put(message);
-
-    const sessionStore = tx.objectStore("sessions");
-    const session = await sessionStore.get(message.sessionUuid);
-    if (session) {
-        session.updatedAt = nowMicros();
-        await sessionStore.put(session);
-    }
-
-    await tx.done;
-};
-
 const branchSelectionsKey = (rootSessionUuid: string) =>
     `ensu.chat.branchSelections.v1.${rootSessionUuid}`;
 
@@ -790,7 +775,7 @@ export const setBranchSelection = async (
     await setKV(branchSelectionsKey(rootSessionUuid), selections);
 };
 
-export const deleteBranchSelections = (rootSessionUuid: string) =>
+const deleteBranchSelections = (rootSessionUuid: string) =>
     removeKV(branchSelectionsKey(rootSessionUuid));
 
 export const deleteSession = async (sessionUuid: string) => {

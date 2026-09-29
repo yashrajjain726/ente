@@ -216,6 +216,131 @@ test("binary deleted is ignored", (t) => {
     assert.equal(scan(t, { "a.bin": Buffer.alloc(16) }, { "a.bin": null }), "");
 });
 
+test("README additions and edits need approval in CI", (t) => {
+    const changed = {
+        README: "# New\n",
+        "README.md": "# Updated\n",
+        "docs/README.fr.md": "# Guide\n",
+        "mobile/readme-notes.txt": "# Notes\n",
+        "rust/crates/example/ReadMe": "",
+    };
+    const { stdout, output, summary } = scan(
+        t,
+        { "README.md": "# Original\n" },
+        changed,
+        { ci: true },
+    );
+    assert.equal(output, 'categories=["README files"]\n');
+    assert.equal(
+        stdout,
+        "::warning title=Change approval needed::5 README files\n",
+    );
+    assert.equal(
+        summary,
+        `5 README files\n\n## README files\n\n${Object.keys(changed)
+            .map((path) => `- \`${path}\``)
+            .join("\n")}\n`,
+    );
+});
+
+test("README edits and untracked files are scanned locally", (t) => {
+    const output = scan(
+        t,
+        { "docs/readme.md": "# Original\n" },
+        { "docs/readme.md": "# Updated\n", README: "# New\n" },
+        { commit: false },
+    );
+    assert.match(output, /^2 README files\n/);
+    assert.match(output, /- `docs\/readme.md`/);
+    assert.match(output, /- `README`/);
+});
+
+test("renaming a file to or from README needs approval", (t) => {
+    for (const [before, after] of [
+        ["guide.txt", "README.txt"],
+        ["README.txt", "guide.txt"],
+    ]) {
+        const { output, summary } = scan(
+            t,
+            { [before]: "# Guide\n" },
+            { [before]: null, [after]: "# Guide\n" },
+            { ci: true },
+        );
+        assert.equal(output, 'categories=["README files"]\n');
+        assert.equal(
+            summary,
+            "1 README file\n\n## README files\n\n- `README.txt`\n",
+        );
+    }
+});
+
+test("README deletions need approval in CI and local scans", (t) => {
+    const summary =
+        "2 README files\n\n## README files\n\n- `README`\n- `docs/readme.md`\n";
+    for (const ci of [false, true]) {
+        const result = scan(
+            t,
+            { README: "# Remove\n", "docs/readme.md": "# Remove\n" },
+            { README: null, "docs/readme.md": null },
+            { ci, commit: ci },
+        );
+        if (ci) {
+            assert.deepEqual(result, {
+                stdout: "::warning title=Change approval needed::2 README files\n",
+                output: 'categories=["README files"]\n',
+                summary,
+            });
+        } else {
+            assert.equal(result, `${summary}\n`);
+        }
+    }
+});
+
+test("unchanged READMEs need no approval", (t) => {
+    const { stdout, output, summary } = scan(
+        t,
+        { "README.md": "# Keep\n" },
+        { "notes.txt": "Ordinary change\n" },
+        { ci: true },
+    );
+    assert.equal(stdout, "");
+    assert.equal(output, "categories=[]\n");
+    assert.equal(summary, "No approval needed.\n");
+});
+
+test("README approval matches the beginning of the filename", (t) => {
+    for (const ci of [false, true]) {
+        const result = scan(
+            t,
+            {},
+            {
+                "README-assets/notes.md": "# Notes\n",
+                "docs/not-README.md": "# Other\n",
+            },
+            { ci, commit: ci },
+        );
+        if (ci) {
+            assert.deepEqual(result, {
+                stdout: "",
+                output: "categories=[]\n",
+                summary: "No approval needed.\n",
+            });
+        } else {
+            assert.equal(result, "");
+        }
+    }
+});
+
+test("Markdown changes in GitHub guardrails still need approval", (t) => {
+    const { output } = scan(
+        t,
+        {},
+        { ".github/PULL_REQUEST_TEMPLATE.md": "# Template\n" },
+        { ci: true },
+    );
+    assert.equal(output, 'categories=["guardrail files"]\n');
+});
+
 test("CI preserves tabs and newlines in binary and large filenames", (t) => {
     const binary = "image.png\tpayload.jar";
     const large = "large\nfile.txt";
@@ -1266,6 +1391,9 @@ test("workflow scans PR changes with the complete checker from main", (t) => {
                 "export function checkRust() { return []; }",
             [`${checkerDir}/web.mjs`]:
                 'throw new Error("loaded an untrusted rule");',
+            [`${checkerDir}/files.mjs`]:
+                'throw new Error("loaded an untrusted file rule");',
+            "docs/README.md": "# Guide\n",
             "src/lib.rs": "pub unsafe fn call() {}",
             "web/example.ts":
                 "// eslint-disable-next-line no-console\nfirst();\n",
@@ -1274,9 +1402,10 @@ test("workflow scans PR changes with the complete checker from main", (t) => {
     );
     assert.equal(
         output,
-        'categories=["guardrail files","Rust lint policy files","Web lint policy files"]\n',
+        'categories=["guardrail files","README files","Rust lint policy files","Web lint policy files"]\n',
     );
     assert.match(summary, /- `src\/lib.rs`/);
     assert.match(summary, /- `web\/example.ts`/);
     assert.match(summary, /- `rust\/Cargo.toml`/);
+    assert.match(summary, /- `docs\/README.md`/);
 });
