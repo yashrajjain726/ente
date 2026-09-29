@@ -12,7 +12,13 @@ import {
     Typography,
 } from "@mui/material";
 import { t } from "i18next";
-import React, { useCallback, useMemo, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 
 export const ItemFormFields: React.FC<{
     type: LockerItemType;
@@ -214,6 +220,14 @@ export const CollectionSelector: React.FC<{
     const [newlyCreatedCollectionIDs, setNewlyCreatedCollectionIDs] = useState<
         number[]
     >([]);
+    const mountedRef = useRef(true);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
 
     const orderedCollections = useMemo(() => {
         const sortedCollections = [...collections].sort((a, b) =>
@@ -254,6 +268,7 @@ export const CollectionSelector: React.FC<{
         setCreateError(null);
         try {
             const newCollectionID = await onCreateCollection(name);
+            if (!mountedRef.current) return;
             setNewlyCreatedCollectionIDs((current) => [
                 newCollectionID,
                 ...current.filter((id) => id !== newCollectionID),

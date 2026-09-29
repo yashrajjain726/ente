@@ -1,6 +1,7 @@
 import { lockerSheetContainerSx, lockerSheetPaperSx } from "@/styles/dialog";
 import {
     lockerColorSx,
+    lockerTextBodyBoldSx,
     lockerTextBodySx,
     lockerTextH2Sx,
     lockerTextMiniSx,
@@ -56,6 +57,7 @@ export function LockerConfirmDialog({
 }: LockerConfirmDialogProps) {
     const titleID = useId();
     const bodyID = useId();
+    const confirmButtonTypography = cancelLabel ? {} : lockerTextBodyBoldSx;
     const handleClose = () => {
         if (!loading) {
             onClose();
@@ -178,6 +180,7 @@ export function LockerConfirmDialog({
                     loading={loading}
                     onClick={onConfirm}
                     sx={(theme) => ({
+                        ...confirmButtonTypography,
                         mt: 3,
                         minHeight: 52,
                         borderRadius: "20px",
