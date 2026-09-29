@@ -987,7 +987,6 @@ const MapBox: React.FC<MapBoxProps> = ({ location, mapEnabled }) => {
             leaflet
                 .tileLayer(urlTemplate, {
                     attribution,
-                    // OSM blocks tile requests without a Referer.
                     referrerPolicy: "strict-origin-when-cross-origin",
                 })
                 .addTo(map);

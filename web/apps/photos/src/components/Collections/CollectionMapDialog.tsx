@@ -1500,7 +1500,6 @@ const MapCanvas = React.memo(function MapCanvas({
                     url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
                     maxZoom={MAX_MAP_ZOOM}
                     updateWhenZooming
-                    // OSM blocks tile requests without a Referer.
                     referrerPolicy="strict-origin-when-cross-origin"
                 />
                 <MapControls useMap={useMap} />

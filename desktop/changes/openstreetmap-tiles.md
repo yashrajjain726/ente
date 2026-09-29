@@ -1,0 +1,1 @@
+- Fixed OpenStreetMap tiles failing to load when viewing photo locations in some self-hosted setups. Thanks to @Himanshucodess for the fix and @daltux for reporting it.
