@@ -19,7 +19,6 @@ import {
 } from "components/ActionToast";
 import { SpaceAvatarImage } from "components/AvatarImage";
 import { SpaceButtonSpinner } from "components/ButtonSpinner";
-import { SpaceCaptionText } from "components/CaptionText";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import { SpaceFeedPostButton } from "components/FeedPostButton";
 import {
@@ -53,17 +52,16 @@ import {
     spaceText,
     spaceTextMuted,
 } from "styles/colors";
-import {
-    minimumPostPhotoFrameAspectRatio,
-    spaceProfilePostRadius,
-} from "styles/tiles";
+import { spaceProfilePostRadius } from "styles/tiles";
 import { spaceTouchTargetSize } from "styles/touch-targets";
-import { firstNameFrom, formatSpaceDate } from "utils/display";
+import { firstNameFrom } from "utils/display";
 import {
     spaceDefaultCoverImagePath,
     type SpaceDraftPostImage,
 } from "utils/post-image";
 import { viewerPhotosFromPost } from "utils/post-photos";
+import { profilePhotoGap, profilePhotoRows } from "utils/profile-photo-layout";
+import { profilePostSections } from "utils/profile-post-sections";
 import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
 const green = "#08C225";
@@ -115,6 +113,12 @@ interface SelectedProfilePost {
     id: string;
     photo: SpaceViewerPhoto;
     photoIndex: number;
+}
+
+interface ProfilePhotoTile {
+    aspectRatio: number;
+    index: number;
+    item: ProfilePostItem;
 }
 
 const profilePostImageCacheKey = (item: ProfilePostItem) =>
@@ -232,9 +236,9 @@ const ProfilePostLoadingIndicator: React.FC = () => (
     </Box>
 );
 
-interface ProfilePostProps {
-    dimensions: ProfilePhotoDimensions;
+interface ProfilePostTileProps {
     displayName: string;
+    flexGrow: number;
     imageUrl?: string;
     index: number;
     isUnavailable: boolean;
@@ -246,9 +250,9 @@ interface ProfilePostProps {
     onRememberDimensions: (itemID: string, image: HTMLImageElement) => void;
 }
 
-const ProfilePost: React.FC<ProfilePostProps> = ({
-    dimensions,
+const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
     displayName,
+    flexGrow,
     imageUrl,
     index,
     isUnavailable: isPostUnavailable,
@@ -262,22 +266,13 @@ const ProfilePost: React.FC<ProfilePostProps> = ({
     const [shouldLoad, setShouldLoad] = React.useState(Boolean(imageUrl));
     const [readyImageUrl, setReadyImageUrl] = React.useState<string>();
     const [imageDecodeFailed, setImageDecodeFailed] = React.useState(false);
-    const postRef = React.useRef<HTMLElement | null>(null);
+    const tileRef = React.useRef<HTMLButtonElement | null>(null);
     const thumbHashDataURL = React.useMemo(
         () => thumbHashDataURLFromBase64(item.thumbHash),
         [item.thumbHash],
     );
     const isCurrentImageReady = Boolean(imageUrl && readyImageUrl == imageUrl);
     const isUnavailable = isPostUnavailable || imageDecodeFailed;
-    const aspectRatio =
-        dimensions.width > 0 && dimensions.height > 0
-            ? dimensions.width / dimensions.height
-            : 1;
-    const frameAspectRatio = Math.max(
-        minimumPostPhotoFrameAspectRatio,
-        aspectRatio,
-    );
-    const caption = item.caption?.trim();
     const photoCount = item.photos?.length ?? 1;
 
     React.useEffect(() => {
@@ -287,7 +282,7 @@ const ProfilePost: React.FC<ProfilePostProps> = ({
     React.useEffect(() => {
         if (isUnavailable) return;
         if (shouldLoad || imageUrl) return;
-        const element = postRef.current;
+        const element = tileRef.current;
         if (!element) return;
         if (
             typeof window == "undefined" ||
@@ -320,185 +315,113 @@ const ProfilePost: React.FC<ProfilePostProps> = ({
 
     return (
         <Box
-            ref={postRef}
-            component="article"
+            ref={tileRef}
+            component="button"
+            type="button"
+            aria-label={
+                isUnavailable
+                    ? "Post unavailable"
+                    : `Open ${displayName} post ${index + 1}${
+                          photoCount > 1 ? `, ${photoCount} photos` : ""
+                      }`
+            }
+            disabled={!imageUrl || isUnavailable}
+            onClick={() => {
+                if (imageUrl && !isUnavailable) onOpen(imageUrl);
+            }}
             sx={{
-                aspectRatio: frameAspectRatio,
+                appearance: "none",
                 bgcolor: photoPlaceholderBackground,
+                border: 0,
                 borderRadius: `${spaceProfilePostRadius}px`,
+                cursor: imageUrl && !isUnavailable ? "pointer" : "default",
+                display: "block",
+                flex: `${flexGrow} 1 0px`,
+                height: "100%",
                 minWidth: 0,
+                opacity: 1,
                 overflow: "hidden",
+                p: 0,
                 position: "relative",
-                transition: "aspect-ratio 220ms ease",
-                width: "100%",
-                "@media (prefers-reduced-motion: reduce)": {
-                    transition: "none",
+                "&:focus-visible": {
+                    outline: `2px solid ${green}`,
+                    outlineOffset: -2,
                 },
             }}
         >
-            <Box
-                component="button"
-                type="button"
-                aria-label={
-                    isUnavailable
-                        ? "Post unavailable"
-                        : `Open ${displayName} post ${index + 1}${
-                              photoCount > 1 ? `, ${photoCount} photos` : ""
-                          }`
-                }
-                disabled={!imageUrl || isUnavailable}
-                onClick={() => {
-                    if (imageUrl && !isUnavailable) onOpen(imageUrl);
-                }}
-                sx={{
-                    appearance: "none",
-                    bgcolor: "transparent",
-                    border: 0,
-                    cursor: imageUrl && !isUnavailable ? "pointer" : "default",
-                    display: "block",
-                    height: "100%",
-                    p: 0,
-                    position: "relative",
-                    width: "100%",
-                    "&:focus-visible": {
-                        outline: `2px solid ${green}`,
-                        outlineOffset: -2,
-                    },
-                }}
-            >
-                {!isUnavailable && thumbHashDataURL ? (
-                    <Box
-                        component="img"
-                        alt=""
-                        aria-hidden
-                        src={thumbHashDataURL}
-                        sx={{
-                            display: "block",
-                            filter: "blur(14px)",
-                            height: "100%",
-                            inset: 0,
-                            objectFit: "cover",
-                            objectPosition: "center",
-                            position: "absolute",
-                            transform: "scale(1.08)",
-                            width: "100%",
-                        }}
-                    />
-                ) : null}
-                {!isUnavailable && imageUrl ? (
-                    <Box
-                        component="img"
-                        alt={`${displayName} post ${index + 1}`}
-                        onLoad={(event) => {
-                            setReadyImageUrl(imageUrl);
-                            onRememberDimensions(item.id, event.currentTarget);
-                        }}
-                        onError={() => {
-                            log.warn(
-                                `Post ${item.postId} is unavailable because the browser could not decode its image`,
-                            );
-                            setImageDecodeFailed(true);
-                            onImageDecodeError();
-                        }}
-                        src={imageUrl}
-                        sx={{
-                            display: "block",
-                            height: "100%",
-                            inset: 0,
-                            objectFit: "cover",
-                            objectPosition: "center",
-                            opacity:
-                                isCurrentImageReady || !thumbHashDataURL
-                                    ? 1
-                                    : 0,
-                            position: "absolute",
-                            transition: thumbHashDataURL
-                                ? "opacity 220ms ease"
-                                : "none",
-                            width: "100%",
-                            "@media (prefers-reduced-motion: reduce)": {
-                                opacity: 1,
-                                transition: "none",
-                            },
-                        }}
-                    />
-                ) : null}
-                {isUnavailable && (
-                    <Box
-                        sx={{
-                            alignItems: "center",
-                            color: textSoft,
-                            display: "flex",
-                            fontSize: 12,
-                            fontWeight: 600,
-                            height: "100%",
-                            justifyContent: "center",
-                            width: "100%",
-                        }}
-                    >
-                        Post unavailable
-                    </Box>
-                )}
-            </Box>
+            {!isUnavailable && thumbHashDataURL ? (
+                <Box
+                    component="img"
+                    alt=""
+                    aria-hidden
+                    src={thumbHashDataURL}
+                    sx={{
+                        display: "block",
+                        filter: "blur(14px)",
+                        height: "100%",
+                        inset: 0,
+                        objectFit: "cover",
+                        objectPosition: "center",
+                        position: "absolute",
+                        transform: "scale(1.08)",
+                        width: "100%",
+                    }}
+                />
+            ) : null}
+            {!isUnavailable && imageUrl ? (
+                <Box
+                    component="img"
+                    alt={`${displayName} post ${index + 1}`}
+                    onLoad={(event) => {
+                        setReadyImageUrl(imageUrl);
+                        onRememberDimensions(item.id, event.currentTarget);
+                    }}
+                    onError={() => {
+                        log.warn(
+                            `Post ${item.postId} is unavailable because the browser could not decode its image`,
+                        );
+                        setImageDecodeFailed(true);
+                        onImageDecodeError();
+                    }}
+                    src={imageUrl}
+                    sx={{
+                        display: "block",
+                        height: "100%",
+                        inset: 0,
+                        objectFit: "contain",
+                        objectPosition: "center",
+                        opacity:
+                            isCurrentImageReady || !thumbHashDataURL ? 1 : 0,
+                        position: "absolute",
+                        transition: thumbHashDataURL
+                            ? "opacity 220ms ease"
+                            : "none",
+                        width: "100%",
+                        "@media (prefers-reduced-motion: reduce)": {
+                            opacity: 1,
+                            transition: "none",
+                        },
+                    }}
+                />
+            ) : null}
             {!isUnavailable && (
-                <>
-                    <Box
-                        aria-hidden
-                        sx={{
-                            background:
-                                "linear-gradient(180deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0))",
-                            filter: "blur(12px)",
-                            height: 100,
-                            left: -12,
-                            pointerEvents: "none",
-                            position: "absolute",
-                            right: -12,
-                            top: -12,
-                        }}
-                    />
-                    <Box
-                        component="time"
-                        dateTime={new Date(item.timestampMs).toISOString()}
-                        sx={{
-                            color: "#C8C8C8",
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 12,
-                            fontWeight: 500,
-                            left: 16,
-                            lineHeight: "16px",
-                            pointerEvents: "none",
-                            position: "absolute",
-                            top: 16,
-                        }}
-                    >
-                        {formatSpaceDate(item.timestampMs)}
-                    </Box>
-                    <SpacePostPhotosBadge count={photoCount} inset={12} />
-                    {caption && (
-                        <Box
-                            title={caption}
-                            sx={{
-                                bottom: 20,
-                                color: "#E6E6E6",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 13,
-                                fontWeight: 600,
-                                left: "50%",
-                                lineHeight: "21px",
-                                maxWidth: "78%",
-                                pointerEvents: "none",
-                                position: "absolute",
-                                textAlign: "center",
-                                textWrap: "balance",
-                                transform: "translateX(-50%)",
-                                width: "max-content",
-                            }}
-                        >
-                            <SpaceCaptionText caption={caption} lineClamp={2} />
-                        </Box>
-                    )}
-                </>
+                <SpacePostPhotosBadge count={photoCount} inset={8} />
+            )}
+            {isUnavailable && (
+                <Box
+                    sx={{
+                        alignItems: "center",
+                        color: textSoft,
+                        display: "flex",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        height: "100%",
+                        justifyContent: "center",
+                        width: "100%",
+                    }}
+                >
+                    Post unavailable
+                </Box>
             )}
         </Box>
     );
@@ -607,6 +530,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         Record<string, true>
     >({});
     const [loadedCoverUrl, setLoadedCoverUrl] = useState<string | null>(null);
+    const [postGridWidth, setPostGridWidth] = useState(0);
+    const postGridRef = React.useRef<HTMLDivElement | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const postImageLoadsInFlightRef = React.useRef<
         Map<string, Promise<string | undefined>>
@@ -630,9 +555,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           ? undefined
           : spaceDefaultCoverImagePath;
     const firstName = firstNameFrom(displayName);
-    const visiblePostItems = postItems.filter(
-        (item) => !deletedPostIDs.has(item.id),
-    );
+    const visiblePostItems = postItems
+        .filter((item) => !deletedPostIDs.has(item.id))
+        .sort((a, b) => b.timestampMs - a.timestampMs);
     const viewerPostItems = visiblePostItems.filter(
         (item) =>
             !item.isUnavailable &&
@@ -647,6 +572,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const canOpenProfileCover = Boolean(onOpenProfileCover);
     const canOpenProfilePhoto = Boolean(onOpenProfilePhoto);
     const hasProfilePosts = postsSharedCount > 0;
+    React.useLayoutEffect(() => {
+        const grid = postGridRef.current;
+        if (!grid) return;
+
+        const observer = new ResizeObserver(([entry]) =>
+            setPostGridWidth(entry!.contentRect.width),
+        );
+        setPostGridWidth(grid.getBoundingClientRect().width);
+        observer.observe(grid);
+        return () => observer.disconnect();
+    }, [hasProfilePosts]);
     const shouldShowPostLoadingIndicator =
         isPostsLoading && (showPostLoadingIndicator ?? true);
     const isCoverImageLoading = Boolean(
@@ -797,6 +733,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         [loadedPhotoDimensionsByID],
     );
 
+    const photoSections = profilePostSections(
+        visiblePostItems.map((item, index) => {
+            const { width, height } = dimensionsForPost(item);
+            return {
+                aspectRatio: width > 0 && height > 0 ? width / height : 1,
+                index,
+                item,
+                timestampMs: item.timestampMs,
+            };
+        }),
+    ).map(({ id, title, items }) => ({
+        id,
+        title,
+        rows: profilePhotoRows(items, postGridWidth),
+    }));
+
     const profileViewerPhotos = viewerPostItems.flatMap((item) =>
         viewerPhotosFromPost({
             ...item,
@@ -847,13 +799,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         });
     };
 
-    const renderPost = (item: ProfilePostItem, index: number) => {
+    const renderPostTile = (
+        { aspectRatio, index, item }: ProfilePhotoTile,
+        rowAspectRatio: number,
+    ) => {
         const imageUrl = loadedPostImageURLFor(item);
         const isUnavailable = !viewerPostIndexByID.has(item.id);
         return (
-            <ProfilePost
+            <ProfilePostTile
                 key={item.id}
-                dimensions={dimensionsForPost(item)}
+                flexGrow={aspectRatio / rowAspectRatio}
                 displayName={displayName}
                 imageUrl={imageUrl}
                 index={index}
@@ -1630,6 +1585,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 >
                     {hasProfilePosts ? (
                         <Box
+                            ref={postGridRef}
                             sx={{
                                 display: "flex",
                                 flexDirection: "column",
@@ -1639,7 +1595,56 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 width: "calc(100% - 32px)",
                             }}
                         >
-                            {visiblePostItems.map(renderPost)}
+                            {photoSections.map(({ id, title, rows }) => (
+                                <Box
+                                    component="section"
+                                    key={id}
+                                    aria-label={title}
+                                >
+                                    <Box
+                                        component="h2"
+                                        sx={{
+                                            color: textSoft,
+                                            fontFamily:
+                                                '"Inter Variable", Inter, sans-serif',
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            lineHeight: "18px",
+                                            m: 0,
+                                            pb: "8px",
+                                        }}
+                                    >
+                                        {title}
+                                    </Box>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: `${profilePhotoGap}px`,
+                                        }}
+                                    >
+                                        {rows.map((row) => (
+                                            <Box
+                                                key={row.tiles[0]!.item.id}
+                                                sx={{
+                                                    display: "flex",
+                                                    flexShrink: 0,
+                                                    gap: `${profilePhotoGap}px`,
+                                                    height: row.height,
+                                                    width: row.width,
+                                                }}
+                                            >
+                                                {row.tiles.map((tile) =>
+                                                    renderPostTile(
+                                                        tile,
+                                                        row.aspectRatio,
+                                                    ),
+                                                )}
+                                            </Box>
+                                        ))}
+                                    </Box>
+                                </Box>
+                            ))}
                         </Box>
                     ) : shouldShowPostLoadingIndicator ? (
                         <ProfilePostLoadingIndicator />
