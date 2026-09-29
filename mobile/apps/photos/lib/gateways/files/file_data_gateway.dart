@@ -120,8 +120,13 @@ class FileDataGateway {
         "type": type,
         "preferNoContent": true,
       },
+      options: Options(
+        validateStatus: (status) =>
+            status == 200 || status == 204 || status == 404,
+      ),
     );
-    if (response.statusCode == 204) return null;
+    // Older museums ignore preferNoContent and still return 404.
+    if (response.statusCode == 204 || response.statusCode == 404) return null;
     return (
       encryptedData: response.data["data"]["encryptedData"] as String,
       decryptionHeader: response.data["data"]["decryptionHeader"] as String,
@@ -143,9 +148,13 @@ class FileDataGateway {
         "type": type,
         "preferNoContent": true,
       },
-      options: Options(headers: headers),
+      options: Options(
+        headers: headers,
+        validateStatus: (status) =>
+            status == 200 || status == 204 || status == 404,
+      ),
     );
-    if (response.statusCode == 204) return null;
+    if (response.statusCode == 204 || response.statusCode == 404) return null;
     return (
       encryptedData: response.data["data"]["encryptedData"] as String,
       decryptionHeader: response.data["data"]["decryptionHeader"] as String,
