@@ -98,6 +98,8 @@ class FlagService {
 
   bool get useNativeVideoEditor => true;
 
+  bool get videoEditorSpeedEnabled => internalUser;
+
   bool get facesTimeline => true;
   bool get ritualsFlag => true;
 

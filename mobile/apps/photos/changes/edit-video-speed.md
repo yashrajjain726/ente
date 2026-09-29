@@ -1,1 +1,1 @@
-- Added speed controls to the video editor so videos can be saved in slow motion or fast motion.
+- (i) Added video editor speed controls for internal users.

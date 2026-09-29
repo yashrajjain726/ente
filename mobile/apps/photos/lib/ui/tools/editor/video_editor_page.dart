@@ -220,14 +220,15 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
                                   VideoRotatePage(controller: _controller!),
                                 ),
                               ),
-                              VideoEditorBottomAction(
-                                label: context.strings.speed,
-                                hugeIcon:
-                                    HugeIcons.strokeRoundedDashboardSpeed02,
-                                onPressed: () => _openSubEditor(
-                                  VideoSpeedPage(controller: _controller!),
+                              if (flagService.videoEditorSpeedEnabled)
+                                VideoEditorBottomAction(
+                                  label: "${context.strings.speed} (i)",
+                                  hugeIcon:
+                                      HugeIcons.strokeRoundedDashboardSpeed02,
+                                  onPressed: () => _openSubEditor(
+                                    VideoSpeedPage(controller: _controller!),
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 12),
