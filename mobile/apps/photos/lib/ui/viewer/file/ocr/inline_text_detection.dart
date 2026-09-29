@@ -387,7 +387,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
     File? localFile = await getFile(file);
     if (!mounted || generation != _evaluationGeneration) return null;
     if (canUseUploadedCopy && (localFile == null || !localFile.existsSync())) {
-      localFile = await getFile(EnteFile.from(file)..localID = null);
+      localFile = await getFileFromServer(file);
     }
     return localFile;
   }
