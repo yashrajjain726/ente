@@ -612,7 +612,7 @@ const FeedLikeButton: React.FC<FeedLikeButtonProps> = ({
                     icon={FavouriteIcon}
                     primaryColor={isLiked ? green : feedActionForeground}
                     size={feedActionIconSize}
-                    strokeWidth={2}
+                    strokeWidth={2.2}
                 />
             </Box>
         </Box>

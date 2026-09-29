@@ -149,6 +149,7 @@ export interface SpaceMessage {
     isDeleted: boolean;
     kind: SpaceMessageKind;
     liked: boolean;
+    reaction?: string;
     quote?: SpaceMessageQuote;
     recipient: FriendProfile;
     replyMessageId?: string;
@@ -174,6 +175,7 @@ export interface SpaceMessageActivity {
     post?: SpaceMessageActivityPost;
     text?: string;
     type: SpaceMessageActivityType;
+    reaction?: string;
     isUnavailable?: boolean;
 }
 
@@ -689,6 +691,7 @@ const messageFromSpaceMessage = async (
         isUnavailable: message.isUnavailable,
         kind: message.kind,
         liked: message.liked,
+        reaction: message.reaction ?? undefined,
         quote,
         recipient,
         replyMessageId: message.replyMessageId,
@@ -750,6 +753,7 @@ const messageActivityFromSpaceActivity = (
         post,
         text: activity.text?.trim() || undefined,
         type: activity.type,
+        reaction: activity.reaction ?? undefined,
         isUnavailable: activity.isUnavailable,
     };
 };
@@ -1255,14 +1259,20 @@ export const replyToCurrentMessage = async (
     }
 };
 
-export const setCurrentMessageLiked = async (
+export const setCurrentMessageReaction = async (
     spaceId: string,
+    senderSpaceId: string,
     messageId: string,
-    liked: boolean,
+    emoji: string | undefined,
 ) => {
     const ctx = await ensureCurrentSpaceContext();
     try {
-        await ctx.likeMessage(spaceId, messageId, liked);
+        await ctx.setMessageReaction(
+            spaceId,
+            senderSpaceId,
+            messageId,
+            emoji ?? null,
+        );
     } finally {
         releaseCurrentSpaceContext(ctx);
     }

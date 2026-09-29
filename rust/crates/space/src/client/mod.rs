@@ -7,6 +7,7 @@ mod media;
 mod messages;
 mod posts;
 mod profiles;
+mod reactions;
 
 #[cfg(test)]
 mod test_support;
