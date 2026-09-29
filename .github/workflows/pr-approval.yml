@@ -67,6 +67,7 @@ jobs:
                               allowPrefixes: [
                                   "mobile/apps/locker/",
                                   "mobile/packages/ente_components/",
+                                  "mobile/packages/strings/",
                               ],
                           },
                           // setalp
