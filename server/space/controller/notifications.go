@@ -143,7 +143,7 @@ func (n *SpaceWebPushSender) OnSpacePokeSent(actor SpaceActivityActor, recipient
 }
 
 func (n *SpaceWebPushSender) OnSpaceMessageLiked(actor SpaceActivityActor, recipientUserID int64) {
-	n.sendAccountActivity(actor, "liked a message", "View conversation", spaceActivityMessageLiked, conversationURL(actor.SpaceID), recipientUserID)
+	n.sendAccountActivity(actor, "reacted to your message", "View conversation", spaceActivityMessageLiked, conversationURL(actor.SpaceID), recipientUserID)
 }
 
 func (n *SpaceWebPushSender) OnSpaceFriendAdded(actor SpaceActivityActor, recipientUserID int64) {

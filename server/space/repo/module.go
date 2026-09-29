@@ -139,6 +139,7 @@ type SpaceMessageRecord struct {
 	RecipientSpaceID    string
 	MessageCipher       []byte
 	EncryptedMessageKey []byte
+	EncryptedReaction   []byte
 	ReplyPostID         sql.NullInt64
 	ReplyMessageID      sql.NullString
 	Liked               bool
@@ -166,6 +167,7 @@ type SpaceMessageConversationActivityRecord struct {
 	RecipientSpaceID    sql.NullString
 	MessageCipher       []byte
 	EncryptedMessageKey []byte
+	EncryptedReaction   []byte
 	ReplyMessageID      sql.NullString
 	PostID              sql.NullInt64
 	PostSpaceID         sql.NullString

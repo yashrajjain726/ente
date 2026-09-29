@@ -318,6 +318,11 @@ type CreateMessageRequest struct {
 	NotificationKind             string `json:"notificationKind,omitempty"`
 }
 
+type SetMessageReactionRequest struct {
+	SenderEncryptedReaction    string `json:"senderEncryptedReaction" binding:"required"`
+	RecipientEncryptedReaction string `json:"recipientEncryptedReaction" binding:"required"`
+}
+
 type LikeMessageResponse struct {
 	Liked bool `json:"liked"`
 }
@@ -329,6 +334,7 @@ type MessageResponse struct {
 	RecipientSpaceID    string  `json:"recipientSpaceId"`
 	MessageCipher       string  `json:"messageCipher,omitempty"`
 	EncryptedMessageKey string  `json:"encryptedMessageKey,omitempty"`
+	EncryptedReaction   string  `json:"encryptedReaction,omitempty"`
 	Text                string  `json:"text,omitempty"`
 	ReplyPostID         *int64  `json:"replyPostId,omitempty"`
 	ReplyMessageID      *string `json:"replyMessageId,omitempty"`
@@ -355,6 +361,7 @@ type MessageConversationActivityResponse struct {
 	RecipientSpaceID    string  `json:"recipientSpaceId,omitempty"`
 	MessageCipher       string  `json:"messageCipher,omitempty"`
 	EncryptedMessageKey string  `json:"encryptedMessageKey,omitempty"`
+	EncryptedReaction   string  `json:"encryptedReaction,omitempty"`
 	ReplyMessageID      *string `json:"replyMessageId,omitempty"`
 	PostID              *int64  `json:"postId,omitempty"`
 	PostSpaceID         string  `json:"postSpaceId,omitempty"`
