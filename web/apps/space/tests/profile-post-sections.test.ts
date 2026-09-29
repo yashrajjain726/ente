@@ -12,7 +12,9 @@ test("each post appears once in the first matching calendar section", () => {
         post("today", new Date(2026, 8, 24)),
         post("yesterday", new Date(2026, 8, 23)),
         post("this-week", new Date(2026, 8, 21)),
-        post("this-month", new Date(2026, 8, 20, 23, 59, 59, 999)),
+        post("last-week-end", new Date(2026, 8, 20, 23, 59, 59, 999)),
+        post("last-week-start", new Date(2026, 8, 14)),
+        post("this-month", new Date(2026, 8, 13, 23, 59, 59, 999)),
         post("august-1", new Date(2026, 7, 31)),
         post("august-2", new Date(2026, 7, 1)),
         post("july", new Date(2026, 6, 1)),
@@ -26,6 +28,7 @@ test("each post appears once in the first matching calendar section", () => {
         ["Today", ["today"]],
         ["Yesterday", ["yesterday"]],
         ["This week", ["this-week"]],
+        ["Last week", ["last-week-end", "last-week-start"]],
         ["This month", ["this-month"]],
         ["Aug 2026", ["august-1", "august-2"]],
         ["Jul 2026", ["july"]],
@@ -35,12 +38,14 @@ test("each post appears once in the first matching calendar section", () => {
     expect(new Set(sections.map(({ id }) => id)).size).toBe(sections.length);
 });
 
-test("a new month still gives yesterday and this week priority", () => {
+test("a new month still gives yesterday and weekly sections priority", () => {
     const posts = [
         post("today", new Date(2026, 9, 1)),
         post("yesterday", new Date(2026, 8, 30)),
         post("monday", new Date(2026, 8, 28)),
         post("sunday", new Date(2026, 8, 27)),
+        post("last-monday", new Date(2026, 8, 21)),
+        post("older", new Date(2026, 8, 20)),
     ];
     expect(
         profilePostSections(posts, new Date(2026, 9, 1, 12)).map(
@@ -50,7 +55,8 @@ test("a new month still gives yesterday and this week priority", () => {
         ["Today", ["today"]],
         ["Yesterday", ["yesterday"]],
         ["This week", ["monday"]],
-        ["Sep 2026", ["sunday"]],
+        ["Last week", ["sunday", "last-monday"]],
+        ["Sep 2026", ["older"]],
     ]);
 });
 
@@ -64,7 +70,7 @@ test("Monday starts a new week while Sunday remains yesterday", () => {
         profilePostSections(posts, new Date(2026, 8, 28, 12)).map(
             ({ title }) => title,
         ),
-    ).toEqual(["Today", "Yesterday", "This month"]);
+    ).toEqual(["Today", "Yesterday", "Last week"]);
 });
 
 test("Sunday is the last day of this week", () => {
@@ -79,13 +85,31 @@ test("Sunday is the last day of this week", () => {
         ),
     ).toEqual([
         ["This week", ["friday", "monday"]],
-        ["This month", ["last-sunday"]],
+        ["Last week", ["last-sunday"]],
+    ]);
+});
+
+test("last week spans the year boundary", () => {
+    const posts = [
+        post("yesterday", new Date(2026, 0, 4)),
+        post("saturday", new Date(2026, 0, 3)),
+        post("last-monday", new Date(2025, 11, 29)),
+        post("older", new Date(2025, 11, 28)),
+    ];
+    expect(
+        profilePostSections(posts, new Date(2026, 0, 5, 12)).map(
+            ({ title, items }) => [title, items.map((p) => p.id)],
+        ),
+    ).toEqual([
+        ["Yesterday", ["yesterday"]],
+        ["Last week", ["saturday", "last-monday"]],
+        ["Dec 2025", ["older"]],
     ]);
 });
 
 test("month headings include the year and skip empty periods", () => {
     const posts = [
-        post("december", new Date(2025, 11, 28)),
+        post("december", new Date(2025, 11, 21)),
         post("october", new Date(2025, 9, 15)),
         post("older-december", new Date(2024, 11, 31)),
     ];
@@ -111,6 +135,8 @@ test.each([
             post("late-yesterday", new Date(year, month, day - 1, 23, 59)),
             post("early-yesterday", new Date(year, month, day - 1)),
             post("before-yesterday", new Date(year, month, day - 2, 23, 59)),
+            post("last-week-start", new Date(year, month, day - 7)),
+            post("before-last-week", new Date(year, month, day - 8, 23, 59)),
         ];
         expect(
             profilePostSections(posts, now).map(({ title, items }) => [
@@ -120,7 +146,8 @@ test.each([
         ).toEqual([
             ["Today", ["today"]],
             ["Yesterday", ["late-yesterday", "early-yesterday"]],
-            [olderTitle, ["before-yesterday"]],
+            ["Last week", ["before-yesterday", "last-week-start"]],
+            [olderTitle, ["before-last-week"]],
         ]);
     },
 );

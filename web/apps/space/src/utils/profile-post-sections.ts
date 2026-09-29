@@ -20,6 +20,11 @@ export const profilePostSections = <Item extends { timestampMs: number }>(
             title: "This week",
             since: new Date(year, month, day - daysSinceMonday),
         },
+        {
+            id: "last-week",
+            title: "Last week",
+            since: new Date(year, month, day - daysSinceMonday - 7),
+        },
         { id: "month", title: "This month", since: new Date(year, month, 1) },
     ].map((section) => ({ ...section, items: new Array<Item>() }));
     const months = new Map<
