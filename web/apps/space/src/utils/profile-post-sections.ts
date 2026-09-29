@@ -1,4 +1,3 @@
-/** Group newest-first posts using calendar boundaries in the viewer's timezone. */
 export const profilePostSections = <Item extends { timestampMs: number }>(
     items: Item[],
     now = new Date(),
