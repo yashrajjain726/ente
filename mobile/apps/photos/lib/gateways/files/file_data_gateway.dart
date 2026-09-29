@@ -80,6 +80,29 @@ class FileDataGateway {
     );
   }
 
+  Future<({String url, String objectID})> getPreviewUploadUrlV2({
+    required int fileID,
+    required String type,
+    required int contentLength,
+    required String contentMd5,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _enteDio.post(
+      "/files/data/preview-upload-url",
+      data: {
+        "fileID": fileID,
+        "type": type,
+        "contentLength": contentLength,
+        "contentMD5": contentMd5,
+      },
+      cancelToken: cancelToken,
+    );
+    return (
+      url: response.data["url"] as String,
+      objectID: response.data["objectID"] as String,
+    );
+  }
+
   Future<String> getPreview({required int fileID, required String type}) async {
     final response = await _enteDio.get(
       "/files/data/preview",

@@ -39,6 +39,7 @@ import "package:photos/module/upload/service/file_uploader.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/file_magic_service.dart";
 import "package:photos/services/filedata/model/file_data.dart";
+import "package:photos/services/filedata/preview_upload.dart";
 import "package:photos/services/isolated_ffmpeg_service.dart";
 import "package:photos/services/machine_learning/compute_controller.dart";
 import "package:photos/ui/notification/toast.dart";
@@ -590,7 +591,14 @@ class VideoPreviewService {
 
           final playlistFile = File("$prefix/output.m3u8");
           final previewFile = File("$prefix/output.ts");
-          final result = await _uploadPreviewVideo(enteFile, previewFile);
+          final result = await uploadVideoPreview(
+            previewFile,
+            fileID: enteFile.uploadedFileID!,
+            gateway: _fileDataGateway,
+            dio: serviceLocator.enteDio,
+            useUploadV2: flagService.previewUploadV2,
+            cancelToken: _streamingCancelToken,
+          );
 
           objectId = result.$1;
           objectSize = result.$2;
@@ -823,28 +831,6 @@ class VideoPreviewService {
       );
     } catch (e, s) {
       _logger.severe("Failed to report video preview", e, s);
-      rethrow;
-    }
-  }
-
-  Future<(String, int)> _uploadPreviewVideo(EnteFile file, File preview) async {
-    _logger.fine("Pushing preview for $file");
-    try {
-      final uploadUrlResult = await _fileDataGateway.getPreviewUploadUrl(
-        fileID: file.uploadedFileID!,
-        type: "vid_preview",
-        cancelToken: _streamingCancelToken,
-      );
-      final objectSize = preview.lengthSync();
-      await serviceLocator.enteDio.put(
-        uploadUrlResult.url,
-        data: preview.openRead(),
-        options: Options(headers: {Headers.contentLengthHeader: objectSize}),
-        cancelToken: _streamingCancelToken,
-      );
-      return (uploadUrlResult.objectID, objectSize);
-    } catch (e) {
-      _logger.warning("failed to upload previewVideo", e);
       rethrow;
     }
   }
