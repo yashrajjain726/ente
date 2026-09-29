@@ -70,10 +70,12 @@ export const MessageQuickReactions: React.FC<{
                 borderRadius: "999px",
                 boxShadow:
                     "0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.32)",
+                boxSizing: "border-box",
                 display: "flex",
                 gap: "2px",
+                maxWidth: "calc(100vw - 16px)",
                 outline: 0,
-                p: "4px",
+                p: "5px",
             }}
         >
             {quickReactionEmojis(selected).map((emoji) => {
@@ -92,10 +94,11 @@ export const MessageQuickReactions: React.FC<{
                         sx={{
                             ...buttonSx,
                             borderRadius: "50%",
-                            fontSize: 22,
-                            height: 36,
+                            flexShrink: 1,
+                            fontSize: 25,
+                            height: 41,
                             pt: "2px",
-                            width: 36,
+                            width: 41,
                         }}
                     >
                         {emoji}
@@ -112,11 +115,12 @@ export const MessageQuickReactions: React.FC<{
                     ...buttonSx,
                     bgcolor: spaceControlBackground,
                     borderRadius: "50%",
-                    height: 36,
-                    width: 36,
+                    flexShrink: 1,
+                    height: 41,
+                    width: 41,
                 }}
             >
-                <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={1.8} />
+                <HugeiconsIcon icon={Add01Icon} size={22} strokeWidth={1.8} />
             </Box>
         </Box>
     );
