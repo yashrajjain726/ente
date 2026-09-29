@@ -195,6 +195,7 @@ pub struct Message {
     pub sender_space_id: String,
     pub recipient_space_id: String,
     pub content: Result<Option<MessageContent>>,
+    pub reaction: Result<Option<String>>,
     pub reply_post_id: Option<i64>,
     pub reply_message_id: Option<String>,
     pub liked: bool,
@@ -221,6 +222,7 @@ pub struct MessageActivity {
     pub outgoing: bool,
     pub message_id: Option<String>,
     pub content: Result<Option<MessageContent>>,
+    pub reaction: Result<Option<String>>,
     pub post_id: Option<i64>,
     pub post_space_id: Option<String>,
 }

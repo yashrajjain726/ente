@@ -267,6 +267,7 @@ pub struct MessageResponse {
     reply_message_id: Option<String>,
     liked: bool,
     viewer_liked: bool,
+    reaction: Option<String>,
     is_deleted: bool,
     created_at: String,
     updated_at: String,
@@ -300,6 +301,7 @@ struct MessageConversationActivity {
     outgoing: bool,
     message_id: Option<String>,
     text: Option<String>,
+    reaction: Option<String>,
     post_id: Option<i64>,
     reply_object_key: Option<String>,
     post_space_id: Option<String>,
@@ -492,18 +494,6 @@ impl From<ente_space::LikePostResponse> for LikePostResponse {
     }
 }
 
-#[derive(Serialize, Tsify)]
-#[serde(rename_all = "camelCase")]
-pub struct LikeMessageResponse {
-    liked: bool,
-}
-
-impl From<ente_space::LikeMessageResponse> for LikeMessageResponse {
-    fn from(value: ente_space::LikeMessageResponse) -> Self {
-        Self { liked: value.liked }
-    }
-}
-
 fn decode_b64_field(value: &str) -> Result<Vec<u8>, Error> {
     b64::decode(value)
         .map_err(ente_space::Error::from)
@@ -686,6 +676,14 @@ impl From<ente_space::Message> for MessageResponse {
                 (String::new(), None, false, true)
             }
         };
+        let reaction = message.reaction.unwrap_or_else(|error| {
+            log::warn!(
+                "Space message {} reaction is unavailable: {}",
+                message.message_id,
+                ente_core::error::chain(&error)
+            );
+            None
+        });
         Self {
             message_id: message.message_id,
             kind: message.kind,
@@ -695,6 +693,7 @@ impl From<ente_space::Message> for MessageResponse {
             reply_post_id: message.reply_post_id,
             reply_object_key,
             reply_message_id: message.reply_message_id,
+            reaction,
             liked: message.liked,
             viewer_liked: message.viewer_liked,
             is_deleted,
@@ -719,7 +718,16 @@ impl From<ente_space::MessageActivity> for MessageConversationActivity {
                 (None, None, true)
             }
         };
+        let reaction = activity.reaction.unwrap_or_else(|error| {
+            log::warn!(
+                "Space conversation activity {} reaction is unavailable: {}",
+                activity.id,
+                ente_core::error::chain(&error)
+            );
+            None
+        });
         Self {
+            reaction,
             id: activity.id,
             activity_type: activity.activity_type,
             kind: activity.kind,
@@ -1242,20 +1250,18 @@ impl SpaceAccountCtxHandle {
         MessageResponse::from(message).into_js().map_err(Into::into)
     }
 
-    #[wasm_bindgen(js_name = likeMessage)]
-    pub async fn like_message(
+    #[wasm_bindgen(js_name = setMessageReaction)]
+    pub async fn set_message_reaction(
         &self,
         space_id: String,
+        sender_space_id: String,
         message_id: String,
-        like: bool,
-    ) -> Result<<LikeMessageResponse as Tsify>::JsType, Error> {
-        LikeMessageResponse::from(
-            self.inner
-                .like_message(&space_id, &message_id, like)
-                .await?,
-        )
-        .into_js()
-        .map_err(Into::into)
+        emoji: Option<String>,
+    ) -> Result<(), Error> {
+        self.inner
+            .set_message_reaction(&space_id, &sender_space_id, &message_id, emoji.as_deref())
+            .await
+            .map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = deleteMessage)]

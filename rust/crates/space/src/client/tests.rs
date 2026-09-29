@@ -60,6 +60,7 @@ async fn message_thread_keeps_content_failures_local_to_each_message() {
         sender_space_id: "space_friend".into(),
         recipient_space_id: "space_owner_main".into(),
         message_cipher: b64::encode(&encrypt_secretbox_payload(&key, plaintext).unwrap()),
+        encrypted_reaction: String::new(),
         encrypted_message_key: encrypted_key.clone(),
         text: String::new(),
         reply_post_id: None,
@@ -70,11 +71,12 @@ async fn message_thread_keeps_content_failures_local_to_each_message() {
         created_at: "2026-09-23T00:00:00Z".into(),
         updated_at: "2026-09-23T00:00:00Z".into(),
     };
-    let readable = message(
+    let mut readable = message(
         "readable",
         "regular",
         br#"{"version":1,"kind":"regular","text":"hello","replyObjectKey":"photo"}"#,
     );
+    readable.encrypted_reaction = "invalid".into();
     let poke = message(
         "poke",
         "regular",
@@ -105,6 +107,7 @@ async fn message_thread_keeps_content_failures_local_to_each_message() {
     assert_eq!(opened.next_cursor, "next");
     assert_eq!(opened.items.len(), 6);
     assert_eq!(content(&opened.items[0]).text, "hello");
+    assert!(opened.items[0].reaction.is_err());
     assert_eq!(
         content(&opened.items[0]).reply_object_key.as_deref(),
         Some("photo")
@@ -136,6 +139,7 @@ async fn unread_poke_uses_latest_activity_kind() {
         sender_space_id: "space_friend".into(),
         recipient_space_id: "space_owner_main".into(),
         message_cipher: String::new(),
+        encrypted_reaction: String::new(),
         encrypted_message_key: String::new(),
         reply_message_id: None,
         post_id: None,
@@ -185,6 +189,7 @@ async fn conversation_activities_open_content_and_preserve_server_kind() {
             sender_space_id: "space_friend".into(),
             recipient_space_id: "space_owner_main".into(),
             message_cipher: b64::encode(&encrypt_secretbox_payload(&key, &plaintext).unwrap()),
+            encrypted_reaction: String::new(),
             encrypted_message_key: encrypted_key.clone(),
             reply_message_id: None,
             post_id: None,
@@ -216,6 +221,7 @@ async fn conversation_activities_open_content_and_preserve_server_kind() {
         sender_space_id: "space_friend".into(),
         recipient_space_id: "space_owner_main".into(),
         message_cipher: b64::encode(&encrypt_secretbox_payload(&key, b"not-json").unwrap()),
+        encrypted_reaction: String::new(),
         encrypted_message_key: encrypted_key,
         reply_message_id: None,
         post_id: None,

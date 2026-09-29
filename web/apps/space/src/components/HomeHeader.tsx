@@ -218,7 +218,7 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                 <HugeiconsIcon
                     icon={BubbleChatIcon}
                     size={headerIconSize}
-                    strokeWidth={2.5}
+                    strokeWidth={2.2}
                 />
                 {showUnreadIndicator && (
                     <Box

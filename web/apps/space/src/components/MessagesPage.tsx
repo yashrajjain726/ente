@@ -19,7 +19,7 @@ import {
     replyToCurrentMessage,
     sendCurrentMessage,
     sendCurrentPoke,
-    setCurrentMessageLiked,
+    setCurrentMessageReaction,
     shouldAutoReadMessageActivities,
     type SpaceMessage,
     type SpaceMessageConversation,
@@ -135,6 +135,10 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     const [showFriendRequestCanceledToast, setShowFriendRequestCanceledToast] =
         React.useState(false);
     const [messages, setMessages] = React.useState<SpaceMessage[]>([]);
+    const reactionQueues = React.useRef(new Map<string, Promise<void>>());
+    const savedReactions = React.useRef(new Map<string, string | undefined>());
+    const localReactions = React.useRef(new Map<string, string | undefined>());
+
     const [selectedFriendProfile, setSelectedFriendProfile] =
         React.useState<SpaceMessageConversation["friend"]>();
     const [
@@ -611,6 +615,10 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
 
         let cancelled = false;
         selectedFriendSpaceIdRef.current = selectedSpaceId;
+        for (const messageId of localReactions.current.keys()) {
+            if (!reactionQueues.current.has(messageId))
+                localReactions.current.delete(messageId);
+        }
         setMessages([]);
         setIsThreadLoading(true);
         const viewer = currentProfileMessageActor(profile);
@@ -627,7 +635,19 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                         page.items.map((message) => message.id),
                     );
                     setMessages((currentMessages) => [
-                        ...page.items,
+                        ...page.items.map((message) => {
+                            if (!localReactions.current.has(message.id))
+                                return message;
+                            const reaction = localReactions.current.get(
+                                message.id,
+                            );
+                            return {
+                                ...message,
+                                reaction,
+                                liked: Boolean(reaction),
+                                viewerLiked: Boolean(reaction),
+                            };
+                        }),
                         ...currentMessages.filter(
                             (message) => !loadedMessageIds.has(message.id),
                         ),
@@ -815,20 +835,56 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                     }
                     void refreshConversations();
                 }}
-                onSetMessageLiked={async (messageId, liked) => {
-                    await setCurrentMessageLiked(
-                        actorSpaceId,
-                        messageId,
-                        liked,
-                    );
-                    setMessages((currentMessages) =>
-                        currentMessages.map((message) =>
-                            message.id == messageId
-                                ? { ...message, liked, viewerLiked: liked }
-                                : message,
-                        ),
-                    );
-                    void refreshConversations();
+                onSetMessageReaction={async (messageId, emoji) => {
+                    const message = messages.find(
+                        (item) => item.id == messageId,
+                    )!;
+                    const previous = reactionQueues.current.get(messageId);
+                    if (!previous)
+                        savedReactions.current.set(messageId, message.reaction);
+                    const update = (reaction: string | undefined) => {
+                        localReactions.current.set(messageId, reaction);
+                        setMessages((items) =>
+                            items.map((item) =>
+                                item.id == messageId
+                                    ? {
+                                          ...item,
+                                          reaction,
+                                          liked: Boolean(reaction),
+                                          viewerLiked: Boolean(reaction),
+                                      }
+                                    : item,
+                            ),
+                        );
+                    };
+                    update(emoji);
+                    const request = (previous ?? Promise.resolve())
+                        .catch(() => undefined)
+                        .then(async () => {
+                            await setCurrentMessageReaction(
+                                actorSpaceId,
+                                message.sender.spaceId!,
+                                messageId,
+                                emoji,
+                            );
+                            savedReactions.current.set(messageId, emoji);
+                        });
+                    reactionQueues.current.set(messageId, request);
+                    try {
+                        await request;
+                        if (reactionQueues.current.get(messageId) == request)
+                            update(emoji);
+                    } catch (error) {
+                        if (reactionQueues.current.get(messageId) == request)
+                            update(savedReactions.current.get(messageId));
+                        throw error;
+                    } finally {
+                        if (reactionQueues.current.get(messageId) == request) {
+                            reactionQueues.current.delete(messageId);
+                            savedReactions.current.delete(messageId);
+                            void refreshConversations();
+                        }
+                    }
                 }}
                 profileLink={spaceInviteURL({
                     spaceUsername: profile.username,

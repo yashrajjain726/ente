@@ -114,7 +114,21 @@ impl AccountSpaceCtx {
                 })
         };
         let content = retain_content_error(content)?;
+        let reaction = if message.is_deleted {
+            Ok(None)
+        } else {
+            retain_content_error(
+                self.open_message_reaction(
+                    viewer_space_id,
+                    &message.message_id,
+                    &message.encrypted_reaction,
+                    message.liked,
+                )
+                .await,
+            )?
+        };
         Ok(Message {
+            reaction,
             message_id: message.message_id,
             kind,
             sender_space_id: message.sender_space_id,
@@ -204,7 +218,17 @@ impl AccountSpaceCtx {
             })
         };
         let content = retain_content_error(content)?;
+        let reaction = retain_content_error(
+            self.open_message_reaction(
+                viewer_space_id,
+                activity.message_id.as_deref().unwrap_or_default(),
+                &activity.encrypted_reaction,
+                activity.activity_type == "message_like",
+            )
+            .await,
+        )?;
         Ok(MessageActivity {
+            reaction,
             id: activity.id,
             activity_type: activity.activity_type,
             kind,

@@ -156,6 +156,8 @@ pub struct MessageResponse {
     #[serde(default)]
     pub encrypted_message_key: String,
     #[serde(default)]
+    pub encrypted_reaction: String,
+    #[serde(default)]
     pub text: String,
     #[serde(default)]
     pub reply_post_id: Option<i64>,
@@ -200,6 +202,8 @@ pub struct MessageConversationActivity {
     pub message_cipher: String,
     #[serde(default)]
     pub encrypted_message_key: String,
+    #[serde(default)]
+    pub encrypted_reaction: String,
     #[serde(default)]
     pub reply_message_id: Option<String>,
     #[serde(default)]
