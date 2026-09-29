@@ -125,7 +125,6 @@ class FileDataGateway {
             status == 200 || status == 204 || status == 404,
       ),
     );
-    // Older museums ignore preferNoContent and still return 404.
     if (response.statusCode == 204 || response.statusCode == 404) return null;
     return (
       encryptedData: response.data["data"]["encryptedData"] as String,
