@@ -1,1 +1,1 @@
-- Improved support for additional camera RAW formats when uploading and viewing photos.
+- Improved desktop previews for RAF, ORF, PEF, NRW, and SRW camera RAW photos.

@@ -9,11 +9,8 @@ vi.mock("ente-base/log", () => ({
 }));
 vi.mock("ente-media/heic-convert", () => ({ heicToJPEG: vi.fn() }));
 
-// The public extension contract of the bundled libvips 8.18.7 RAW loader.
-const rawExtensions = (
-    "3fr ari arw cap cin cr2 cr3 crw dcr dng erf fff iiq k25 kdc mdc " +
-    "mos mrw nef nrw orf ori pef pxn raf raw rw2 rwl sr2 srf srw x3f"
-).split(" ");
+// Keep this change scoped to the five selected camera RAW formats.
+const rawExtensions = ["raf", "orf", "pef", "nrw", "srw"];
 
 // Intentionally unrecognized bytes exercise the filename fallback, not decoding.
 const unknownBytes = new Uint8Array([0, 1, 2, 3]);
@@ -98,7 +95,7 @@ describe("camera RAW format support", () => {
     test("preserves content detection for a JPEG with a RAW filename", async () => {
         const file = new File(
             [new Uint8Array([0xff, 0xd8, 0xff, 0xe0])],
-            "photo.RAW",
+            "photo.PEF",
         );
         expect(await detectFileTypeInfo(file)).toEqual({
             fileType: FileType.image,
@@ -114,24 +111,26 @@ describe("camera RAW format support", () => {
     });
 
     test("keeps original bytes when the platform decoder does not support a RAW file", async () => {
-        const file = new File([unknownBytes], "photo.x3f");
+        const file = new File([unknownBytes], "photo.pef");
         const error = new Error(
             "Camera is not supported by the native decoder",
         );
         const convertToJPEG = vi.fn().mockRejectedValue(error);
         const onConvertToJPEGError = vi.fn();
-        expect(
-            await renderableImageBlobWeb(file, file.name, {
-                convertToJPEG,
-                onConvertToJPEGError,
-            }),
-        ).toBe(file);
+        const result = await renderableImageBlobWeb(file, file.name, {
+            convertToJPEG,
+            onConvertToJPEGError,
+        });
+        expect(await result.arrayBuffer()).toEqual(await file.arrayBuffer());
+        expect(result.type).toBe("image/x-pentax-pef");
         expect(onConvertToJPEGError).toHaveBeenCalledExactlyOnceWith(error);
     });
 
     test("leaves RAW bytes unchanged when no native converter is available", async () => {
-        const file = new File([unknownBytes], "photo.x3f");
-        expect(await renderableImageBlobWeb(file, file.name)).toBe(file);
+        const file = new File([unknownBytes], "photo.pef");
+        const result = await renderableImageBlobWeb(file, file.name);
+        expect(await result.arrayBuffer()).toEqual(await file.arrayBuffer());
+        expect(result.type).toBe("image/x-pentax-pef");
     });
 
     test.each([
@@ -146,6 +145,32 @@ describe("camera RAW format support", () => {
                     new File([unknownBytes], `photo.${extension}`),
                 ),
             ).toMatchObject({ mimeType });
+        },
+    );
+
+    test.each(["arw", "cr2", "cr3", "dng", "nef", "rw2"])(
+        "retains existing .%s conversion eligibility",
+        (extension) => {
+            expect(needsJPEGConversion(extension)).toBe(true);
+        },
+    );
+
+    test("keeps CRW upload recognition without adding its preview conversion", async () => {
+        expect(needsJPEGConversion("crw")).toBe(false);
+        expect(
+            await detectFileTypeInfo(new File([unknownBytes], "photo.crw")),
+        ).toMatchObject({ fileType: FileType.image, extension: "crw" });
+    });
+
+    test.each(["x3f", "3fr", "raw"])(
+        "does not add fallback recognition or conversion for .%s",
+        async (extension) => {
+            expect(needsJPEGConversion(extension)).toBe(false);
+            await expect(
+                detectFileTypeInfo(
+                    new File([unknownBytes], `photo.${extension}`),
+                ),
+            ).rejects.toThrow();
         },
     );
 
