@@ -33,8 +33,6 @@ import { spaceAppBackgroundColor as homeBackground } from "styles/colors";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
-const inviteFriendsToastDelayMs = 3000;
-
 const Page: React.FC = () => {
     const router = useSpaceRouter();
     const {
@@ -79,12 +77,7 @@ const Page: React.FC = () => {
             ? localFeedPosts[0].id
             : undefined;
     useEffect(() => {
-        if (!firstPostID) return;
-        const timer = window.setTimeout(
-            () => setShowInviteFriendsToast(true),
-            inviteFriendsToastDelayMs,
-        );
-        return () => window.clearTimeout(timer);
+        if (firstPostID) setShowInviteFriendsToast(true);
     }, [firstPostID]);
 
     useEffect(() => {
