@@ -920,7 +920,6 @@ class VideoPreviewService {
     bool Function(int bytes)? tryReserveBytes,
   }) async {
     _logger.fine("Getting playlist for $file");
-    int? width, height, size;
 
     try {
       late final String objectID;
@@ -937,7 +936,7 @@ class VideoPreviewService {
         objectID = previewInfo.objectId;
       }
 
-      final FileInfo? playlistCache = await cacheManager.getFileFromCache(
+      final playlistCache = await cacheManager.getFileFromCache(
         _getCacheKey(objectID),
       );
       final detailsCache = await cacheManager.getFileFromCache(
@@ -945,26 +944,27 @@ class VideoPreviewService {
       );
       for (final cachedFile in [playlistCache, detailsCache]) {
         if (cachedFile != null &&
-            cachedFile.file.lengthSync() > maxHlsMetadataBytes) {
+            await cachedFile.file.length() > maxHlsMetadataBytes) {
           throw const FormatException("HLS metadata exceeds the allowed size");
         }
       }
       late final String playlistTemplate;
+      late final Map<String, dynamic> metadata;
       if (playlistCache != null) {
-        playlistTemplate = playlistCache.file.readAsStringSync();
-        if (detailsCache != null) {
-          final details = json.decode(detailsCache.file.readAsStringSync());
-          width = details["width"];
-          height = details["height"];
-          size = details["size"];
-        }
+        playlistTemplate = await playlistCache.file.readAsString();
+        metadata = detailsCache == null
+            ? const {}
+            : json.decode(await detailsCache.file.readAsString())
+                  as Map<String, dynamic>;
       } else {
-        final Map<String, dynamic> playlistData = await _getPlaylistData(file);
-        playlistTemplate = playlistData["playlist"];
-        width = playlistData["width"];
-        height = playlistData["height"];
-        size = playlistData["size"];
+        final playlistData = await _getPlaylistData(file);
+        if (playlistData == null) return null;
+        playlistTemplate = playlistData["playlist"] as String;
+        metadata = playlistData;
       }
+      final width = metadata["width"] as int?;
+      final height = metadata["height"] as int?;
+      final size = metadata["size"] as int?;
       final videoFile = (await videoCacheManager.getFileFromCache(
         _getVideoPreviewKey(objectID),
       ))?.file;
@@ -1057,9 +1057,12 @@ class VideoPreviewService {
     }
   }
 
-  Future<Map<String, dynamic>> _getPlaylistData(EnteFile file) async {
-    late final ({String encryptedData, String decryptionHeader}) fetchResult;
-    if (collectionsService.isSharedPublicLink(file.collectionID!)) {
+  Future<Map<String, dynamic>?> _getPlaylistData(EnteFile file) async {
+    final isPublicCollection = collectionsService.isSharedPublicLink(
+      file.collectionID!,
+    );
+    late final ({String encryptedData, String decryptionHeader})? fetchResult;
+    if (isPublicCollection) {
       fetchResult = await _fileDataGateway.fetchPublicFileData(
         baseUrl: endpointConfig.endpoint,
         fileID: file.uploadedFileID!,
@@ -1073,17 +1076,16 @@ class VideoPreviewService {
         type: "vid_preview",
       );
     }
-    final encryptionKey =
-        collectionsService.isSharedPublicLink(file.collectionID!)
+    if (fetchResult == null) return null;
+    final encryptionKey = isPublicCollection
         ? getPublicFileKey(file)
         : getFileKey(file);
-    final playlistData = await decryptAndUnzipJson(
+    return decryptAndUnzipJson(
       encryptionKey,
       encryptedData: fetchResult.encryptedData,
       header: fetchResult.decryptionHeader,
       maxOutputBytes: maxHlsMetadataBytes,
     );
-    return playlistData;
   }
 
   int? parseDurationFromHLS(String playlist) {

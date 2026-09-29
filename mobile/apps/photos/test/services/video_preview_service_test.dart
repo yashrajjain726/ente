@@ -1,3 +1,4 @@
+import "package:dio/dio.dart";
 import "package:flutter_cache_manager/flutter_cache_manager.dart";
 import 'package:flutter_test/flutter_test.dart';
 import "package:photos/core/configuration.dart";
@@ -11,11 +12,32 @@ import "package:photos/services/file_magic_service.dart";
 import 'package:photos/services/filedata/model/file_data.dart';
 import "package:photos/services/isolated_ffmpeg_service.dart";
 import 'package:photos/services/video_preview_service.dart';
+import "package:shared_preferences/shared_preferences.dart";
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late VideoPreviewService videoPreviewService;
+  final requestedPaths = <String>[];
+
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    ServiceLocator.instance.prefs = await SharedPreferences.getInstance();
+    ServiceLocator.instance.enteDio = Dio()
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (request, handler) {
+            requestedPaths.add(request.path);
+            expect(request.path, "/files/data/fetch");
+            handler.resolve(Response(requestOptions: request, statusCode: 204));
+          },
+        ),
+      );
+  });
+
+  tearDownAll(() => ServiceLocator.instance.enteDio.close(force: true));
 
   setUp(() {
+    requestedPaths.clear();
     videoPreviewService = VideoPreviewService(
       _FakeConfiguration(),
       _FakeServiceLocator(),
@@ -26,6 +48,19 @@ void main() {
       _FakeDefaultCacheManager(),
       _FakeCacheManager(),
     );
+  });
+
+  test("missing playlist data returns no preview before decryption", () async {
+    final file = EnteFile()
+      ..uploadedFileID = 42
+      ..collectionID = 1
+      ..fileType = FileType.video;
+    fileDataService.previewIds[42] = PreviewInfo(
+      objectId: "preview-object",
+      objectSize: 1000,
+    );
+    expect(await videoPreviewService.getPlaylist(file), isNull);
+    expect(requestedPaths, ["/files/data/fetch"]);
   });
 
   group('calcStatus', () {
@@ -79,6 +114,12 @@ class _FakeFileMagicService extends Fake implements FileMagicService {}
 class _FakeIsolatedFfmpegService extends Fake
     implements IsolatedFfmpegService {}
 
-class _FakeDefaultCacheManager extends Fake implements DefaultCacheManager {}
+class _FakeDefaultCacheManager extends Fake implements DefaultCacheManager {
+  @override
+  Future<FileInfo?> getFileFromCache(
+    String key, {
+    bool ignoreMemCache = false,
+  }) async => null;
+}
 
 class _FakeCacheManager extends Fake implements CacheManager {}
