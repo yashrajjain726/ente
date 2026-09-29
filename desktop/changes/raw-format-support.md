@@ -1,0 +1,1 @@
+- Improved support for additional camera RAW formats when uploading and viewing photos.

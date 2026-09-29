@@ -1,16 +1,48 @@
-// Image extensions that the browser is unlikely to be able to render, but
-// which our desktop app should be able to convert to JPEG. Both conditions
-// must hold for an extension to be in this list.
-const needsJPEGConversionExtensions = [
+// Camera RAW suffixes recognized by the libvips 8.18.7 dcraw loader bundled on
+// Windows and Linux. macOS conversion uses sips and depends on OS/camera support.
+// https://github.com/libvips/libvips/blob/v8.18.7/libvips/foreign/dcrawload.c
+export const cameraRawExtensions = [
+    "3fr",
+    "ari",
     "arw",
+    "cap",
+    "cin",
     "cr2",
     "cr3",
+    "crw",
+    "dcr",
     "dng",
+    "erf",
+    "fff",
+    "iiq",
+    "k25",
+    "kdc",
+    "mdc",
+    "mos",
+    "mrw",
+    "nef",
+    "nrw",
+    "orf",
+    "ori",
+    "pef",
+    "pxn",
+    "raf",
+    "raw",
+    "rw2",
+    "rwl",
+    "sr2",
+    "srf",
+    "srw",
+    "x3f",
+];
+
+// Formats that need a native conversion attempt before the browser can render
+// them. The platform decoder may not support every camera or RAW variant.
+const needsJPEGConversionExtensions = [
+    ...cameraRawExtensions,
     "heic",
     "jp2",
-    "nef",
     "psd",
-    "rw2",
     "tif",
     "tiff",
 ];
