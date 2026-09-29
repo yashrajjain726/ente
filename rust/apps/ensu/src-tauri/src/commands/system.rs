@@ -7,44 +7,11 @@ pub struct SystemInfo {
     total_memory_bytes: Option<u64>,
 }
 
-#[cfg(unix)]
-#[expect(
-    unsafe_code,
-    reason = "Read physical memory through the system's sysconf API"
-)]
 fn total_memory_bytes() -> Option<u64> {
-    let pages = unsafe { libc::sysconf(libc::_SC_PHYS_PAGES) };
-    let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
-    if pages <= 0 || page_size <= 0 {
-        return None;
-    }
-
-    u64::try_from(pages)
-        .ok()?
-        .checked_mul(u64::try_from(page_size).ok()?)
-}
-
-#[cfg(target_os = "windows")]
-#[expect(unsafe_code, reason = "Read physical memory through the Windows API")]
-fn total_memory_bytes() -> Option<u64> {
-    use windows_sys::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
-
-    let mut status = MEMORYSTATUSEX {
-        dwLength: std::mem::size_of::<MEMORYSTATUSEX>() as u32,
-        ..Default::default()
-    };
-
-    let ok = unsafe { GlobalMemoryStatusEx(&mut status) };
-    if ok == 0 {
-        None
-    } else {
-        Some(status.ullTotalPhys)
-    }
-}
-
-#[cfg(not(any(unix, target_os = "windows")))]
-fn total_memory_bytes() -> Option<u64> {
-    None
+    let mut system = sysinfo::System::new();
+    system.refresh_memory_specifics(sysinfo::MemoryRefreshKind::nothing().with_ram());
+    let total = system.total_memory();
+    (total > 0).then_some(total)
 }
 
 #[tauri::command]

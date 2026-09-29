@@ -16,6 +16,7 @@ log.workspace = true
 notify = "6.1.1"
 serde.workspace = true
 serde_json.workspace = true
+sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 tauri = { version = "2.11.2", features = [] }
 tauri-plugin-dialog = "2.7.1"
 tauri-plugin-fs = "2.5.1"
@@ -25,17 +26,20 @@ tauri-plugin-updater = "2.10.1"
 uuid = { workspace = true, features = ["v4"] }
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2.0"
 rustix = { version = "1.1.4", features = ["fs"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_SystemInformation"] }
+filepath = "0.2.0"
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation"] }
 
 [target.'cfg(any(windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = "2.4.4"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
+
+[dev-dependencies]
+filepath = "0.2.0"
 
 [lints]
 workspace = true

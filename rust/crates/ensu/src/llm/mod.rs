@@ -4,6 +4,7 @@ mod event;
 mod generate;
 mod history;
 mod model;
+mod worker;
 
 pub use context::*;
 pub use event::*;
