@@ -28,7 +28,7 @@ Notes let you store any text securely with end-to-end encryption. Use them for s
 
 ## Features
 
-### Rich text content
+### Write freely
 
 Notes support plain text content. Write as much as you need - there's no character limit.
 
