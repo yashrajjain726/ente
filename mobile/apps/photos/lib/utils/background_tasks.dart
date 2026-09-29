@@ -110,7 +110,7 @@ class BackgroundTasks {
                 BackgroundTaskConfig(
                   identifier: refresh,
                   kind: BackgroundTaskKind.refresh,
-                  frequency: Duration(minutes: Platform.isIOS ? 30 : 15),
+                  frequency: const Duration(minutes: 15),
                   initialDelay: kDebugMode
                       ? Duration.zero
                       : const Duration(minutes: 10),
@@ -126,18 +126,15 @@ class BackgroundTasks {
               BackgroundTaskConfig(
                 identifier: processing,
                 kind: BackgroundTaskKind.processing,
-                frequency: Platform.isIOS
-                    ? const Duration(minutes: 30)
-                    : const Duration(hours: 2),
+                frequency: const Duration(hours: 1),
                 initialDelay: Platform.isIOS && !kDebugMode
                     ? const Duration(minutes: 30)
                     : Duration.zero,
                 flexInterval: Platform.isAndroid
-                    ? const Duration(hours: 2)
+                    ? const Duration(hours: 1)
                     : null,
                 requiresNetwork: true,
                 requiresCharging: Platform.isAndroid,
-                requiresDeviceIdle: Platform.isAndroid,
                 runBudget: Platform.isIOS
                     ? BgTaskUtils.taskTimeoutFor(
                         BgTaskUtils.iOSBackgroundProcessingTask,
