@@ -22,12 +22,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     collectionNamesByUploadItem,
     filterNonEmptyUploadItems,
+    uploadQueueItemKey,
 } from "./file-upload-helpers";
 import {
     getRequiredFields,
+    hasUnsavedItemChanges,
     itemFormDataForSave,
 } from "./item-form-fields-utils";
-import { hasPendingUploads, hasUnsavedItemChanges } from "./unsaved-changes";
 import { useUploadQueue, type LockerUploadCallbacks } from "./use-upload-queue";
 
 export type CreateOption = LockerItemType;
@@ -336,9 +337,8 @@ export const useCreateItemDialogState = ({
         normalizeSelectedCollectionIDs,
     ]);
 
-    const pendingUploads = hasPendingUploads(
-        selectedUploadItems,
-        completedFileKeys,
+    const pendingUploads = selectedUploadItems.some(
+        (item) => !completedFileKeys.has(uploadQueueItemKey(item)),
     );
     const hasUnsavedChanges =
         isFileMode && !isEditMode
