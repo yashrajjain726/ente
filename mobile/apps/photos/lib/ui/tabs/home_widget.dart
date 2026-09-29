@@ -3,7 +3,6 @@ import "dart:convert";
 import "dart:io";
 
 import "package:app_links/app_links.dart";
-import "package:ente_components/ente_components.dart";
 import "package:ente_crypto/ente_crypto.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
@@ -60,7 +59,6 @@ import "package:photos/ui/collections/collection_action_sheet.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
 import "package:photos/ui/components/models/button_type.dart";
 import "package:photos/ui/extents_page_view.dart";
-import "package:photos/ui/growth/referral_screen.dart";
 import "package:photos/ui/home/christmas/christmas_pull_animation.dart";
 import "package:photos/ui/home/christmas/christmas_utils.dart";
 import "package:photos/ui/home/christmas/snow_fall_overlay.dart";
@@ -1241,18 +1239,8 @@ class _HomeWidgetState extends State<HomeWidget> {
         return;
       }
       if (!context.mounted) return;
-      final sheetAction = await showBottomSheetComponent<ChangeLogPageAction>(
-        context: context,
-        builder: (context) => const ChangeLogPage(),
-      );
+      await showChangeLogSheet(context);
       await updateService.hideChangeLog();
-      if (!mounted) {
-        return;
-      }
-      if (sheetAction == ChangeLogPageAction.openReferrals) {
-        if (!context.mounted) return;
-        await openReferralScreen(context, showLoadingDialog: true);
-      }
     } finally {
       _isShowingChangeLog = false;
     }
