@@ -240,7 +240,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
 
     _regionDetectionAttempt++;
     try {
-      final File? localFile = await getFile(widget.file);
+      final File? localFile = await _resolveStillImage(generation);
       if (!mounted || generation != _evaluationGeneration) return;
       if (localFile == null || !localFile.existsSync()) {
         throw StateError("Live-photo still is unavailable");
@@ -381,13 +381,24 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
     }
   }
 
+  Future<File?> _resolveStillImage(int generation) async {
+    final file = widget.file;
+    final canUseUploadedCopy = file.isUploaded && !file.isRemoteOnlyFile;
+    File? localFile = await getFile(file);
+    if (!mounted || generation != _evaluationGeneration) return null;
+    if (canUseUploadedCopy && (localFile == null || !localFile.existsSync())) {
+      localFile = await getFile(EnteFile.from(file)..localID = null);
+    }
+    return localFile;
+  }
+
   Future<void> _prepareStillImageOnDemand() async {
     final generation = _evaluationGeneration;
     setState(() {
       _isPreparingOnDemand = true;
     });
     try {
-      final localFile = await getFile(widget.file);
+      final localFile = await _resolveStillImage(generation);
       if (!mounted || generation != _evaluationGeneration) return;
       if (localFile == null || !localFile.existsSync()) {
         throw StateError("Could not resolve image for OCR");

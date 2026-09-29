@@ -1,0 +1,1 @@
+- Fixed text selection when a photo's local copy is unavailable but an uploaded copy can be retrieved.
