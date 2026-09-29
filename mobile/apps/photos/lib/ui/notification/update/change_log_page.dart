@@ -37,23 +37,26 @@ class _ChangeLogPageState extends State<ChangeLogPage> {
     final l10n = context.strings;
     final colors = context.componentColors;
     final isLocalGallery = isLocalGalleryMode;
+    final continueButton = ButtonComponent(
+      variant: isLocalGallery
+          ? ButtonComponentVariant.primary
+          : ButtonComponentVariant.secondary,
+      size: ButtonComponentSize.large,
+      label: l10n.continueLabel,
+      shouldSurfaceExecutionStates: false,
+      onTap: () async {
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      },
+    );
     return BottomSheetComponent(
       header: _ChangeLogHeader(title: l10n.whatsNew),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       actionsTopSpacing: Spacing.lg,
       content: _getChangeLog(),
       actions: [
-        ButtonComponent(
-          variant: ButtonComponentVariant.primary,
-          size: ButtonComponentSize.large,
-          label: l10n.continueLabel,
-          shouldSurfaceExecutionStates: false,
-          onTap: () async {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            }
-          },
-        ),
+        if (isLocalGallery) continueButton,
         Theme(
           data: Theme.of(context).copyWith(
             extensions: [
@@ -100,6 +103,7 @@ class _ChangeLogPageState extends State<ChangeLogPage> {
             },
           ),
         ),
+        if (!isLocalGallery) continueButton,
       ],
     );
   }
