@@ -340,23 +340,32 @@ export const useCreateItemDialogState = ({
     const pendingUploads = selectedUploadItems.some(
         (item) => !completedFileKeys.has(uploadQueueItemKey(item)),
     );
-    const hasUnsavedChanges =
-        isFileMode && !isEditMode
-            ? pendingUploads
-            : hasUnsavedItemChanges(
-                  formData,
-                  editFormData(editItem),
-                  selectedCollectionIDs,
-                  normalizeSelectedCollectionIDs(
-                      isEditMode
-                          ? editCollectionIDs
-                          : defaultCollectionID !== null &&
-                              defaultCollectionID !== undefined
-                            ? [defaultCollectionID]
-                            : [],
-                  ),
-                  collectionName,
-              );
+    let initialCollectionIDs: number[] = [];
+    if (isEditMode) {
+        initialCollectionIDs = editCollectionIDs;
+    } else if (
+        defaultCollectionID !== null &&
+        defaultCollectionID !== undefined
+    ) {
+        initialCollectionIDs = [defaultCollectionID];
+    }
+
+    const initialFormData = editFormData(editItem);
+    const initialSelectedCollectionIDs =
+        normalizeSelectedCollectionIDs(initialCollectionIDs);
+
+    let hasUnsavedChanges: boolean;
+    if (isFileMode && !isEditMode) {
+        hasUnsavedChanges = pendingUploads;
+    } else {
+        hasUnsavedChanges = hasUnsavedItemChanges(
+            formData,
+            initialFormData,
+            selectedCollectionIDs,
+            initialSelectedCollectionIDs,
+            collectionName,
+        );
+    }
 
     const requestExit = useCallback(
         (action: "close" | "back") => {
