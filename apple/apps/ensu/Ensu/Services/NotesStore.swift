@@ -188,11 +188,7 @@ final class NotesStore: ObservableObject, ModelMaintenance {
             do {
                 hits += try await provider.search(collection.id, query: query)
             } catch NotesError.RebuildRequired {
-                enqueue(collection.id, rebuild: true, due: .distantPast)
-                update(collection.id) {
-                    $0.status = .pending
-                    $0.indexAvailable = false
-                }
+                requestRebuild(collection.id)
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
@@ -200,6 +196,20 @@ final class NotesStore: ObservableObject, ModelMaintenance {
             }
         }
         return hits
+    }
+
+    func reload(_ locator: NotePassageLocator) async throws -> GroundedExcerpt? {
+        guard collections.contains(where: { $0.id == locator.collectionId && $0.eligible })
+        else { return nil }
+        do {
+            guard let hit = try await provider.reload(locator) else { return nil }
+            return try await verify(
+                selectMixedGroundingCandidates(packHits: [], notesHits: [hit], notesLimit: 1)
+            ).first
+        } catch NotesError.RebuildRequired {
+            requestRebuild(locator.collectionId)
+            return nil
+        }
     }
 
     func verify(_ excerpts: [GroundedExcerpt]) async throws -> [GroundedExcerpt] {
@@ -218,12 +228,9 @@ final class NotesStore: ObservableObject, ModelMaintenance {
             }
             do {
                 let reference = try await provider.verify(reference)
-                result.append(
-                    GroundedExcerpt(
-                        score: excerpt.score,
-                        source: .localNote(reference: reference),
-                        text: excerpt.text
-                    ))
+                var verifiedExcerpt = excerpt
+                verifiedExcerpt.source = .localNote(reference: reference)
+                result.append(verifiedExcerpt)
                 accepted += 1
             } catch is CancellationError {
                 throw CancellationError()
@@ -252,6 +259,14 @@ final class NotesStore: ObservableObject, ModelMaintenance {
             } catch {
                 operationError = "Could not open this note. Check folder access and try again."
             }
+        }
+    }
+
+    private func requestRebuild(_ id: String) {
+        enqueue(id, rebuild: true, due: .distantPast)
+        update(id) {
+            $0.status = .pending
+            $0.indexAvailable = false
         }
     }
 
@@ -393,11 +408,7 @@ final class NotesStore: ObservableObject, ModelMaintenance {
                 }
             } catch NotesError.RebuildRequired {
                 if snapshot == nil {
-                    enqueue(id, rebuild: true, due: .distantPast)
-                    update(id) {
-                        $0.status = .pending
-                        $0.indexAvailable = false
-                    }
+                    requestRebuild(id)
                 } else {
                     fail(id, NotesError.RebuildRequired)
                 }

@@ -178,7 +178,41 @@ pub struct NotesOutcome {
 }
 
 #[derive(Clone, Debug, uniffi::Record)]
+pub struct NotePassageLocator {
+    pub collection_id: String,
+    pub document_id: String,
+    pub indexed_revision: String,
+    pub shard_sha256: String,
+    pub chunk_index: u64,
+}
+
+impl From<core::NotePassageLocator> for NotePassageLocator {
+    fn from(value: core::NotePassageLocator) -> Self {
+        Self {
+            collection_id: value.collection_id,
+            document_id: value.document_id,
+            indexed_revision: value.indexed_revision,
+            shard_sha256: value.shard_sha256,
+            chunk_index: value.chunk_index,
+        }
+    }
+}
+
+impl From<NotePassageLocator> for core::NotePassageLocator {
+    fn from(value: NotePassageLocator) -> Self {
+        Self {
+            collection_id: value.collection_id,
+            document_id: value.document_id,
+            indexed_revision: value.indexed_revision,
+            shard_sha256: value.shard_sha256,
+            chunk_index: value.chunk_index,
+        }
+    }
+}
+
+#[derive(Clone, Debug, uniffi::Record)]
 pub struct NotesHit {
+    pub locator: NotePassageLocator,
     pub collection_id: String,
     pub document_id: String,
     pub revision: String,
@@ -194,6 +228,7 @@ impl From<core::NotesSearchHit> for NotesHit {
             collection_id: value.collection_id,
             document_id: value.document_id,
             revision: value.revision,
+            locator: value.locator.into(),
             score: value.score,
             title: value.title,
             section: value.section,
@@ -208,6 +243,7 @@ impl From<NotesHit> for core::NotesSearchHit {
             collection_id: value.collection_id,
             document_id: value.document_id,
             revision: value.revision,
+            locator: value.locator.into(),
             score: value.score,
             title: value.title,
             section: value.section,
@@ -346,20 +382,34 @@ impl NotesCollection {
         })
     }
 
+    pub fn reload_passage(
+        &self,
+        locator: NotePassageLocator,
+    ) -> Result<Option<NotesHit>, NotesError> {
+        core::NotesCollectionIndex::open(&self.root, self.id.clone())
+            .and_then(|index| index.reload_passage(&locator.into()))
+            .map(|hit| hit.map(Into::into))
+            .map_err(index_read_error)
+    }
+
     pub fn search(&self, query: Vec<f32>) -> Result<Vec<NotesHit>, NotesError> {
-        let result = core::NotesCollectionIndex::open(&self.root, self.id.clone())
-            .and_then(|index| index.search(&query));
-        match result {
-            Ok(hits) => Ok(hits.into_iter().map(Into::into).collect()),
-            Err(core::NotesError::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => {
-                Err(NotesError::RebuildRequired)
-            }
-            Err(error) => Err(error.into()),
-        }
+        core::NotesCollectionIndex::open(&self.root, self.id.clone())
+            .and_then(|index| index.search(&query))
+            .map(|hits| hits.into_iter().map(Into::into).collect())
+            .map_err(index_read_error)
     }
 
     pub fn remove(&self) -> Result<(), NotesError> {
         core::remove_notes_collection(&self.root, &self.id).map_err(Into::into)
+    }
+}
+
+fn index_read_error(error: core::NotesError) -> NotesError {
+    match error {
+        core::NotesError::Io(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            NotesError::RebuildRequired
+        }
+        error => error.into(),
     }
 }
 

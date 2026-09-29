@@ -1,3 +1,5 @@
+pub use log::warn;
+
 #[macro_export]
 macro_rules! setup {
     () => {

@@ -7,6 +7,7 @@ import android.provider.DocumentsContract
 import android.util.AtomicFile
 import androidx.core.content.FileProvider
 import io.ente.ensu.bindings.LlmContext
+import io.ente.ensu.bindings.NotePassageLocator
 import io.ente.ensu.bindings.NoteSourceReference
 import io.ente.ensu.bindings.NotesCancellation
 import io.ente.ensu.bindings.NotesCollection
@@ -129,6 +130,11 @@ class NotesProvider(private val context: Context) {
     internal suspend fun search(id: String, query: List<Float>) = withAccess {
         registration(id)
         handle(id).use { it.search(query) }
+    }
+
+    internal suspend fun reload(locator: NotePassageLocator) = withAccess {
+        registration(locator.collectionId)
+        handle(locator.collectionId).use { it.reloadPassage(locator) }
     }
 
     internal suspend fun inspectFreshness(id: String, cancel: NotesCancellation) = withAccess {

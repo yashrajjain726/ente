@@ -25,6 +25,7 @@ fn main() {
         .manage(commands::chat_db::ChatDbState::default())
         .manage(commands::knowledge::State::default())
         .manage(commands::conversation::State::default())
+        .manage(commands::followup::State::default())
         .setup(|app| {
             logging::init_logging(app.handle());
             logging::log("App", "setup started");
@@ -95,6 +96,7 @@ fn main() {
             commands::llm::llm_prewarm_multimodal_context,
             commands::llm::llm_generate_chat_stream,
             commands::conversation::conversation_prepare,
+            commands::followup::conversation_resolve_followup,
             commands::llm::llm_cancel,
             commands::llm::llm_retrieval_epoch,
             commands::llm::llm_model_state_epoch,

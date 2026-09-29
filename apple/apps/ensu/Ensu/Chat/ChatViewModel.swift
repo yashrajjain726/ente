@@ -1216,6 +1216,40 @@ final class ChatViewModel: ObservableObject {
             var embeddingAssetInvalid = false
             var knowledgeHits: [GroundedExcerpt] = []
             let enabledDatasets = knowledgeStore.enabledReadyDatasets
+            var followup: ConversationFollowup?
+            var reloaded: [GroundedExcerpt] = []
+            defer { followup?.cancel() }
+            do {
+                if prompt.imageFiles.isEmpty {
+                    let path = buildConversationPath(for: userNode)
+                    let pathIds = Set(path)
+                    let assistantTexts = (messageStore[userNode.sessionId] ?? [])
+                        .filter { pathIds.contains($0.id.uuidString) && $0.role == .assistant }
+                        .map { $0.text }
+                    followup = try await Task.detached {
+                        [chatDb] () throws -> ConversationFollowup? in
+                        guard
+                            assistantTexts.contains(where: {
+                                !parseGroundedAssistantText(storedText: $0).sources.isEmpty
+                            })
+                        else { return nil }
+                        return try chatDb.startConversationFollowup(
+                            sessionUuid: userNode.sessionId.uuidString, path: path,
+                            question: userNode.text
+                        )
+                    }.value
+                    try Task.checkCancellation()
+                    guard activeGenerationId == generationId else { return }
+                    if followup != nil { conversationStatus = "Finding sources" }
+                }
+            } catch {
+                guard !isCancellation(error), activeGenerationId == generationId else { return }
+                if case ConversationError.Stale = error {
+                    generationErrorMessage = "Conversation changed. Retry the message."
+                    return
+                }
+                logger.warning("Source search preparation failed", details: "\(error)")
+            }
             let queryText = userNode.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !queryText.isEmpty,
                 (!enabledDatasets.isEmpty
@@ -1247,6 +1281,30 @@ final class ChatViewModel: ObservableObject {
                     }
                     embeddingAssetInvalid = error is EmbeddingAssetInvalidError
                 }
+            }
+
+            do {
+                if let turn = followup {
+                    let locators = try await Task.detached { [searched = knowledgeHits] in
+                        try turn.searchWithHistory(searched: searched)
+                    }.value
+                    try Task.checkCancellation()
+                    guard activeGenerationId == generationId else { return }
+                    for locator in locators {
+                        if let hit = try await reloadPassage(locator) {
+                            reloaded.append(hit)
+                        }
+                    }
+                }
+            } catch {
+                guard !isCancellation(error), activeGenerationId == generationId else { return }
+                if case ConversationError.Stale = error {
+                    generationErrorMessage = "Conversation changed. Retry the message."
+                    return
+                }
+                logger.warning("Source history search failed", details: "\(error)")
+                followup?.cancel()
+                followup = nil
             }
 
             do {
@@ -1432,7 +1490,9 @@ final class ChatViewModel: ObservableObject {
                                 expectedUserText: userNode.text,
                                 historyQuery: userNode.text,
                                 maxTokens: nil,
-                                searched: knowledgeHits
+                                searched: knowledgeHits,
+                                followup: followup,
+                                reloaded: reloaded
                             ),
                             temperature: self.resolveTemperature(),
                             onProgress: {
@@ -1553,6 +1613,22 @@ final class ChatViewModel: ObservableObject {
                 control: control,
                 onToken: onToken
             )
+        }
+    }
+
+    private func reloadPassage(_ locator: PassageLocator) async throws -> GroundedExcerpt? {
+        do {
+            switch locator {
+            case .ensuPack:
+                return try await knowledgeProvider.reload(
+                    locator, datasets: knowledgeStore.enabledReadyDatasets)
+            case .localNote(let note):
+                return try await notesStore.reload(note)
+            }
+        } catch {
+            if isCancellation(error) { throw error }
+            logger.warning("Source reload failed", details: "\(error)")
+            return nil
         }
     }
 

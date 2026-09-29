@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BinaryHeap};
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::Path;
+use std::sync::OnceLock;
 
 use memmap2::{Mmap, MmapOptions};
 use serde::Deserialize;
@@ -19,6 +20,7 @@ const MAX_MANIFEST_BYTES: u64 = 1_048_576;
 const MAX_METADATA_FRAME_BYTES: u64 = 1_048_576;
 #[derive(Debug, Clone, PartialEq)]
 pub struct RetrievalHit {
+    pub locator: super::PassageLocator,
     pub score: f32,
     pub text: String,
     pub title: String,
@@ -54,6 +56,9 @@ struct MetadataRow {
 
 pub struct RetrievalIndex {
     dataset_identity: String,
+    stable_id: String,
+    revision_sha256: OnceLock<String>,
+    manifest_bytes: Vec<u8>,
     count: usize,
     dim: usize,
     scale: f32,
@@ -98,7 +103,8 @@ impl RetrievalIndex {
                 "manifest size is outside the supported range".to_string(),
             ));
         }
-        let manifest: Manifest = serde_json::from_slice(&fs::read(&manifest_path)?)?;
+        let manifest_bytes = fs::read(&manifest_path)?;
+        let manifest: Manifest = serde_json::from_slice(&manifest_bytes)?;
         validate_manifest(&manifest, directory_identity, expected_pack)?;
 
         let count = usize::try_from(manifest.count).map_err(|_| {
@@ -174,6 +180,9 @@ impl RetrievalIndex {
         let metadata = unsafe { MmapOptions::new().map(&metadata_file)? };
 
         Ok(Self {
+            stable_id: expected_pack.stable_id.clone(),
+            revision_sha256: OnceLock::new(),
+            manifest_bytes,
             dataset_identity: manifest.dataset,
             count,
             dim,
@@ -189,6 +198,17 @@ impl RetrievalIndex {
 
     pub fn dataset_identity(&self) -> &str {
         &self.dataset_identity
+    }
+
+    fn revision_sha256(&self) -> &str {
+        self.revision_sha256.get_or_init(|| {
+            let offsets = self
+                .offsets
+                .iter()
+                .flat_map(|offset| offset.to_le_bytes())
+                .collect::<Vec<_>>();
+            text_revision_digest(&self.manifest_bytes, &self.metadata, &offsets)
+        })
     }
 
     pub fn search(
@@ -254,6 +274,30 @@ impl RetrievalIndex {
         self.load_hits(&ranked)
     }
 
+    pub fn reload_passage(
+        &self,
+        locator: &super::PassageLocator,
+    ) -> Result<Option<RetrievalHit>, RetrievalError> {
+        let super::PassageLocator::EnsuPack {
+            dataset_id,
+            revision_sha256,
+            row,
+        } = locator
+        else {
+            return Ok(None);
+        };
+        let Ok(row) = usize::try_from(*row) else {
+            return Ok(None);
+        };
+        if dataset_id != &self.stable_id
+            || row >= self.count
+            || revision_sha256 != self.revision_sha256()
+        {
+            return Ok(None);
+        }
+        Ok(self.load_hits(&[RankedRow { score: 0.0, row }])?.pop())
+    }
+
     fn load_hits(&self, ranked: &[RankedRow]) -> Result<Vec<RetrievalHit>, RetrievalError> {
         let mut by_block = BTreeMap::<usize, Vec<(usize, RankedRow)>>::new();
         for (rank, selected) in ranked.iter().copied().enumerate() {
@@ -306,6 +350,11 @@ impl RetrievalIndex {
                     ));
                 }
                 hits[rank] = Some(RetrievalHit {
+                    locator: super::PassageLocator::EnsuPack {
+                        dataset_id: self.stable_id.clone(),
+                        revision_sha256: self.revision_sha256().to_owned(),
+                        row: selected.row as u64,
+                    },
                     score: selected.score,
                     text,
                     title,
@@ -507,6 +556,21 @@ fn python_quote(value: &str) -> String {
     encoded
 }
 
+fn text_revision_digest(manifest: &[u8], metadata: &[u8], offsets: &[u8]) -> String {
+    ente_ensu_crypto::sha256_parts(&[
+        b"ensu-pack-text-revision-v1\0",
+        &(manifest.len() as u64).to_le_bytes(),
+        manifest,
+        &(metadata.len() as u64).to_le_bytes(),
+        metadata,
+        &(offsets.len() as u64).to_le_bytes(),
+        offsets,
+    ])
+    .iter()
+    .map(|byte| format!("{byte:02x}"))
+    .collect()
+}
+
 fn sanitize_prompt_text(value: &str) -> String {
     let normalized_line_endings = value.replace("\r\n", "\n").replace('\r', "\n");
     let normalized = normalized_line_endings
@@ -613,6 +677,60 @@ pub(super) mod tests {
             revision,
             expected,
         }
+    }
+
+    #[test]
+    fn passage_reload_preserves_sources_and_rejects_changed_artifacts() {
+        use crate::retrieval::PassageLocator;
+        let pack = synthetic_pack("simplewiki-test");
+        let index = RetrievalIndex::open(&pack.revision, &pack.expected).unwrap();
+        let mut query = vec![0.0; 512];
+        query[0] = 1.0;
+        let hits = index.search(&query, 2, 0.0).unwrap();
+        assert_ne!(hits[0].locator, hits[1].locator);
+        drop(index);
+        let index = RetrievalIndex::open(&pack.revision, &pack.expected).unwrap();
+        for field in ["row", "dataset"] {
+            let mut wrong = hits[0].locator.clone();
+            let PassageLocator::EnsuPack {
+                dataset_id, row, ..
+            } = &mut wrong
+            else {
+                panic!("expected a pack locator")
+            };
+            match field {
+                "row" => *row = u64::MAX,
+                _ => *dataset_id = "wikibooks".to_string(),
+            }
+            assert!(index.reload_passage(&wrong).unwrap().is_none(), "{field}");
+        }
+        for (hit, text) in hits.iter().zip(["first passage", "second passage"]) {
+            let reloaded = index.reload_passage(&hit.locator).unwrap().unwrap();
+            assert_eq!(reloaded.locator, hit.locator);
+            assert_eq!(reloaded.text, text);
+            assert_eq!(reloaded.source_url, hit.source_url);
+        }
+        drop(index);
+
+        let metadata_path = pack.revision.join(KNOWLEDGE_META_FILE);
+        let bytes = fs::read(&metadata_path).unwrap();
+        let decoded = zstd::stream::decode_all(bytes.as_slice()).unwrap();
+        let changed = String::from_utf8(decoded)
+            .unwrap()
+            .replace("first passage", "new passage");
+        let compressed = zstd::stream::encode_all(changed.as_bytes(), 1).unwrap();
+        fs::write(metadata_path, &compressed).unwrap();
+        fs::write(
+            pack.revision.join(KNOWLEDGE_OFFSETS_FILE),
+            [0_u64, compressed.len() as u64]
+                .into_iter()
+                .flat_map(u64::to_le_bytes)
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        let index = RetrievalIndex::open(&pack.revision, &pack.expected).unwrap();
+        assert!(index.reload_passage(&hits[0].locator).unwrap().is_none());
+        assert_eq!(index.search(&query, 1, 0.0).unwrap()[0].text, "new passage");
     }
 
     #[test]
