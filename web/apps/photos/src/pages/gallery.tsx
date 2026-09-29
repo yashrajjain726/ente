@@ -212,11 +212,8 @@ const Page: React.FC = () => {
         files: EnteFile[];
         title: string;
         collectionID: number;
-        restore: () => void;
     }>();
     const closeSlideshow = useCallback(() => setSlideshow(undefined), []);
-
-    useEffect(() => slideshow?.restore, [slideshow]);
 
     const [pendingFileNavigation, setPendingFileNavigation] = useState<{
         fileIndex: number;
@@ -467,18 +464,10 @@ const Page: React.FC = () => {
             });
             return;
         }
-        const trigger = document.querySelector<HTMLButtonElement>(
-            '[aria-controls="collection-options"]',
-        );
         setSlideshow({
             files,
             title: activeCollectionSummary?.name ?? activeCollection.name,
             collectionID: activeCollection.id,
-            restore: () => {
-                requestAnimationFrame(() => {
-                    if (trigger?.isConnected) trigger.focus();
-                });
-            },
         });
     }, [
         activeCollection,
