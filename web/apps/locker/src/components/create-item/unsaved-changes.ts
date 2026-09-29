@@ -13,14 +13,17 @@ export function hasUnsavedItemChanges(
     const collections = new Set(collectionIDs);
     const initialCollections = new Set(initialCollectionIDs);
 
-    return (
-        collectionName !== "" ||
-        [...fields].some(
-            (field) => (data[field] ?? "") !== (initialData[field] ?? ""),
-        ) ||
+    const hasCollectionDraft = collectionName !== "";
+    const hasFieldChanges = [...fields].some((field) => {
+        const currentValue = data[field] ?? "";
+        const initialValue = initialData[field] ?? "";
+        return currentValue !== initialValue;
+    });
+    const hasCollectionChanges =
         collections.size !== initialCollections.size ||
-        [...collections].some((id) => !initialCollections.has(id))
-    );
+        [...collections].some((id) => !initialCollections.has(id));
+
+    return hasCollectionDraft || hasFieldChanges || hasCollectionChanges;
 }
 
 export function hasPendingUploads(
