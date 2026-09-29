@@ -462,7 +462,6 @@ export const useCreateItemDialogState = ({
         try {
             const cleanData = itemFormDataForSave(formType, formData);
             await onSave(formType, cleanData, selectedCollectionIDs);
-            // Successful persistence must bypass the unsaved-changes guard.
             onClose();
         } catch (error) {
             log.error("Failed to save Locker item", error);
