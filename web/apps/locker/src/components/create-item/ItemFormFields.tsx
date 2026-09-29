@@ -286,6 +286,7 @@ export const CollectionSelector: React.FC<{
                     onCreateCollection
                         ? () => {
                               setCreateOpen((open) => !open);
+                              setCreateName("");
                               setCreateError(null);
                           }
                         : undefined
@@ -303,6 +304,7 @@ export const CollectionSelector: React.FC<{
                         onSubmit={() => void handleCreateCollection()}
                         onCancel={() => {
                             setCreateOpen(false);
+                            setCreateName("");
                             setCreateError(null);
                         }}
                         loading={creating}
