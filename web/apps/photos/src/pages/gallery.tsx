@@ -15,10 +15,7 @@ import {
     type AlbumDetails,
 } from "@/components/Collections/EditAlbumDetailsDialog";
 import { GalleryBarAndListHeader } from "@/components/Collections/GalleryBarAndListHeader";
-import {
-    requestSlideshowFullscreen,
-    slideshowFiles,
-} from "@/components/Collections/album-slideshow";
+import { slideshowFiles } from "@/components/Collections/album-slideshow";
 import { Export } from "@/components/Export";
 import { FamilyManagement } from "@/components/FamilyManagement";
 import type { FileListHeaderOrFooter } from "@/components/FileList";
@@ -473,14 +470,12 @@ const Page: React.FC = () => {
         const trigger = document.querySelector<HTMLButtonElement>(
             '[aria-controls="collection-options"]',
         );
-        const restoreFullscreen = requestSlideshowFullscreen(closeSlideshow);
         // ponytail: snapshot the album; live playlist updates are outside this feature.
         setSlideshow({
             files,
             title: activeCollectionSummary?.name ?? activeCollection.name,
             collectionID: activeCollection.id,
             restore: () => {
-                restoreFullscreen();
                 requestAnimationFrame(() => {
                     if (trigger?.isConnected) trigger.focus();
                 });
@@ -490,7 +485,6 @@ const Page: React.FC = () => {
         activeCollection,
         activeCollectionFiles,
         activeCollectionSummary?.name,
-        closeSlideshow,
         showNotification,
     ]);
 
