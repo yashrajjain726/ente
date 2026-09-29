@@ -246,11 +246,9 @@ class _VideoEditorPageState extends State<VideoEditorPage> {
     if (!await ensurePhotoLibraryAddPermission(context)) return;
     if (!mounted) return;
 
-    final shouldUseNative =
-        (flagService.internalUser
-            ? _useNativeExport
-            : flagService.useNativeVideoEditor) &&
-        _controller!.speed == 1.0;
+    final shouldUseNative = flagService.internalUser
+        ? _useNativeExport
+        : flagService.useNativeVideoEditor;
 
     _logEditState(shouldUseNative: shouldUseNative);
 
