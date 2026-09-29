@@ -13,7 +13,6 @@ export const slideshowFiles = (files: EnteFile[]) =>
 export const slideshowIndex = (index: number, offset: number, count: number) =>
     count ? (index + offset + count) % count : 0;
 
-// ponytail: fixed five-second playback; skip photos that cannot load in ten seconds.
 export function scheduleSlideshowAdvance(
     {
         enabled,

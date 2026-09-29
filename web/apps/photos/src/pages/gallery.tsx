@@ -470,7 +470,6 @@ const Page: React.FC = () => {
         const trigger = document.querySelector<HTMLButtonElement>(
             '[aria-controls="collection-options"]',
         );
-        // ponytail: snapshot the album; live playlist updates are outside this feature.
         setSlideshow({
             files,
             title: activeCollectionSummary?.name ?? activeCollection.name,
