@@ -48,11 +48,11 @@ jobs:
                           // neeraj-pilot
                           231175576: {},
                           // laurens-pilot
-                          239996999: { allowPrefixes: ["mobile/", "rust/"] },
+                          239996999: { allowPrefixes: ["mobile/", "rust/", "docs/docs/"] },
                           // AswinAsok
-                          64626875: { allowPrefixes: ["web/", "desktop/"] },
+                          64626875: { allowPrefixes: ["web/", "desktop/", "docs/"] },
                           // ashil-pilot
-                          293300083: { allowPrefixes: ["mobile/"] },
+                          293300083: { allowPrefixes: ["mobile/", "docs/docs/"] },
                           // anandbaburajan
                           2698932: {
                               allowPrefixes: [
@@ -60,6 +60,7 @@ jobs:
                                   "desktop/",
                                   "rust/crates/space/",
                                   "rust/bindings/wasm/space/",
+                                  "docs/docs/",
                               ],
                           },
                           // aman-pilot
@@ -68,6 +69,7 @@ jobs:
                                   "mobile/apps/locker/",
                                   "mobile/packages/ente_components/",
                                   "mobile/packages/strings/",
+                                  "docs/docs/",
                               ],
                           },
                           // setalp
@@ -79,6 +81,7 @@ jobs:
                                   "rust/bindings/uniffi/ensu/",
                                   "rust/crates/ensu/",
                                   "web/apps/ensu/",
+                                  "docs/docs/",
                               ],
                           },
                       };
