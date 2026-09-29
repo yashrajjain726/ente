@@ -62,9 +62,9 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
   @override
   Logger get logger => _logger;
 
-  Future<rust.MlDb>? _dbFuture;
+  Future<rust.MlStore>? _dbFuture;
 
-  Future<rust.MlDb> get _db async {
+  Future<rust.MlStore> get _db async {
     final future = _dbFuture ??= _openDatabase();
     try {
       return await future;
@@ -76,12 +76,12 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
     }
   }
 
-  Future<rust.MlDb> _openDatabase() async {
+  Future<rust.MlStore> _openDatabase() async {
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final String path = join(documentsDirectory.path, _databaseName);
     _logger.info("Opening rust ML DB access: DB path $path");
     try {
-      return await rust.MlDb.open(path: path);
+      return await rust.MlStore.open(path: path);
     } on rust.MlDbError_Downgrade catch (e) {
       throw DatabaseDowngradeError(e.message);
     }
