@@ -267,6 +267,7 @@ class VideoExportEngine(
     }
 }
 
+@UnstableApi
 private class DurationLimitedMuxerFactory(
     private val durationUs: Long,
     private val factory: Muxer.Factory = InAppMp4Muxer.Factory().setVideoDurationUs(durationUs)
@@ -283,6 +284,7 @@ private class DurationLimitedMuxerFactory(
     }
 }
 
+@UnstableApi
 private class ConstantSpeedProvider(private val speed: Float) : SpeedProvider {
     override fun getSpeed(timeUs: Long): Float = speed
 
