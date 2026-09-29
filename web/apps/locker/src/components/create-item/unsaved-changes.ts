@@ -1,7 +1,7 @@
 import type { LockerUploadCandidate } from "@/types";
 import { uploadQueueItemKey } from "./file-upload-helpers";
 
-/** Compare drafts without treating absent optional fields or ordering as edits. */
+// Compare drafts without treating absent optional fields or ordering as edits.
 export function hasUnsavedItemChanges(
     data: Record<string, string>,
     initialData: Record<string, string>,
