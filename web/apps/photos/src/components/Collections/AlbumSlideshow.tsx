@@ -215,31 +215,40 @@ function Slide({
 
     useEffect(() => {
         let cancelled = false;
+        const isCancelled = () => cancelled;
+        let livePhotoURL: string | undefined;
         void downloadManager
             .renderableThumbnailURL(file)
             .then((url) => {
-                if (!cancelled) setThumbnail(url);
+                if (!isCancelled()) setThumbnail(url);
             })
             .catch(() => undefined);
         void downloadManager
             .renderableSourceURLs(file)
             .then(async (source) => {
-                const url =
-                    source.type === "image"
-                        ? source.imageURL
-                        : source.type === "livePhoto"
-                          ? await source.imageURL()
-                          : undefined;
-                if (!cancelled) setOriginal(url);
+                if (isCancelled()) return;
+                if (source.type === "livePhoto") {
+                    const url = await source.imageURL();
+                    if (isCancelled()) {
+                        URL.revokeObjectURL(url);
+                    } else {
+                        // Only Live Photo still URLs are owned by this slide.
+                        livePhotoURL = url;
+                        setOriginal(url);
+                    }
+                } else if (source.type === "image") {
+                    setOriginal(source.imageURL);
+                }
             })
             .catch((error: unknown) => {
-                if (!cancelled) {
+                if (!isCancelled()) {
                     log.error("Failed to load slideshow photo", error);
                     setFailed(true);
                 }
             });
         return () => {
             cancelled = true;
+            if (livePhotoURL) URL.revokeObjectURL(livePhotoURL);
         };
     }, [file]);
 
