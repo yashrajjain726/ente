@@ -984,7 +984,12 @@ const MapBox: React.FC<MapBoxProps> = ({ location, mapEnabled }) => {
         if (!mapRef.current) {
             const map = leaflet.map(mapContainer).setView(position, zoom);
             map.attributionControl.setPrefix(leafletAttributionPrefix);
-            leaflet.tileLayer(urlTemplate, { attribution }).addTo(map);
+            leaflet
+                .tileLayer(urlTemplate, {
+                    attribution,
+                    referrerPolicy: "strict-origin-when-cross-origin",
+                })
+                .addTo(map);
             markerRef.current = leaflet.marker(position).addTo(map);
             mapRef.current = map;
         } else {

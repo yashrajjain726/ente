@@ -1500,6 +1500,7 @@ const MapCanvas = React.memo(function MapCanvas({
                     url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
                     maxZoom={MAX_MAP_ZOOM}
                     updateWhenZooming
+                    referrerPolicy="strict-origin-when-cross-origin"
                 />
                 <MapControls useMap={useMap} />
                 <MapClusters
