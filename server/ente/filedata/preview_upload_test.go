@@ -9,7 +9,7 @@ import (
 
 func TestPreviewUploadSizeBoundaries(t *testing.T) {
 	const checksum = "XUFAKrxLKna5cZ2REBfFkg=="
-	for _, size := range []int64{1, maxPreviewPartSize} {
+	for _, size := range []int64{1, ente.MaxMultipartPartSize} {
 		require.NoError(t, (PreviewUploadRequest{
 			FileID: 1, Type: ente.PreviewImage, ContentLength: size, ContentMD5: checksum,
 		}).Validate())
@@ -21,9 +21,9 @@ func TestPreviewUploadSizeBoundaries(t *testing.T) {
 		partCount  int
 	}{
 		{"small single part", 1, 1, 1},
-		{"part length exceeds object", 1, minPreviewPartSize, 1},
-		{"exact multiple", minPreviewPartSize * 2, minPreviewPartSize, 2},
-		{"maximum size", maxPreviewUploadSize, maxPreviewPartSize, 2},
+		{"part length exceeds object", 1, ente.MinMultipartPartSize, 1},
+		{"exact multiple", ente.MinMultipartPartSize * 2, ente.MinMultipartPartSize, 2},
+		{"maximum size", maxPreviewUploadSize, ente.MaxMultipartPartSize, 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			checksums := make([]string, tc.partCount)

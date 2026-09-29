@@ -1,18 +1,12 @@
 package filedata
 
 import (
-	"crypto/md5"
-	"encoding/base64"
 	"fmt"
 
 	"github.com/ente/museum/ente"
 )
 
-const (
-	maxPreviewUploadSize = int64(10 << 30)
-	maxPreviewPartSize   = int64(5 << 30)
-	minPreviewPartSize   = int64(5 << 20)
-)
+const maxPreviewUploadSize = int64(10 << 30)
 
 type PreviewUploadRequest struct {
 	FileID        int64           `json:"fileID" binding:"required"`
@@ -25,10 +19,10 @@ func (r PreviewUploadRequest) Validate() error {
 	if err := validatePreviewUpload(r.FileID, r.Type, r.ContentLength); err != nil {
 		return err
 	}
-	if r.ContentLength > maxPreviewPartSize {
+	if r.ContentLength > ente.MaxMultipartPartSize {
 		return ente.NewBadRequestWithMessage("previews larger than 5 GiB require multipart upload")
 	}
-	return validatePreviewMD5(r.ContentMD5)
+	return ente.ValidateMD5(r.ContentMD5)
 }
 
 type MultipartPreviewUploadRequest struct {
@@ -43,18 +37,15 @@ func (r MultipartPreviewUploadRequest) Validate() error {
 	if err := validatePreviewUpload(r.FileID, r.Type, r.ContentLength); err != nil {
 		return err
 	}
-	if r.PartLength <= 0 || r.PartLength > maxPreviewPartSize {
-		return ente.NewBadRequestWithMessage("partLength must be between 1 byte and 5 GiB")
-	}
-	if r.ContentLength > r.PartLength && r.PartLength < minPreviewPartSize {
-		return ente.NewBadRequestWithMessage("partLength must be at least 5 MiB when more than one part is required")
+	if err := ente.ValidateMultipartPartLength(r.ContentLength, r.PartLength); err != nil {
+		return err
 	}
 	partCount := (r.ContentLength-1)/r.PartLength + 1
 	if int64(len(r.PartMD5s)) != partCount {
 		return ente.NewBadRequestWithMessage(fmt.Sprintf("partMd5s must contain exactly %d checksums", partCount))
 	}
 	for _, checksum := range r.PartMD5s {
-		if err := validatePreviewMD5(checksum); err != nil {
+		if err := ente.ValidateMD5(checksum); err != nil {
 			return err
 		}
 	}
@@ -70,14 +61,6 @@ func validatePreviewUpload(fileID int64, objectType ente.ObjectType, contentLeng
 	}
 	if contentLength <= 0 || contentLength > maxPreviewUploadSize {
 		return ente.NewBadRequestWithMessage("contentLength must be between 1 byte and 10 GiB")
-	}
-	return nil
-}
-
-func validatePreviewMD5(checksum string) error {
-	digest, err := base64.StdEncoding.DecodeString(checksum)
-	if err != nil || len(digest) != md5.Size || base64.StdEncoding.EncodeToString(digest) != checksum {
-		return ente.NewBadRequestWithMessage("MD5 checksums must be base64-encoded 16-byte digests")
 	}
 	return nil
 }

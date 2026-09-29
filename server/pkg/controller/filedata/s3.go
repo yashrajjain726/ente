@@ -21,7 +21,7 @@ import (
 
 const PreSignedRequestValidityDuration = 7 * 24 * stime.Hour
 
-func (c *Controller) getUploadURL(object ente.TempObject) (*ente.UploadURL, error) {
+func (c *Controller) getUploadURL(object ente.TempObject) (string, error) {
 	s3Client := c.S3Config.GetS3Client(object.BucketId)
 	r, _ := s3Client.PutObjectRequest(&s3.PutObjectInput{
 		Bucket:        c.S3Config.GetBucket(object.BucketId),
@@ -31,16 +31,13 @@ func (c *Controller) getUploadURL(object ente.TempObject) (*ente.UploadURL, erro
 	})
 	url, err := r.Presign(PreSignedRequestValidityDuration)
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return "", stacktrace.Propagate(err, "")
 	}
 	err = c.ObjectCleanupController.AddTempObject(object)
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return "", stacktrace.Propagate(err, "")
 	}
-	return &ente.UploadURL{
-		ObjectKey: object.ObjectKey,
-		URL:       url,
-	}, nil
+	return url, nil
 }
 func (c *Controller) getMultiPartUploadURL(object ente.TempObject, count int64, partLength int64, partMD5s []string) (*ente.MultipartUploadURLs, error) {
 	s3Client := c.S3Config.GetS3Client(object.BucketId)

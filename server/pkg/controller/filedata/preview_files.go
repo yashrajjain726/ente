@@ -49,13 +49,13 @@ func (c *Controller) PreviewUploadURL(ctx *gin.Context, request filedata.Preview
 			CompleteURL: &multiPartUploadURLs.CompleteURL,
 		}, nil
 	}
-	enteUrl, err := c.getUploadURL(object)
+	url, err := c.getUploadURL(object)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &filedata.PreviewUploadUrl{
 		ObjectID: id,
-		Url:      &enteUrl.URL,
+		Url:      &url,
 	}, nil
 }
 
@@ -69,11 +69,11 @@ func (c *Controller) PreviewUploadURLWithMetadata(ctx *gin.Context, request file
 	}
 	object.ContentLength = &request.ContentLength
 	object.ContentMD5 = &request.ContentMD5
-	upload, err := c.getUploadURL(object)
+	url, err := c.getUploadURL(object)
 	if err != nil {
 		return nil, err
 	}
-	return &filedata.PreviewUploadUrl{ObjectID: id, Url: &upload.URL}, nil
+	return &filedata.PreviewUploadUrl{ObjectID: id, Url: &url}, nil
 }
 
 func (c *Controller) MultipartPreviewUploadURLWithMetadata(ctx *gin.Context, request filedata.MultipartPreviewUploadRequest) (*filedata.PreviewUploadUrl, error) {
@@ -99,15 +99,11 @@ func (c *Controller) previewUploadObject(ctx *gin.Context, fileID int64, objectT
 	if err := c._checkPreviewWritePerm(ctx, fileID, actorUser); err != nil {
 		return "", ente.TempObject{}, err
 	}
-	fileOwnerID, err := c.FileRepo.GetOwnerID(fileID)
-	if err != nil {
-		return "", ente.TempObject{}, stacktrace.Propagate(err, "")
-	}
 	id := filedata.NewUploadID(objectType)
 	return id, ente.TempObject{
-		ObjectKey: filedata.ObjectKey(fileID, fileOwnerID, objectType, &id),
+		ObjectKey: filedata.ObjectKey(fileID, actorUser, objectType, &id),
 		BucketId:  c.S3Config.GetBucketID(objectType),
-		UserID:    fileOwnerID,
+		UserID:    actorUser,
 		App:       auth.GetApp(ctx),
 		Purpose:   string(objectType),
 		Client:    network.GetClientInfo(ctx),
