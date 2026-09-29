@@ -8,12 +8,17 @@ import {
     CollectionSelector,
     type CollectionSelectorAttributes,
 } from "@/components/CollectionSelector";
+import { AlbumSlideshow } from "@/components/Collections/AlbumSlideshow";
 import { CollectionMapDialog } from "@/components/Collections/CollectionMapDialog";
 import {
     EditAlbumDetailsDialog,
     type AlbumDetails,
 } from "@/components/Collections/EditAlbumDetailsDialog";
 import { GalleryBarAndListHeader } from "@/components/Collections/GalleryBarAndListHeader";
+import {
+    requestSlideshowFullscreen,
+    slideshowFiles,
+} from "@/components/Collections/album-slideshow";
 import { Export } from "@/components/Export";
 import { FamilyManagement } from "@/components/FamilyManagement";
 import type { FileListHeaderOrFooter } from "@/components/FileList";
@@ -206,6 +211,15 @@ const Page: React.FC = () => {
         [],
     );
     const [isFileViewerOpen, setIsFileViewerOpen] = useState(false);
+    const [slideshow, setSlideshow] = useState<{
+        files: EnteFile[];
+        title: string;
+        collectionID: number;
+        restore: () => void;
+    }>();
+    const closeSlideshow = useCallback(() => setSlideshow(undefined), []);
+
+    useEffect(() => slideshow?.restore, [slideshow]);
 
     const [pendingFileNavigation, setPendingFileNavigation] = useState<{
         fileIndex: number;
@@ -446,6 +460,50 @@ const Page: React.FC = () => {
         tempDeletedFileIDs,
         tempHiddenFileIDs,
     ]);
+    const startSlideshow = useCallback(() => {
+        if (!activeCollection) return;
+        const files = slideshowFiles(activeCollectionFiles);
+        if (!files.length) {
+            showNotification({
+                color: "primary",
+                title: t("no_photos_found_here"),
+            });
+            return;
+        }
+        const trigger = document.querySelector<HTMLButtonElement>(
+            '[aria-controls="collection-options"]',
+        );
+        const restoreFullscreen = requestSlideshowFullscreen(closeSlideshow);
+        // ponytail: snapshot the album; live playlist updates are outside this feature.
+        setSlideshow({
+            files,
+            title: activeCollectionSummary?.name ?? activeCollection.name,
+            collectionID: activeCollection.id,
+            restore: () => {
+                restoreFullscreen();
+                requestAnimationFrame(() => {
+                    if (trigger?.isConnected) trigger.focus();
+                });
+            },
+        });
+    }, [
+        activeCollection,
+        activeCollectionFiles,
+        activeCollectionSummary?.name,
+        closeSlideshow,
+        showNotification,
+    ]);
+
+    useEffect(() => {
+        if (
+            slideshow &&
+            (slideshow.collectionID !== activeCollection?.id ||
+                isInSearchMode ||
+                !user)
+        )
+            closeSlideshow();
+    }, [slideshow, activeCollection?.id, isInSearchMode, user, closeSlideshow]);
+
     const mapFileSource = useMemo(
         () => ({
             collectionFiles: state.collectionFiles,
@@ -704,7 +762,8 @@ const Page: React.FC = () => {
             authenticateUserVisibilityProps.open ||
             albumNameInputVisibilityProps.open ||
             editAlbumDetailsVisibilityProps.open ||
-            isFileViewerOpen
+            isFileViewerOpen ||
+            slideshow
         ) {
             return;
         }
@@ -1810,7 +1869,7 @@ const Page: React.FC = () => {
             message={
                 watchFolderView ? t("watch_folder_dropzone_hint") : undefined
             }
-            disabled={shouldDisableDropzone}
+            disabled={shouldDisableDropzone || !!slideshow}
             onDrop={setDragAndDropFiles}
         >
             {blockingLoad && <TranslucentLoadingOverlay />}
@@ -1931,6 +1990,7 @@ const Page: React.FC = () => {
                     onAddSaveGroup,
                     onEditAlbumDetails: showEditAlbumDetails,
                     onShowMap: handleShowCollectionMap,
+                    onCollectionSlideshow: startSlideshow,
                 }}
                 mode={barMode}
                 shouldHide={isInSearchMode}
@@ -2075,6 +2135,15 @@ const Page: React.FC = () => {
                     }
                 />
             )}
+            {slideshow &&
+                slideshow.collectionID === activeCollection?.id &&
+                !isInSearchMode && (
+                    <AlbumSlideshow
+                        files={slideshow.files}
+                        title={slideshow.title}
+                        onClose={closeSlideshow}
+                    />
+                )}
             {activeCollectionSummary && (
                 <CollectionMapDialog
                     {...collectionMapVisibilityProps}

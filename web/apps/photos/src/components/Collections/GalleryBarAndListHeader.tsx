@@ -63,7 +63,11 @@ type GalleryBarAndListHeaderProps = Omit<
     canCreateAlbum: boolean;
 } & Pick<
         CollectionHeaderProps,
-        "onRemotePull" | "onAddSaveGroup" | "onEditAlbumDetails" | "onShowMap"
+        | "onRemotePull"
+        | "onAddSaveGroup"
+        | "onEditAlbumDetails"
+        | "onShowMap"
+        | "onCollectionSlideshow"
     > &
     Pick<
         CollectionShareProps,
@@ -96,6 +100,7 @@ export const GalleryBarAndListHeader: React.FC<
     onEditAlbumDetails,
     onAddSaveGroup,
     onShowMap,
+    onCollectionSlideshow,
     setFileListHeader,
 }) => {
     const { show: showAllAlbums, props: allAlbumsVisibilityProps } =
@@ -184,6 +189,7 @@ export const GalleryBarAndListHeader: React.FC<
                         onRemotePull,
                         onAddSaveGroup,
                         onShowMap,
+                        onCollectionSlideshow,
                     }}
                     collectionSummary={collectionSummary}
                     onCollectionShare={openCollectionShare}
@@ -227,6 +233,7 @@ export const GalleryBarAndListHeader: React.FC<
         onRemotePull,
         onAddSaveGroup,
         onShowMap,
+        onCollectionSlideshow,
         onEditAlbumDetails,
         albumDescription,
         descriptionHeight,

@@ -9,6 +9,7 @@ import {
     collectionDialogBodyMutedSx as bodyMutedSx,
     collectionDialogFullScreenQuery,
     collectionDialogDividerSx as dividerSx,
+    collectionDialogToggleGroupSx as filterPillsSx,
     collectionDialogHeaderActionsSx as headerActionsSx,
     collectionDialogHeaderRowSx as headerRowSx,
     collectionDialogHeaderSx as headerSx,
@@ -549,46 +550,6 @@ const sweepButtonSx: SxProps<Theme> = (theme) => ({
     ...theme.applyStyles("dark", { borderColor: surfaceStrokeDark }),
 });
 
-const filterPillsSx = (theme: Theme) => ({
-    display: "flex",
-    gap: "8px",
-    "& .MuiToggleButtonGroup-grouped": {
-        flex: "1 1 0",
-        minWidth: 0,
-        marginLeft: "0 !important",
-        padding: "10px 12px",
-        border: 0,
-        borderRadius: "16px !important",
-        color: "text.muted",
-        backgroundColor: "background.paper",
-        fontSize: "14px",
-        lineHeight: "20px",
-        fontWeight: 500,
-        letterSpacing: "-0.011em",
-        textTransform: "none",
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        transition: theme.transitions.create("background-color", {
-            duration: 120,
-        }),
-        "&:hover": { backgroundColor: "fill.faintHover", color: "text.base" },
-        "&:focus-visible": {
-            outline: `1px solid ${theme.vars.palette.stroke.base}`,
-            outlineOffset: 2,
-        },
-        ...theme.applyStyles("dark", {
-            "&:not(.Mui-selected)": {
-                backgroundColor: "rgba(255 255 255 / 0.12)",
-            },
-        }),
-        "&.Mui-selected": {
-            backgroundColor: "accent.main",
-            color: "accent.contrastText",
-        },
-        "&.Mui-selected:hover": { backgroundColor: "accent.dark" },
-    },
-});
 const GridColumns = 3;
 const GridGap = 8;
 const GridPaddingInline = 20;

@@ -19,6 +19,7 @@ import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import PublicIcon from "@mui/icons-material/Public";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
+import SlideshowIcon from "@mui/icons-material/Slideshow";
 import SortIcon from "@mui/icons-material/Sort";
 import TvIcon from "@mui/icons-material/Tv";
 import UnarchiveIcon from "@mui/icons-material/Unarchive";
@@ -82,6 +83,7 @@ export interface CollectionHeaderProps {
     onCollectionShare: () => void;
     onCollectionManageLink: () => void;
     onCollectionCast: () => void;
+    onCollectionSlideshow: () => void;
     onEditAlbumDetails: () => void;
     hasActiveFileSelection: boolean;
     onAddSaveGroup: AddSaveGroup;
@@ -141,6 +143,7 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
     onCollectionShare,
     onCollectionManageLink,
     onCollectionCast,
+    onCollectionSlideshow,
     onEditAlbumDetails,
     hasActiveFileSelection,
     onAddSaveGroup,
@@ -663,6 +666,16 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
             break;
     }
 
+    if (activeCollection)
+        menuOptions.push(
+            <OverflowMenuOption
+                key="slideshow"
+                startIcon={<SlideshowIcon />}
+                onClick={onCollectionSlideshow}
+            >
+                {t("slideshow")}
+            </OverflowMenuOption>,
+        );
     const validMenuOptions = menuOptions.filter((o) => !!o);
 
     return (
