@@ -494,18 +494,6 @@ impl From<ente_space::LikePostResponse> for LikePostResponse {
     }
 }
 
-#[derive(Serialize, Tsify)]
-#[serde(rename_all = "camelCase")]
-pub struct LikeMessageResponse {
-    liked: bool,
-}
-
-impl From<ente_space::LikeMessageResponse> for LikeMessageResponse {
-    fn from(value: ente_space::LikeMessageResponse) -> Self {
-        Self { liked: value.liked }
-    }
-}
-
 fn decode_b64_field(value: &str) -> Result<Vec<u8>, Error> {
     b64::decode(value)
         .map_err(ente_space::Error::from)
@@ -1260,22 +1248,6 @@ impl SpaceAccountCtxHandle {
             )
             .await?;
         MessageResponse::from(message).into_js().map_err(Into::into)
-    }
-
-    #[wasm_bindgen(js_name = likeMessage)]
-    pub async fn like_message(
-        &self,
-        space_id: String,
-        message_id: String,
-        like: bool,
-    ) -> Result<<LikeMessageResponse as Tsify>::JsType, Error> {
-        LikeMessageResponse::from(
-            self.inner
-                .like_message(&space_id, &message_id, like)
-                .await?,
-        )
-        .into_js()
-        .map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = setMessageReaction)]
