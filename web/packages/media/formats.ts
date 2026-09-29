@@ -1,6 +1,6 @@
-// Image extensions that browsers are unlikely to render, for which the desktop
-// app should attempt native JPEG conversion. RAW support depends on the
-// platform decoder and camera model.
+// Image extensions that the browser is unlikely to be able to render, but
+// which our desktop app should be able to convert to JPEG. Both conditions
+// must hold for an extension to be in this list.
 const needsJPEGConversionExtensions = [
     "arw",
     "cr2",

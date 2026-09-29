@@ -9,19 +9,14 @@ vi.mock("ente-base/log", () => ({
 }));
 vi.mock("ente-media/heic-convert", () => ({ heicToJPEG: vi.fn() }));
 
-// Keep this change scoped to the five selected camera RAW formats.
 const rawExtensions = ["raf", "orf", "pef", "nrw", "srw"];
 
-// Intentionally unrecognized bytes exercise the filename fallback, not decoding.
 const unknownBytes = new Uint8Array([0, 1, 2, 3]);
 
-// A minimal TIFF with an empty IFD. RAW files sharing this signature retain the
-// detected TIFF type; the native converter also needs their original filename.
 const tiffBytes = new Uint8Array([
     0x49, 0x49, 0x2a, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ]);
 
-// These recognizable headers exercise file-type rather than filename fallback.
 const rawHeaders = [
     {
         extension: "orf",
@@ -41,8 +36,6 @@ describe("camera RAW format support", () => {
                 extension,
             });
 
-            // ML fallback and browser editing/casting checks use the filename
-            // extension, independently of content-based type detection.
             expect(needsJPEGConversion(extension.toUpperCase())).toBe(true);
 
             const jpeg = new Blob(["converted"], { type: "image/jpeg" });
@@ -61,7 +54,7 @@ describe("camera RAW format support", () => {
     test.each(rawHeaders)(
         "converts content-detected $extension files",
         async ({ extension, bytes }) => {
-            const file = new File([bytes], `photo.${extension}`);
+            const file = new File([bytes], "photo.bin");
             expect(await detectFileTypeInfo(file)).toMatchObject({ extension });
             const jpeg = new Blob(["converted"], { type: "image/jpeg" });
             const convertToJPEG = vi.fn().mockResolvedValue(jpeg);
