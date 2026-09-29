@@ -1,0 +1,1 @@
+- Added slideshows for albums.
