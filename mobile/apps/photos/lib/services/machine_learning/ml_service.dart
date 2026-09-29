@@ -635,6 +635,10 @@ class MLService {
           _logger.info(
             'stopping indexing because user is not connected to wifi and in online mode',
           );
+          if (maxFilesToIndex != null) {
+            allowImageIndexing = false;
+            continue;
+          }
           break;
         } else {
           await MLModelDownloadService.instance.ensureModelsDownloaded(
