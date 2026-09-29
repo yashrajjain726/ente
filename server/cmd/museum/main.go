@@ -629,6 +629,8 @@ func main() {
 	storageAPI.POST("/files/data/fetch", fileHandler.GetFilesData)
 	storageAPI.GET("/files/data/fetch", fileHandler.GetFileData)
 	storageAPI.GET("/files/data/preview-upload-url", fileHandler.GetPreviewUploadURL)
+	storageAPI.POST("/files/data/preview-upload-url", fileHandler.GetPreviewUploadURLV2)
+	storageAPI.POST("/files/data/multipart-preview-upload-url", fileHandler.GetMultipartPreviewUploadURL)
 	storageAPI.GET("/files/data/preview", fileHandler.GetPreviewURL)
 
 	storageAPI.POST("/files", fileHandler.CreateOrUpdate)
