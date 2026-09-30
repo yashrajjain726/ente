@@ -1,13 +1,18 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 use tauri::{Manager, RunEvent, async_runtime};
 
+#[forbid(unsafe_code)]
 mod commands;
+#[forbid(unsafe_code)]
 mod logging;
+mod platform;
 #[cfg(any(windows, target_os = "linux"))]
+#[forbid(unsafe_code)]
 mod single_instance;
 
+#[forbid(unsafe_code)]
 fn main() {
     logging::install_panic_hook();
     logging::log("App", "starting Tauri backend");

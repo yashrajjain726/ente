@@ -1,9 +1,10 @@
+#[cfg(windows)]
 use std::fs::File;
+#[cfg(windows)]
 use std::io;
 use std::path::Path;
 
-use filepath::FilePath;
-
+#[cfg(windows)]
 pub(super) fn open(root: &Path, document_id: &str) -> io::Result<File> {
     if !root.is_absolute() {
         return Err(io::Error::new(
@@ -16,7 +17,7 @@ pub(super) fn open(root: &Path, document_id: &str) -> io::Result<File> {
         path.push(component);
     }
     let file = File::open(path)?;
-    if !path_is_beneath(&file.path()?, root) {
+    if !path_is_beneath(&crate::platform::final_handle_path(&file)?, root) {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "Source note escaped its collection",
@@ -64,14 +65,22 @@ fn comparison_path(path: &Path) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(windows)]
     use std::fs;
+    #[cfg(windows)]
     use std::io::Read;
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
+    #[cfg(windows)]
+    use std::path::PathBuf;
 
-    use super::{open, path_is_beneath};
+    #[cfg(windows)]
+    use super::open;
+    use super::path_is_beneath;
 
+    #[cfg(windows)]
     struct Directory(PathBuf);
 
+    #[cfg(windows)]
     impl Directory {
         fn new() -> Self {
             let directory =
@@ -84,12 +93,14 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
     impl Drop for Directory {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
     }
 
+    #[cfg(windows)]
     #[test]
     fn opens_nested_files_and_rejects_parent_and_absolute_paths() {
         let directory = Directory::new();
@@ -102,28 +113,6 @@ mod tests {
         assert_eq!(contents, "inside");
         assert!(open(&root, "../outside/note.md").is_err());
         assert!(open(&root, directory.0.join("outside/note.md").to_str().unwrap()).is_err());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn rejects_a_swapped_file_or_directory_symlink() {
-        use std::os::unix::fs::symlink;
-        let directory = Directory::new();
-        let root = directory.0.join("root");
-        fs::remove_file(root.join("nested/note.md")).unwrap();
-        symlink(
-            directory.0.join("outside/note.md"),
-            root.join("nested/note.md"),
-        )
-        .unwrap();
-        assert!(open(&root, "nested/note.md").is_err());
-        fs::remove_file(root.join("nested/note.md")).unwrap();
-        fs::remove_dir(root.join("nested")).unwrap();
-        symlink(directory.0.join("outside"), root.join("nested")).unwrap();
-        assert!(open(&root, "nested/note.md").is_err());
-        fs::rename(&root, directory.0.join("original-root")).unwrap();
-        symlink(directory.0.join("outside"), &root).unwrap();
-        assert!(open(&root, "note.md").is_err());
     }
 
     #[cfg(windows)]
@@ -164,6 +153,7 @@ mod tests {
         assert_eq!(error.raw_os_error(), None);
     }
 
+    #[cfg(windows)]
     #[test]
     fn supports_unicode_names_and_reads_from_the_opened_handle() {
         let directory = Directory::new();
@@ -177,6 +167,7 @@ mod tests {
         assert_eq!(contents, "original");
     }
 
+    #[cfg(windows)]
     #[test]
     fn supports_paths_longer_than_legacy_windows_limits() {
         let directory = Directory::new();
@@ -225,6 +216,7 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
     #[test]
     fn reads_literal_reserved_windows_filenames() {
         let directory = Directory::new();

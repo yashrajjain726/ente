@@ -5,8 +5,8 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
+use ente_ensu_crypto::Sha256Hasher;
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
 use url::Url;
 
 use crate::config::{
@@ -237,7 +237,7 @@ impl RetrievalIndex {
             return Ok(digest);
         }
         self.metadata.verify()?;
-        let mut hash = Sha256::new();
+        let mut hash = Sha256Hasher::new();
         hash.update(b"ensu-pack-text-revision-v1\0");
         hash.update((self.manifest_bytes.len() as u64).to_le_bytes());
         hash.update(&self.manifest_bytes);
