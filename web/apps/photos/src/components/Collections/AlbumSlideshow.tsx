@@ -135,7 +135,9 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
         )) {
             void downloadManager
                 .renderableThumbnailURL(file)
-                .then(() => downloadManager.renderableSourceURLs(file))
+                .catch(() => undefined);
+            void downloadManager
+                .renderableSourceURLs(file)
                 .catch(() => undefined);
         }
     }, [orderedFiles, slide.index]);
