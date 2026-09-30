@@ -36,8 +36,9 @@ func TestLimitRequestBody(t *testing.T) {
 				// Exercise both ordinary body logging and the redacted path.
 				for _, path := range []string{"/test", "/events"} {
 					t.Run(path, func(t *testing.T) {
+						rateLimiter := &RateLimitMiddleware{limit: 1}
 						router := gin.New()
-						router.Use(LimitRequestBody(), Logger(func(c *gin.Context) string { return c.FullPath() }))
+						router.Use(rateLimiter.GlobalRateLimiter(), LimitRequestBody(), Logger(func(c *gin.Context) string { return c.FullPath() }))
 						called := false
 						router.POST(path, func(c *gin.Context) {
 							called = true
@@ -54,6 +55,7 @@ func TestLimitRequestBody(t *testing.T) {
 						}
 						response := httptest.NewRecorder()
 						router.ServeHTTP(response, req)
+						require.Equal(t, int64(1), rateLimiter.count)
 
 						if tc.size > maxRequestBodySize {
 							require.Equal(t, http.StatusRequestEntityTooLarge, response.Code)
@@ -72,6 +74,40 @@ func TestLimitRequestBody(t *testing.T) {
 	}
 }
 
+func TestGlobalRateLimitBeforeBodyRead(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tc := range []struct {
+		name          string
+		method        string
+		path          string
+		contentLength int64
+	}{
+		{"declared oversized body", http.MethodPost, "/test", maxRequestBodySize + 1},
+		{"unknown length body", http.MethodPost, "/test", -1},
+		{"unmatched route", http.MethodPost, "/missing", 4},
+		{"options", http.MethodOptions, "/test", 4},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rateLimiter := &RateLimitMiddleware{limit: 0}
+			router := gin.New()
+			router.Use(rateLimiter.GlobalRateLimiter(), LimitRequestBody(), Logger(func(c *gin.Context) string { return c.FullPath() }))
+			router.POST("/test", func(c *gin.Context) {
+				t.Fatal("handler called after rate limit rejection")
+			})
+			body := strings.NewReader("body")
+			req := httptest.NewRequest(tc.method, tc.path, body)
+			req.ContentLength = tc.contentLength
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, req)
+
+			require.Equal(t, http.StatusTooManyRequests, response.Code)
+			require.JSONEq(t, `{"error":"Rate limit breached, try later"}`, response.Body.String())
+			require.Equal(t, int64(1), rateLimiter.count)
+			require.Equal(t, 4, body.Len(), "rate-limited body was read")
+		})
+	}
+}
+
 func TestLoggerStopsOnBodyReadError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	logger := logrus.StandardLogger()
@@ -79,8 +115,9 @@ func TestLoggerStopsOnBodyReadError(t *testing.T) {
 	t.Cleanup(func() { logger.ReplaceHooks(originalHooks) })
 	hook := logtest.NewGlobal()
 
+	rateLimiter := &RateLimitMiddleware{limit: 1}
 	router := gin.New()
-	router.Use(LimitRequestBody(), Logger(func(c *gin.Context) string { return c.FullPath() }))
+	router.Use(rateLimiter.GlobalRateLimiter(), LimitRequestBody(), Logger(func(c *gin.Context) string { return c.FullPath() }))
 	router.POST("/test", func(c *gin.Context) {
 		t.Fatal("handler called after body read error")
 	})
@@ -89,6 +126,7 @@ func TestLoggerStopsOnBodyReadError(t *testing.T) {
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, req)
 
+	require.Equal(t, int64(1), rateLimiter.count)
 	require.Equal(t, http.StatusBadRequest, response.Code)
 	entries := hook.AllEntries()
 	require.Len(t, entries, 1)
