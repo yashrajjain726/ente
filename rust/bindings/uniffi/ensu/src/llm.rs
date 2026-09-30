@@ -149,7 +149,7 @@ impl LlmContext {
     pub fn generate_chat_stream(
         &self,
         request: LlmChatRequest,
-        callback: Box<dyn LlmGenerationEventCallback>,
+        callback: Arc<dyn LlmGenerationEventCallback>,
     ) -> Result<LlmGenerationSummary, LlmError> {
         let mut sink = CallbackSink { callback };
         self.handle
@@ -169,7 +169,7 @@ impl LlmContext {
     }
 }
 
-#[uniffi::export(callback_interface)]
+#[uniffi::export(foreign)]
 pub trait LlmGenerationEventCallback: Send + Sync {
     fn on_event(&self, event: LlmGenerationEvent);
 }
@@ -267,7 +267,7 @@ impl From<llm::GenerationEvent> for LlmGenerationEvent {
 }
 
 struct CallbackSink {
-    callback: Box<dyn LlmGenerationEventCallback>,
+    callback: Arc<dyn LlmGenerationEventCallback>,
 }
 
 impl llm::EventSink for CallbackSink {

@@ -123,13 +123,7 @@ android {
     }
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-        // TODO: Remove when UniFFI releases https://github.com/mozilla/uniffi-rs/pull/2949.
-        freeCompilerArgs.add("-Xwarning-level=UNUSED_EXPRESSION:warning")
-    }
-}
+kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 
 tasks.matching { it.name == "preDebugBuild" }.configureEach { dependsOn(buildRustJniDebug) }
 

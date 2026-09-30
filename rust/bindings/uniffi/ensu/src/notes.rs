@@ -105,7 +105,7 @@ pub struct NotesRead {
     pub source: NotesDocument,
 }
 
-#[uniffi::export(callback_interface)]
+#[uniffi::export(foreign)]
 pub trait NotesSource: Send + Sync {
     fn list_documents(&self) -> Result<Vec<NotesDocument>, NotesError>;
     fn read_document(&self, document_id: String) -> Result<NotesRead, NotesError>;
@@ -117,7 +117,7 @@ pub struct NotesProgress {
     pub indexed_document_count: u64,
 }
 
-#[uniffi::export(callback_interface)]
+#[uniffi::export(foreign)]
 pub trait NotesProgressCallback: Send + Sync {
     fn on_progress(&self, progress: NotesProgress);
 }
@@ -283,7 +283,7 @@ impl NotesCollection {
 
     pub fn inspect_freshness(
         &self,
-        source: Box<dyn NotesSource>,
+        source: Arc<dyn NotesSource>,
         cancellation: Arc<NotesCancellation>,
     ) -> Result<NotesFreshness, NotesError> {
         cancellation.check()?;
@@ -308,10 +308,10 @@ impl NotesCollection {
 
     pub fn index(
         &self,
-        source: Box<dyn NotesSource>,
+        source: Arc<dyn NotesSource>,
         context: Arc<LlmContext>,
         cancellation: Arc<NotesCancellation>,
-        progress: Box<dyn NotesProgressCallback>,
+        progress: Arc<dyn NotesProgressCallback>,
         options: NotesIndexOptions,
     ) -> Result<NotesOutcome, NotesError> {
         let NotesIndexOptions {
@@ -453,8 +453,8 @@ fn read(
 }
 
 #[uniffi::export]
-pub fn notes_content_revision(bytes: Vec<u8>) -> String {
-    core::notes_content_revision(&bytes)
+pub fn notes_content_revision(bytes: &[u8]) -> String {
+    core::notes_content_revision(bytes)
 }
 
 #[uniffi::export]
