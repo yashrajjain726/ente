@@ -251,58 +251,54 @@ jobs:
                   sudo apt-get install -y libsecret-1-dev libsodium-dev libfuse2 ninja-build libgtk-3-dev dpkg-dev pkg-config rpm patchelf libsqlite3-dev locate libayatana-appindicator3-dev libffi-dev libtiff5 xz-utils libarchive-tools libcurl4-openssl-dev
                   sudo updatedb --localpaths='/usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu'
 
-            - name: Install verified Linux packaging tools
+            - name: Install verified fpm
               run: |
                   set -euo pipefail
 
                   gem_lock="$GITHUB_WORKSPACE/mobile/apps/auth/linux/packaging/fpm-gems.sha256"
-                  tools_dir="$(mktemp -d "${RUNNER_TEMP:?}/auth-linux-tools.XXXXXX")"
-                  mkdir "$tools_dir/bin" "$tools_dir/downloads"
-                  cd "$tools_dir/downloads"
+                  gem_home="$(mktemp -d "${RUNNER_TEMP:?}/auth-fpm.XXXXXX")"
+                  export GEM_HOME="$gem_home" GEM_PATH="$gem_home"
+                  cd "$gem_home"
 
                   while read -r _checksum gem_file; do
-                      curl --fail --location --silent --show-error \
+                      curl -fsSL --proto '=https' \
                           "https://rubygems.org/downloads/$gem_file" --output "$gem_file"
                   done < "$gem_lock"
                   sha256sum --check "$gem_lock"
 
                   # An isolated gem home and --local keep the entire dependency closure offline.
-                  export GEM_HOME="$tools_dir/gems"
-                  export GEM_PATH="$GEM_HOME"
                   gem install --local --no-document --env-shebang ./*.gem
-                  cat > "$tools_dir/bin/fpm" <<'EOF'
-                  #!/usr/bin/env bash
-                  set -euo pipefail
-                  tools_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-                  export GEM_HOME="$tools_dir/gems"
-                  export GEM_PATH="$GEM_HOME"
-                  exec "$GEM_HOME/bin/fpm" "$@"
-                  EOF
+                  "$gem_home/bin/fpm" --version
+                  printf 'GEM_HOME=%s\nGEM_PATH=%s\n' "$gem_home" "$gem_home" >> "${GITHUB_ENV:?}"
+                  printf '%s\n' "$gem_home/bin" >> "${GITHUB_PATH:?}"
 
-                  curl --fail --location --silent --show-error \
+            - name: Install verified AppImage tools
+              run: |
+                  set -euo pipefail
+
+                  tools_dir="$(mktemp -d "${RUNNER_TEMP:?}/auth-appimage.XXXXXX")"
+                  cd "$tools_dir"
+
+                  curl -fsSL --proto '=https' \
                       https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage \
                       --output appimagetool.AppImage
-                  curl --fail --location --silent --show-error \
+                  echo 'ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  appimagetool.AppImage' | sha256sum --check
+                  curl -fsSL --proto '=https' \
                       https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64 \
                       --output runtime-x86_64
-                  sha256sum --check <<'EOF'
-                  ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  appimagetool.AppImage
-                  2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d  runtime-x86_64
-                  EOF
-                  mv appimagetool.AppImage runtime-x86_64 "$tools_dir/"
+                  echo '2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d  runtime-x86_64' | sha256sum --check
 
                   # Both Fastforge and post_process_appimage.sh must use the verified runtime.
-                  cat > "$tools_dir/bin/appimagetool" <<'EOF'
+                  cat > appimagetool <<'EOF'
                   #!/usr/bin/env bash
                   set -euo pipefail
-                  tools_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+                  tools_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
                   export APPIMAGE_EXTRACT_AND_RUN=1
                   exec "$tools_dir/appimagetool.AppImage" --runtime-file "$tools_dir/runtime-x86_64" "$@"
                   EOF
-                  chmod +x "$tools_dir/appimagetool.AppImage" "$tools_dir/bin/"*
-                  "$tools_dir/bin/fpm" --version
-                  "$tools_dir/bin/appimagetool" --version
-                  printf '%s\n' "$tools_dir/bin" >> "${GITHUB_PATH:?}"
+                  chmod +x appimagetool.AppImage appimagetool
+                  ./appimagetool --version
+                  printf '%s\n' "$tools_dir" >> "${GITHUB_PATH:?}"
 
             - name: Build Linux app
               run: |
