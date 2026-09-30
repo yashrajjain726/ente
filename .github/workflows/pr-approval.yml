@@ -67,6 +67,7 @@ jobs:
                           281837475: {
                               allowPrefixes: [
                                   "mobile/apps/locker/",
+                                  "mobile/apps/photos/",
                                   "mobile/packages/ente_components/",
                                   "mobile/packages/strings/",
                                   "docs/docs/",
