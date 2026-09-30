@@ -8,8 +8,6 @@ pub(super) fn refers_back(question: &str) -> bool {
         .filter(|word| !word.is_empty());
     while let Some(word) = words.next() {
         let word = word.to_lowercase();
-        // A time expression is not a source antecedent. Keep checking the rest
-        // of the question: "this year, what does it cover?" still refers back.
         if matches!(
             word.as_str(),
             "this" | "that" | "these" | "those" | "previous" | "earlier"
@@ -31,8 +29,6 @@ pub(super) fn refers_back(question: &str) -> bool {
 }
 
 fn starts_temporal_phrase<'a>(words: impl Iterator<Item = &'a str>) -> bool {
-    // Bound lookahead, including phrases like "earlier in the previous fiscal
-    // year" and "these past few months", without scanning unrelated clauses.
     for word in words.take(8) {
         let word = word.to_lowercase();
         if [
@@ -72,8 +68,7 @@ fn starts_temporal_phrase<'a>(words: impl Iterator<Item = &'a str>) -> bool {
         {
             continue;
         }
-        // Bare "second" can be an ordinal ("that second policy"), and "may"
-        // can be a verb ("that may differ"). Neither establishes a time phrase.
+        // Exclude "second" (ordinal) and "may" (verb) as time markers.
         return matches!(word.as_str(), "seconds" | "centuries" | "millennia")
             || [
                 "minute",
@@ -173,9 +168,7 @@ pub fn direct_followup_references(
         question,
         prior.iter().chain(searched.iter().map(|hit| &hit.source)),
     );
-    // Ownership can still refer to an earlier source ("compare Juniper with my
-    // policy"). Keep it eligible for reload; fitting determines whether the
-    // query is a comparison that needs historical priority.
+    // "my/our" permit reload; select_sources decides historical priority.
     let may_refer_back = refers_back(question) || has_ownership_hint(question);
     if !may_refer_back
         && !named.is_empty()
