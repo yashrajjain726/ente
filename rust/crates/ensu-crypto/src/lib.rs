@@ -1,5 +1,3 @@
-#![forbid(unsafe_code)]
-
 use ente_core::{
     b64,
     crypto::{self, Header, Key, blob},
