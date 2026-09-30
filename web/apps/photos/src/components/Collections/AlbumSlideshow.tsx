@@ -128,7 +128,6 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
     );
 
     useEffect(() => {
-        // ponytail: the download manager already caches and deduplicates these requests.
         for (const file of slideshowPrefetchFiles(
             orderedFiles,
             slide.index,
