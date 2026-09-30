@@ -517,9 +517,7 @@ const PinSetupDialog: React.FC<SetupDialogProps> = ({
                                 fontSize: "1.25rem",
                                 padding: "12px 0",
                             },
-                            "aria-label": t("app_lock_pin_digit_label", {
-                                index: i + 1,
-                            }),
+                            "aria-label": `PIN digit ${String(i + 1)}`,
                         },
                     }}
                     sx={{ flex: 1, minWidth: 0 }}

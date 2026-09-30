@@ -822,7 +822,7 @@ export const FileList: React.FC<FileListProps> = ({
             {showBackToTop && (
                 <BackToTopButton
                     size="small"
-                    aria-label={t("scroll_to_top")}
+                    aria-label="scroll to top"
                     onClick={handleScrollToTop}
                 >
                     <KeyboardArrowUpIcon />

@@ -915,9 +915,6 @@ function createMarkerIcon(
 
     const outerBorderRadius = 16;
     const innerBorderRadius = 12;
-    const escapedLocationLabel = t("location")
-        .replaceAll("&", "&amp;")
-        .replaceAll('"', "&quot;");
 
     const hoverHandlers = interactive
         ? "onmouseover=\"this.style.background='#22c55e'; this.style.borderColor='#22c55e'; this.parentElement.querySelector('.triangle').style.borderTopColor='#22c55e';\" onmouseout=\"this.style.background='white'; this.style.borderColor='#ffffff'; this.parentElement.querySelector('.triangle').style.borderTopColor='white';\""
@@ -956,7 +953,7 @@ function createMarkerIcon(
               >
                 ${
                     hasImage
-                        ? `<img src="${imageSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:${innerBorderRadius}px;" alt="${escapedLocationLabel}" />`
+                        ? `<img src="${imageSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:${innerBorderRadius}px;" alt="Location" />`
                         : `<div style="width:100%;height:100%;border-radius:${innerBorderRadius}px;animation:skeleton-pulse 1.5s ease-in-out infinite;"></div>
                            <style>@keyframes skeleton-pulse{0%{background-color:#ffffff}50%{background-color:#f0f0f0}100%{background-color:#ffffff}}</style>`
                 }
@@ -1869,7 +1866,7 @@ function CenteredBox({ children, onClose, closeLabel }: CenteredBoxProps) {
         <CenteredBoxContainer>
             {onClose && (
                 <IconButton
-                    aria-label={closeLabel ?? t("close")}
+                    aria-label={closeLabel ?? "Close"}
                     onClick={onClose}
                     sx={{ position: "absolute", top: 16, right: 16 }}
                 >
@@ -1899,7 +1896,7 @@ const MapCover = React.memo(function MapCover({
             <CoverImageContainer>
                 <img
                     src={coverImageUrl}
-                    alt={t("cover")}
+                    alt="Cover"
                     style={{
                         position: "absolute",
                         inset: 0,
@@ -1911,7 +1908,7 @@ const MapCover = React.memo(function MapCover({
                 />
                 <CoverGradientOverlay />
 
-                <CoverCloseButton aria-label={t("close")} onClick={onClose}>
+                <CoverCloseButton aria-label="Close" onClick={onClose}>
                     <CloseIcon sx={{ fontSize: 20 }} />
                 </CoverCloseButton>
 
