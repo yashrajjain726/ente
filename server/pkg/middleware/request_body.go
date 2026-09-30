@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Match client_max_body_size in scripts/deploy/museum.nginx.conf.
 const maxRequestBodySize = 4 << 20
 
 func LimitRequestBody() gin.HandlerFunc {
