@@ -407,6 +407,7 @@ Future<void> _runMinimally(
           final disposition = await MLService.instance.runAllML(
             force: false,
             allowImageIndexing: BgTaskUtils.allowsImageIndexing(taskId),
+            maxFilesToIndex: BgTaskUtils.isRefreshTask(taskId) ? 100 : null,
             control: mlRunControl,
             lockWait: mlLockWait,
           );

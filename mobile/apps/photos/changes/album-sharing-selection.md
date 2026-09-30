@@ -1,0 +1,1 @@
+- Improved album sharing suggestions and empty states, and fixed recipient removal while animations finish.

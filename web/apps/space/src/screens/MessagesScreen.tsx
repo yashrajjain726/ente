@@ -1786,9 +1786,9 @@ const MessageBubble: React.FC<{
                                             borderRadius: "12px",
                                             fontFamily:
                                                 '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif',
-                                            fontSize: 14,
-                                            minHeight: 24,
-                                            minWidth: 28,
+                                            fontSize: 15,
+                                            minHeight: 25,
+                                            minWidth: 29,
                                             pt: "2px",
                                             px: "3px",
                                             color: green,
@@ -2211,10 +2211,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
 
     React.useLayoutEffect(() => {
         resizeComposer(composerRef.current);
-        if (!selectedFriend || !stickToThreadBottomRef.current) return;
+        if (!selectedThreadID || !stickToThreadBottomRef.current) return;
         if (smoothNextMessageScrollRef.current) return;
         scrollThreadToBottom();
-    }, [messageText, replyingTo, scrollThreadToBottom, selectedFriend]);
+    }, [messageText, replyingTo, scrollThreadToBottom, selectedThreadID]);
 
     React.useEffect(() => {
         setReplyingTo(null);
@@ -2224,7 +2224,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         setMessageText("");
         stickToThreadBottomRef.current = true;
         smoothNextMessageScrollRef.current = false;
-    }, [selectedFriend]);
+    }, [selectedThreadID]);
 
     React.useEffect(() => {
         if (!messageContextMenu?.open) return;
@@ -2253,7 +2253,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     }, [isThreadReadOnly]);
 
     React.useLayoutEffect(() => {
-        if (!selectedFriend || isThreadLoading) return;
+        if (!selectedThreadID || isThreadBusy) return;
         if (!stickToThreadBottomRef.current) return;
         if (smoothNextMessageScrollRef.current) {
             smoothNextMessageScrollRef.current = false;
@@ -2262,10 +2262,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         }
         scrollThreadToBottom();
     }, [
-        isThreadLoading,
+        isThreadBusy,
         scheduleThreadBottomScroll,
         scrollThreadToBottom,
-        selectedFriend,
+        selectedThreadID,
         visibleMessages.length,
     ]);
 

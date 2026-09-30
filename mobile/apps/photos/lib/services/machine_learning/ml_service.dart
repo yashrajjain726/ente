@@ -343,6 +343,7 @@ class MLService {
   Future<MlRunDisposition> runAllML({
     bool force = false,
     bool allowImageIndexing = true,
+    int? maxFilesToIndex,
     MlRunControl? control,
     Duration? lockWait,
   }) async {
@@ -395,6 +396,7 @@ class MLService {
             mode: mode,
             force: force,
             allowImageIndexing: allowImageIndexing,
+            maxFilesToIndex: maxFilesToIndex,
             control: runControl,
           );
         },
@@ -436,6 +438,7 @@ class MLService {
     required MLMode mode,
     required bool force,
     required bool allowImageIndexing,
+    required int? maxFilesToIndex,
     required MlRunControl control,
   }) async {
     assert(MlProcessLock.instance.isBusy, "ml funnel must be held");
@@ -472,6 +475,7 @@ class MLService {
           mode: mode,
           control: control,
           allowImageIndexing: allowImageIndexing,
+          maxFilesToIndex: maxFilesToIndex,
         );
       }
       if (control.stopRequested) {
@@ -590,6 +594,7 @@ class MLService {
     required MLMode mode,
     required MlRunControl control,
     bool allowImageIndexing = true,
+    int? maxFilesToIndex,
   }) async {
     assert(MlProcessLock.instance.isBusy, "ml funnel must be held");
     if (control.stopRequested) {
@@ -610,6 +615,7 @@ class MLService {
           fetchEmbeddingsAndInstructions(fileDownloadMlLimit, mode: mode);
 
       int fileAnalyzedCount = 0;
+      int fileAttemptCount = 0;
       final Stopwatch stopwatch = Stopwatch()..start();
 
       bool stopRun = false;
@@ -629,6 +635,10 @@ class MLService {
           _logger.info(
             'stopping indexing because user is not connected to wifi and in online mode',
           );
+          if (maxFilesToIndex != null) {
+            allowImageIndexing = false;
+            continue;
+          }
           break;
         } else {
           await MLModelDownloadService.instance.ensureModelsDownloaded(
@@ -640,7 +650,10 @@ class MLService {
           }
         }
         final futures = <Future<bool>>[];
-        for (final instruction in chunk) {
+        final instructions = maxFilesToIndex == null
+            ? chunk
+            : chunk.take(maxFilesToIndex - fileAttemptCount);
+        for (final instruction in instructions) {
           if (control.stopRequested) {
             _logRunStopped(control, "between indexing instructions");
             stopRun = true;
@@ -648,6 +661,7 @@ class MLService {
           }
           futures.add(_processImage(instruction));
         }
+        fileAttemptCount += futures.length;
         // Drain: work that was already started must complete (and commit)
         // before this run can exit and release the process lock.
         final awaitedFutures = await Future.wait(futures);
@@ -656,6 +670,9 @@ class MLService {
           (previousValue, element) => previousValue + (element ? 1 : 0),
         );
         fileAnalyzedCount += sumFutures;
+        if (fileAttemptCount == maxFilesToIndex) {
+          allowImageIndexing = false;
+        }
         if (stopRun) {
           break;
         }

@@ -564,7 +564,10 @@ func main() {
 		rateLimiter.APIRateLimitMiddleware(urlSanitizer),
 	)
 	fileLinkApi := server.Group("/file-link")
-	fileLinkApi.Use(fileLinkMiddleware.Authenticate(urlSanitizer))
+	fileLinkApi.Use(
+		fileLinkMiddleware.Authenticate(urlSanitizer),
+		rateLimiter.APIRateLimitMiddleware(urlSanitizer),
+	)
 
 	publicMemoryAPI := server.Group("/public-memory")
 	publicMemoryAPI.Use(

@@ -2520,6 +2520,10 @@
   "@mediaManagementHintTitle": {
     "description": "Title of a sheet prompting Android users to enable media management permission."
   },
+  "meetEnteLocker": "Meet Ente Locker",
+  "@meetEnteLocker": {
+    "description": "Button in the Photos changelog that opens the Ente Locker website"
+  },
   "members": "Members",
   "memberStorageUsed": "{amount} used",
   "@memberStorageUsed": {
@@ -4214,6 +4218,7 @@
   "sortNewestFirst": "Newest first",
   "sortOldestFirst": "Oldest first",
   "sortZToA": "Z-A",
+  "speed": "Speed",
   "sportsAction": "Game on",
   "sportsWithThem": "Sports with {name}",
   "@sportsWithThem": {
@@ -5002,7 +5007,7 @@
   "youAreViewer": "You are a viewer",
   "youAreCollaborator": "You are a collaborator",
   "youAreAdmin": "You are an admin",
-  "emptyAlbumShareMessage": "You have not shared this album with anyone yet.",
+  "emptyAlbumShareMessage": "Add a person to\nshare your album with them",
   "addPeople": "Add people",
   "fromYourContacts": "From your contacts",
   "chooseAccess": "Choose access",

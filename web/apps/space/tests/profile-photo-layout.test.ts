@@ -52,10 +52,10 @@ test("a landscape can share a row with two portraits to avoid a lone portrait", 
     ]);
 });
 
-test("a standalone portrait stays compact and keeps its original proportions", () => {
+test("a single-post section fills the width with the feed's portrait height cap", () => {
     const tiles = photos([9 / 16]);
-    expect(profilePhotoRows(tiles, 328)).toEqual([
-        { aspectRatio: 9 / 16, height: 246, width: 246 * (9 / 16), tiles },
+    expect(profilePhotoRows(tiles, 324)).toEqual([
+        { aspectRatio: 9 / 16, height: 432, width: 324, tiles },
     ]);
 });
 

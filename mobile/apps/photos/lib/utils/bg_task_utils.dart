@@ -139,8 +139,13 @@ class BgTaskUtils {
       "io.ente.photos.androidBackgroundProcessing";
 
   static bool allowsImageIndexing(String taskName) =>
+      isRefreshTask(taskName) ||
       taskName == iOSBackgroundProcessingTask ||
       taskName == androidBackgroundProcessingTask;
+
+  static bool isRefreshTask(String taskName) =>
+      taskName == iOSBackgroundAppRefreshTask ||
+      taskName == androidPeriodicTask;
 
   static Duration taskStartupElapsedFor(
     String taskName,

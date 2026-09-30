@@ -388,7 +388,7 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
                         display: "block",
                         height: "100%",
                         inset: 0,
-                        objectFit: "contain",
+                        objectFit: "cover",
                         objectPosition: "center",
                         opacity:
                             isCurrentImageReady || !thumbHashDataURL ? 1 : 0,

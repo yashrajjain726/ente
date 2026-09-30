@@ -112,7 +112,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   flutter_map: 8.3.1
-  flutter_rust_bridge: 2.12.0
+  flutter_rust_bridge: 2.13.0
   # Version 9.2.4 leaves lock-screen keys behind after an app reinstall.
   # Upgrade only after this is fixed or with a migration.
   # https://github.com/juliansteenbakker/flutter_secure_storage/issues/870#issuecomment-2777447937

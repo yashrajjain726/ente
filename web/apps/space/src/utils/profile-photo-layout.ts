@@ -1,3 +1,5 @@
+import { minimumPostPhotoFrameAspectRatio } from "../styles/tiles";
+
 export const profilePhotoGap = 6;
 const profilePhotoMinRowHeight = 100;
 
@@ -47,13 +49,16 @@ export const profilePhotoRows = <Tile extends { aspectRatio: number }>(
             0,
         );
         const gaps = (rowSize - 1) * profilePhotoGap;
-        // Keep sparse sections compact without cropping their photos. Shorter
-        // rows keep their natural width and align with the section heading.
-        const height = Math.min((width - gaps) / aspectRatio, width * 0.75);
+        const height = Math.min(
+            (width - gaps) / aspectRatio,
+            tiles.length == 1
+                ? width / minimumPostPhotoFrameAspectRatio
+                : width * 0.75,
+        );
         rows.push({
             aspectRatio,
             height,
-            width: height * aspectRatio + gaps,
+            width: tiles.length == 1 ? width : height * aspectRatio + gaps,
             tiles: rowTiles,
         });
         index += rowSize;

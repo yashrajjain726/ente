@@ -111,19 +111,28 @@ class FileDataGateway {
     return response.data["url"] as String;
   }
 
-  Future<({String encryptedData, String decryptionHeader})>
+  Future<({String encryptedData, String decryptionHeader})?>
   fetchSingleFileData({required int fileID, required String type}) async {
     final response = await _enteDio.get(
       "/files/data/fetch",
-      queryParameters: {"fileID": fileID, "type": type},
+      queryParameters: {
+        "fileID": fileID,
+        "type": type,
+        "preferNoContent": true,
+      },
+      options: Options(
+        validateStatus: (status) =>
+            status == 200 || status == 204 || status == 404,
+      ),
     );
+    if (response.statusCode == 204 || response.statusCode == 404) return null;
     return (
       encryptedData: response.data["data"]["encryptedData"] as String,
       decryptionHeader: response.data["data"]["decryptionHeader"] as String,
     );
   }
 
-  Future<({String encryptedData, String decryptionHeader})>
+  Future<({String encryptedData, String decryptionHeader})?>
   fetchPublicFileData({
     required String baseUrl,
     required int fileID,
@@ -133,9 +142,18 @@ class FileDataGateway {
   }) async {
     final response = await nonEnteDio.get(
       "$baseUrl/public-collection/files/data/fetch",
-      queryParameters: {"fileID": fileID, "type": type},
-      options: Options(headers: headers),
+      queryParameters: {
+        "fileID": fileID,
+        "type": type,
+        "preferNoContent": true,
+      },
+      options: Options(
+        headers: headers,
+        validateStatus: (status) =>
+            status == 200 || status == 204 || status == 404,
+      ),
     );
+    if (response.statusCode == 204 || response.statusCode == 404) return null;
     return (
       encryptedData: response.data["data"]["encryptedData"] as String,
       decryptionHeader: response.data["data"]["decryptionHeader"] as String,
