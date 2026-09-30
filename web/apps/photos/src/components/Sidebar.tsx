@@ -1179,9 +1179,7 @@ const DesktopAppLockSettings: React.FC<
                     label={t("app_lock")}
                     caption={
                         !appLock.supported
-                            ? t("app_lock_not_supported", {
-                                  defaultValue: "App lock is not supported",
-                              })
+                            ? t("app_lock_not_supported")
                             : undefined
                     }
                     disabled={!appLock.supported}

@@ -12,7 +12,6 @@ import {
 import type { LocalUser } from "ente-accounts/services/user";
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import { useIsSmallWidth } from "ente-base/components/utils/hooks";
-import { ut } from "ente-base/i18n";
 import type { Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
 import { FileType } from "ente-media/file-type";
@@ -275,7 +274,7 @@ export const PickCoverPhotoDialog: React.FC<PickCoverPhotoDialogProps> = ({
                         autoFocus={Boolean(selectedFile)}
                         sx={actionButtonSx}
                     >
-                        {ut("Confirm")}
+                        {t("confirm")}
                     </LoadingButton>
                 </DialogActions>
             </Stack>

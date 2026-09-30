@@ -84,7 +84,7 @@ export function UploadConfirmationDialog({
                             : importSource == "apple-photos"
                               ? isSheet
                                   ? "Apple Photos"
-                                  : "Import from Apple Photos"
+                                  : t("import_from_apple_photos")
                               : t("upload_to_ente")}
                     </Typography>
                     <Stack direction="row" sx={headerActionsSx}>

@@ -639,9 +639,7 @@ const ShowMoreFacesButton: React.FC<ShowMoreFacesButtonProps> = ({
                 "&:hover": { backgroundColor: "fill.muted" },
             }}
         >
-            {showingAllPeople
-                ? t("show_less_faces", { defaultValue: "Show fewer faces" })
-                : t("show_more_faces", { defaultValue: "Show more faces" })}
+            {showingAllPeople ? t("show_less_faces") : t("show_more_faces")}
         </Button>
     </Box>
 );

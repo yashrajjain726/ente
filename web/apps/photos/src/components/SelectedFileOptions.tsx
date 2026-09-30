@@ -340,8 +340,8 @@ const DownloadButton: React.FC<ButtonishProps> = ({ onClick }) => (
 );
 
 const SendLinkButton: React.FC<ButtonishProps> = ({ onClick }) => (
-    <Tooltip title="Send link">
-        <IconButton {...{ onClick }} aria-label="Send link">
+    <Tooltip title={t("send_link")}>
+        <IconButton {...{ onClick }} aria-label={t("send_link")}>
             <HugeiconsIcon icon={Navigation03Icon} />
         </IconButton>
     </Tooltip>

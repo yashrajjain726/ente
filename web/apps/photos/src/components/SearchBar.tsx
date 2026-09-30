@@ -578,10 +578,10 @@ const labelForOption = (option: SearchOption) => {
             return t("description");
 
         case "cameraMake":
-            return t("cameraMake", { defaultValue: "Camera Make" });
+            return t("camera_make");
 
         case "cameraModel":
-            return t("cameraModel", { defaultValue: "Camera Model" });
+            return t("camera_model");
 
         case "date":
             return t("date");

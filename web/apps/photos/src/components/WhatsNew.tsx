@@ -14,8 +14,8 @@ import {
 import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
 import { useIsSmallWidth } from "ente-base/components/utils/hooks";
 import { ensureElectron } from "ente-base/electron";
-import { ut } from "ente-base/i18n";
 import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
+import { t } from "i18next";
 import React, { useEffect } from "react";
 
 interface WhatsNewProps {
@@ -43,7 +43,7 @@ export const WhatsNew: React.FC<WhatsNewProps> = ({ open, onClose }) => {
                         variant="body"
                         sx={{ color: "text.faint", fontWeight: "regular" }}
                     >
-                        {ut("What's new")}
+                        {t("whats_new")}
                     </Typography>
                 </DialogTitle>
                 <DialogContent>
@@ -58,7 +58,7 @@ export const WhatsNew: React.FC<WhatsNewProps> = ({ open, onClose }) => {
                         fullWidth
                         endIcon={<ArrowForwardIcon />}
                     >
-                        <ButtonContents>{ut("Continue")}</ButtonContents>
+                        <ButtonContents>{t("continue")}</ButtonContents>
                     </FocusVisibleButton>
                 </DialogActions>
             </Box>
@@ -67,19 +67,13 @@ export const WhatsNew: React.FC<WhatsNewProps> = ({ open, onClose }) => {
 };
 
 const ChangelogContent: React.FC = () => {
-    // Update changelogVersion whenever this content changes.
+    // Update changelogVersion whenever the English release notes change.
 
     return (
         <Stack sx={{ gap: 2, mb: 1 }}>
-            <Typography variant="h6">
-                {ut(
-                    "Album slideshows, view more RAW formats, better video loading in viewer, and more",
-                )}
-            </Typography>
+            <Typography variant="h6">{t("whats_new_headline")}</Typography>
             <Typography sx={{ color: "text.muted" }}>
-                {ut(
-                    "Album slideshows, previews for more RAW formats, video loading progress and retry in the viewer, updated All People view, improved RAW and Ultra HDR thumbnails on Windows and Linux, plus fixes for video sizing, maps, and more.",
-                )}
+                {t("whats_new_description")}
             </Typography>
         </Stack>
     );

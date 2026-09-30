@@ -647,7 +647,7 @@
     "add_new_email": "添加新的电子邮件",
     "shared_with_people_count_zero": "与特定人员共享",
     "shared_with_people_count_one": "已与1个人共享",
-    "shared_with_people_count": "已与 {count, number} 个人共享",
+    "shared_with_people_count": "已与 {{count, number}} 个人共享",
     "participants_count_zero": "暂无参与者",
     "participants_count_one": "1 名参与者",
     "participants_count": "{{count, number}} 名参与者",
