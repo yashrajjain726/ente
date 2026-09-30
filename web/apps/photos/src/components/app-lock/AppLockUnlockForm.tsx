@@ -85,8 +85,8 @@ const useCooldownState = (
         remainingMs: remaining,
         text:
             minutes > 0
-                ? `${t("minutes_count_short", { count: minutes })} ${t("seconds_count_short", { count: seconds })}`
-                : t("seconds_count_short", { count: seconds }),
+                ? `${String(minutes)}m ${String(seconds)}s`
+                : `${String(seconds)}s`,
     };
 };
 
