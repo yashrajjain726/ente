@@ -239,6 +239,7 @@ fn generate_frb_package(package_dir: &Path) -> Result<(), DynError> {
             FrbConfig {
                 build_runner: Some(false),
                 dart_fix: Some(false),
+                dart_format: Some(false),
                 ..Default::default()
             },
             config,
@@ -255,11 +256,18 @@ fn generate_frb_package(package_dir: &Path) -> Result<(), DynError> {
 
     result?;
 
+    let dart = if cfg!(windows) { "dart.bat" } else { "dart" };
     run_command(
-        Command::new(if cfg!(windows) { "dart.bat" } else { "dart" })
+        Command::new(dart)
             .args(["run", "build_runner", "build"])
             .current_dir(package_dir),
         format!("failed to generate Dart code in {}", package_dir.display()),
+    )?;
+    run_command(
+        Command::new(dart)
+            .args(["format", "lib/src/rust"])
+            .current_dir(package_dir),
+        format!("failed to format Dart code in {}", package_dir.display()),
     )
 }
 
