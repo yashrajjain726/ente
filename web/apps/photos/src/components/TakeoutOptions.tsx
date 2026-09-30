@@ -80,7 +80,7 @@ export function TakeoutOptions({
                         {provider == "apple"
                             ? isSheet
                                 ? "Apple Photos"
-                                : t("import_from_apple_photos")
+                                : "Import from Apple Photos"
                             : t(
                                   isSheet
                                       ? "google_takeout"
@@ -111,12 +111,12 @@ export function TakeoutOptions({
                         icon={<HugeiconsIcon icon={Folder01Icon} size={18} />}
                         label={
                             provider == "apple"
-                                ? t("exported_folder")
+                                ? "Exported folder"
                                 : t("unzipped_folder")
                         }
                         description={
                             provider == "apple"
-                                ? t("apple_photos_exported_folder_hint")
+                                ? "Select the folder exported from Photos"
                                 : t("unzipped_folder_hint")
                         }
                         pending={isFolderSelectionPending}
@@ -175,8 +175,8 @@ export function TakeoutOptions({
 
 function AppleExportSteps(): React.JSX.Element {
     const steps = [
-        t("apple_photos_export_originals_step"),
-        t("apple_photos_export_metadata_step"),
+        "In Photos, select your photos and choose File > Export > Export Unmodified Originals",
+        "Select Export IPTC as XMP so dates, locations, and captions come along",
     ];
 
     return (
