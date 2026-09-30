@@ -1,9 +1,10 @@
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::AddBos;
 
-use super::{Context, Error};
+use super::Error;
+use super::context::LocalContext;
 
-impl Context {
+impl LocalContext {
     pub fn embed(&self, query: &str) -> Result<Vec<f32>, Error> {
         let params = self.embedding_params().ok_or(Error::Unsupported(
             "Context is not configured for embeddings",

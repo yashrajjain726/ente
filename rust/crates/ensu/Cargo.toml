@@ -7,7 +7,6 @@ ente-assets.workspace = true
 ente-core.workspace = true
 ente-ensu-crypto.workspace = true
 ente-image.workspace = true
-memmap2 = "0.9.9"
 regex.workspace = true
 rubato = { version = "5.0.0", optional = true }
 rusqlite = { workspace = true, default-features = true, optional = true }

@@ -4,6 +4,8 @@ use tauri::{Manager, RunEvent, async_runtime};
 
 mod commands;
 mod logging;
+#[path = "../../../../crates/ensu/src/platform.rs"]
+mod platform;
 #[cfg(any(windows, target_os = "linux"))]
 mod single_instance;
 
