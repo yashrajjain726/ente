@@ -40,6 +40,8 @@ async fn run_locked(args: ExportArgs, selected: Option<&str>, as_json: bool) -> 
     let index = state.resolve(selected)?;
     let account = state.accounts.swap_remove(index);
     let session = api::session(&account, Product::Photos)?;
+    // Declare first so export's stores drop before this lock.
+    let _storage_use;
     let mut export = Export::open(
         &args.destination,
         &session.master_key,
@@ -58,6 +60,7 @@ async fn run_locked(args: ExportArgs, selected: Option<&str>, as_json: bool) -> 
         .context("account was removed while waiting for access")?;
     let session = api::session(&account, Product::Photos)?;
     export.verify_source(&session.master_key)?;
+    _storage_use = account_home.storage_use()?;
     home::create(&account_home.path)?;
     let db_path = store_path(&account_home.path, export.destination())?;
     ensure!(

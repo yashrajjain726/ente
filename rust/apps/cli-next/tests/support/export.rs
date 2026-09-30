@@ -1103,13 +1103,26 @@ fn export_rejects_invalid_live_archives_and_component_hashes() -> TestResult {
                 }
                 archives.push(zip.finish()?.into_inner());
             }
+            let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+            for name in ["image.jpg", "video.mov"] {
+                zip.start_file(
+                    name,
+                    zip::write::SimpleFileOptions::default()
+                        .compression_method(zip::CompressionMethod::Deflated),
+                )?;
+                std::io::copy(
+                    &mut std::io::Read::take(std::io::repeat(0), 9 * 1024 * 1024),
+                    &mut zip,
+                )?;
+            }
+            archives.push(zip.finish()?.into_inner());
             for (index, archive) in archives.iter().enumerate() {
                 let mut data = metadata(&format!("Invalid-{index}.jpg"), archive);
                 data["fileType"] = json!(2);
                 data["hash"] = json!(format!(
                     "{}:{}",
                     digest(b"component"),
-                    digest(if index + 1 == archives.len() {
+                    digest(if index == 5 {
                         b"wrong video"
                     } else {
                         b"component"
@@ -1129,13 +1142,17 @@ fn export_rejects_invalid_live_archives_and_component_hashes() -> TestResult {
             let destination = tempfile::tempdir()?;
             let root = destination.path().join("export");
             let output = home.run(&["photos", "export", root.to_str().unwrap(), "--json"]);
-            failure(&output);
+            let error = failure(&output);
+            assert!(
+                error.contains("Live Photo archive expands beyond limit"),
+                "{error}"
+            );
             let result: Value = serde_json::from_slice(&output.stdout)?;
             assert_eq!(
                 result["copies"],
-                json!({"expected":7,"completed":1,"pending":6})
+                json!({"expected":8,"completed":1,"pending":7})
             );
-            assert_eq!(result["failures"], 6);
+            assert_eq!(result["failures"], 7);
             assert_eq!(fs::read(root.join("Album/Good.jpg"))?, b"independent");
             assert_eq!(fs::read_dir(root.join("Album/metadata"))?.count(), 1);
             for index in 0..archives.len() {

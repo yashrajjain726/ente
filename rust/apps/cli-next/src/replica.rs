@@ -27,7 +27,7 @@ pub const SCHEMA: &str = "
     CREATE TABLE photos_files (
         collection_id INTEGER NOT NULL REFERENCES photos_collections(id) ON DELETE CASCADE,
         id INTEGER NOT NULL, name TEXT, updated_at INTEGER NOT NULL,
-        record TEXT NOT NULL, decrypt_failed INTEGER NOT NULL,
+        record TEXT NOT NULL, failed INTEGER NOT NULL,
         PRIMARY KEY(collection_id,id)
     );
     CREATE INDEX photos_files_id ON photos_files(id,updated_at DESC);
@@ -190,8 +190,16 @@ impl FileRecord {
     }
 }
 
+pub struct AlbumEntry {
+    pub id: i64,
+    pub name: Option<String>,
+    pub value: Result<Collection>,
+}
+
 pub struct Entry {
-    pub file: File,
+    pub id: i64,
+    pub name: Option<String>,
+    pub file: Result<File>,
     pub album_ids: Vec<i64>,
 }
 
@@ -249,11 +257,28 @@ impl<'a> Replica<'a> {
         Ok(())
     }
 
+    pub fn retry_failed_albums(&mut self, session: &Session) -> Result<()> {
+        let mut after = 0;
+        loop {
+            let ids: Vec<i64> = self.db.read(|db| {
+                let mut query = db.prepare("SELECT id FROM photos_collections WHERE id>?1 AND json_extract(record,'$.failure') IS NOT NULL ORDER BY id LIMIT 128")?;
+                Ok(query.query_map([after], |row| row.get(0))?.collect::<SqliteResult<_>>()?)
+            })?;
+            if ids.is_empty() {
+                return Ok(());
+            }
+            for id in ids {
+                after = id;
+                self.retry_album(session, id)?;
+            }
+        }
+    }
+
     pub fn retry_album(&mut self, session: &Session, id: i64) -> Result<()> {
         let Some(previous) = self.album_record(id)? else {
             return Ok(());
         };
-        if previous.documents.is_some() {
+        if previous.documents.is_some() && previous.failure.is_none() {
             return Ok(());
         }
         let parent_key = if previous.remote.owner.id == session.user_id {
@@ -337,7 +362,7 @@ impl<'a> Replica<'a> {
         let mut after = 0;
         loop {
             let records: Vec<FileRecord> = self.db.read(|db| {
-                let mut query = db.prepare("SELECT record FROM photos_files WHERE collection_id=?1 AND decrypt_failed=1 AND id>?2 ORDER BY id LIMIT 128")?;
+                let mut query = db.prepare("SELECT record FROM photos_files WHERE collection_id=?1 AND failed=1 AND id>?2 ORDER BY id LIMIT 128")?;
                 Ok(query.query_map(params![album.id,after], |r| read_json(r,0))?.collect::<SqliteResult<_>>()?)
             })?;
             if records.is_empty() {
@@ -387,9 +412,9 @@ impl<'a> Replica<'a> {
         &self,
         selector: Option<&str>,
         limit: Option<i64>,
-        read: impl FnOnce(&mut dyn Iterator<Item = SqliteResult<Collection>>) -> Result<T>,
+        read: impl FnOnce(&mut dyn Iterator<Item = SqliteResult<AlbumEntry>>) -> Result<T>,
     ) -> Result<T> {
-        let mut sql = "SELECT record FROM photos_collections".to_owned();
+        let mut sql = "SELECT record,name FROM photos_collections".to_owned();
         let mut parameters = Vec::new();
         if let Some(selector) = selector {
             sql.push_str(" WHERE id=? OR name=?");
@@ -404,7 +429,11 @@ impl<'a> Replica<'a> {
             let mut statement = db.prepare(&sql)?;
             let mut rows = statement.query_map(params_from_iter(parameters), |row| {
                 let record: AlbumRecord = read_json(row, 0)?;
-                record.album(self.user_id).map_err(conversion)
+                Ok(AlbumEntry {
+                    id: record.remote.id,
+                    name: row.get(1)?,
+                    value: record.album(self.user_id),
+                })
             })?;
             Ok(read(&mut rows))
         })?
@@ -417,22 +446,23 @@ impl<'a> Replica<'a> {
         limit: Option<i64>,
         read: impl FnOnce(&mut dyn Iterator<Item = SqliteResult<Entry>>) -> Result<T>,
     ) -> Result<T> {
-        let mut conditions = Vec::new();
+        let mut sql = "SELECT record,(SELECT json_group_array(collection_id ORDER BY collection_id) FROM photos_files m WHERE m.id=f.id".to_owned();
         let mut parameters = Vec::new();
         if let Some(album) = album {
-            conditions.push("collection_id=?");
+            sql.push_str(" AND m.collection_id=?1");
             parameters.push(Value::Integer(album));
         }
+        sql.push_str("),name FROM photos_files f WHERE ");
+        if album.is_some() {
+            sql.push_str("collection_id=?1");
+        } else {
+            sql.push_str("NOT EXISTS (SELECT 1 FROM photos_files newer WHERE newer.id=f.id AND (newer.updated_at>f.updated_at OR (newer.updated_at=f.updated_at AND newer.collection_id<f.collection_id)))");
+        }
         if let Some(selector) = selector {
-            conditions.push("(id=? OR name=?)");
+            sql.push_str(" AND (id=? OR name=?)");
             parameters.extend([canonical_id(selector), Value::Text(selector.into())]);
         }
-        let mut sql = "WITH matched AS (SELECT * FROM photos_files".to_owned();
-        if !conditions.is_empty() {
-            sql.push_str(" WHERE ");
-            sql.push_str(&conditions.join(" AND "));
-        }
-        sql.push_str(") SELECT record,(SELECT json_group_array(collection_id ORDER BY collection_id) FROM matched m WHERE m.id=f.id) FROM (SELECT *,row_number() OVER(PARTITION BY id ORDER BY updated_at DESC,collection_id) AS rank FROM matched) f WHERE rank=1 ORDER BY id");
+        sql.push_str(" ORDER BY id");
         if let Some(limit) = limit {
             sql.push_str(" LIMIT ?");
             parameters.push(Value::Integer(limit));
@@ -442,7 +472,9 @@ impl<'a> Replica<'a> {
             let mut rows = statement.query_map(params_from_iter(parameters), |row| {
                 let record: FileRecord = read_json(row, 0)?;
                 Ok(Entry {
-                    file: record.file(self.user_id).map_err(conversion)?,
+                    id: record.remote.id,
+                    name: row.get(2)?,
+                    file: record.file(self.user_id),
                     album_ids: read_json(row, 1)?,
                 })
             })?;
@@ -488,7 +520,7 @@ fn save_album(
     };
     let json = encode(&record)?;
     tx.execute(
-        "INSERT INTO photos_collections(id,name,updated_at,record) VALUES(?1,?2,?3,?4) ON CONFLICT(id) DO UPDATE SET name=coalesce(excluded.name,photos_collections.name),updated_at=excluded.updated_at,record=excluded.record",
+        "INSERT INTO photos_collections(id,name,updated_at,record) VALUES(?1,?2,?3,?4) ON CONFLICT(id) DO UPDATE SET name=coalesce(excluded.name,photos_collections.name),updated_at=excluded.updated_at,record=excluded.record WHERE excluded.record!=photos_collections.record OR coalesce(excluded.name,photos_collections.name) IS NOT photos_collections.name",
         params![record.remote.id, name, record.remote.updation_time, json],
     )?;
     Ok(())
@@ -512,14 +544,14 @@ fn save_file(
     };
     let json = encode(&record)?;
     tx.execute(
-        "INSERT INTO photos_files VALUES(?1,?2,?3,?4,?5,?6) ON CONFLICT(collection_id,id) DO UPDATE SET name=coalesce(excluded.name,photos_files.name),updated_at=excluded.updated_at,record=excluded.record,decrypt_failed=excluded.decrypt_failed WHERE excluded.updated_at>=photos_files.updated_at",
+        "INSERT INTO photos_files VALUES(?1,?2,?3,?4,?5,?6) ON CONFLICT(collection_id,id) DO UPDATE SET name=coalesce(excluded.name,photos_files.name),updated_at=excluded.updated_at,record=excluded.record,failed=excluded.failed WHERE excluded.updated_at>=photos_files.updated_at AND (excluded.record!=photos_files.record OR coalesce(excluded.name,photos_files.name) IS NOT photos_files.name OR excluded.failed!=photos_files.failed)",
         params![
             album,
             record.remote.id,
             name,
             record.remote.updation_time,
             json,
-            record.documents.is_none()
+            record.failure.is_some()
         ],
     )?;
     Ok(())
@@ -533,10 +565,6 @@ pub fn read_json<T: DeserializeOwned>(row: &Row<'_>, column: usize) -> SqliteRes
     let text: String = row.get(column)?;
     serde_json::from_str(&text)
         .map_err(|e| SqliteError::FromSqlConversionFailure(column, Type::Text, Box::new(e)))
-}
-
-fn conversion(error: anyhow::Error) -> SqliteError {
-    SqliteError::FromSqlConversionFailure(0, Type::Text, error.into_boxed_dyn_error())
 }
 
 pub fn canonical_id(selector: &str) -> Value {

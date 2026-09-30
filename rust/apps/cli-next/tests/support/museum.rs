@@ -280,7 +280,6 @@ async fn exercise(origin: String) -> TestResult {
     ]));
     assert_eq!(fs::read(output_path).unwrap(), original);
 
-    // Two origins with the same server user ID are still different accounts.
     let alias_origin = origin.replace("127.0.0.1", "localhost");
     assert_ne!(alias_origin, origin);
     let before = fs::read(home.dir.path().join("vault.json")).unwrap();

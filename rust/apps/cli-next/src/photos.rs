@@ -41,6 +41,7 @@ pub async fn run(
     let mut replica = Replica::new(&mut db, session.user_id);
     if !options.offline {
         replica.sync_collections(&session).await?;
+        replica.retry_failed_albums(&session)?;
     } else {
         ensure!(
             replica.collections_cursor()?.is_some(),
@@ -58,25 +59,37 @@ pub async fn run(
 
 fn album(command: AlbumCommand, replica: &Replica<'_>, options: &Options) -> Result<()> {
     match command {
-        AlbumCommand::List(args) => replica.collections(
-            None,
-            args.limit().map(|limit| i64::from(limit) + 1),
-            |rows| {
-                output::albums(
-                    rows.map(|album| AlbumView::try_from(album?)),
-                    &args,
-                    options.json,
-                )
-            },
-        ),
+        AlbumCommand::List(args) => replica.collections(None, None, |rows| {
+            let mut incomplete = false;
+            let albums = rows.filter_map(|row| {
+                let entry = match row {
+                    Ok(entry) => entry,
+                    Err(error) => return Some(Err(error.into())),
+                };
+                match entry.value.and_then(AlbumView::try_from) {
+                    Ok(album) => Some(Ok(album)),
+                    Err(error) => {
+                        eprintln!("album {}: {error:#}", entry.id);
+                        incomplete = true;
+                        None
+                    }
+                }
+            });
+            output::albums(albums, &args, options.json)?;
+            ensure!(!incomplete, "album list is incomplete");
+            Ok(())
+        }),
         AlbumCommand::View { album } => {
             let album =
                 replica.collections(Some(&album), Some((MAX_CANDIDATES + 1) as i64), |rows| {
                     select(rows.map(|album| Ok(album?)), &album, "album", |a| {
-                        (a.id, &a.name)
+                        (a.id, a.name.as_deref().unwrap_or("unavailable"))
                     })
                 })?;
-            let album = AlbumView::try_from(album)?;
+            let album = album
+                .value
+                .and_then(AlbumView::try_from)
+                .with_context(|| format!("album {}", album.id))?;
             if options.json {
                 output::json(&album)
             } else {
@@ -93,17 +106,29 @@ async fn file(
     replica: &mut Replica<'_>,
     options: &Options,
 ) -> Result<()> {
+    let mut incomplete = false;
     let albums =
         replica.collections(album, album.map(|_| (MAX_CANDIDATES + 1) as i64), |rows| {
             if let Some(selector) = album {
-                Ok(vec![select(
-                    rows.map(|album| Ok(album?)),
-                    selector,
-                    "album",
-                    |a| (a.id, &a.name),
-                )?])
+                let entry = select(rows.map(|album| Ok(album?)), selector, "album", |a| {
+                    (a.id, a.name.as_deref().unwrap_or("unavailable"))
+                })?;
+                Ok(vec![
+                    entry.value.with_context(|| format!("album {}", entry.id))?,
+                ])
             } else {
-                rows.map(|album| Ok(album?)).collect::<Result<Vec<_>>>()
+                let mut albums = Vec::new();
+                for row in rows {
+                    let entry = row?;
+                    match entry.value {
+                        Ok(album) => albums.push(album),
+                        Err(error) => {
+                            eprintln!("album {}: {error:#}", entry.id);
+                            incomplete = true;
+                        }
+                    }
+                }
+                Ok(albums)
             }
         })?;
     if options.offline {
@@ -119,36 +144,44 @@ async fn file(
     }
     let album_id = album.map(|_| albums[0].id);
     let find = |selector: &str| {
-        replica.files(
+        let entry = replica.files(
             album_id,
             Some(selector),
             Some((MAX_CANDIDATES + 1) as i64),
             |rows| {
                 select(rows.map(|entry| Ok(entry?)), selector, "file", |e| {
-                    (e.file.id, &e.file.name)
+                    (e.id, e.name.as_deref().unwrap_or("unavailable"))
                 })
             },
-        )
+        )?;
+        let file = entry.file.with_context(|| format!("file {}", entry.id))?;
+        Ok::<_, anyhow::Error>((file, entry.album_ids))
     };
     match command {
-        FileCommand::List(args) => replica.files(
-            album_id,
-            None,
-            args.limit().map(|limit| i64::from(limit) + 1),
-            |rows| {
-                output::files(
-                    rows.map(|entry| {
-                        let entry = entry?;
-                        FileView::new(entry.file, &entry.album_ids)
-                    }),
-                    &args,
-                    options.json,
-                )
-            },
-        ),
+        FileCommand::List(args) => replica.files(album_id, None, None, |rows| {
+            let files = rows.filter_map(|row| {
+                let entry = match row {
+                    Ok(entry) => entry,
+                    Err(error) => return Some(Err(error.into())),
+                };
+                match entry
+                    .file
+                    .and_then(|file| FileView::new(file, &entry.album_ids))
+                {
+                    Ok(file) => Some(Ok(file)),
+                    Err(error) => {
+                        eprintln!("file {}: {error:#}", entry.id);
+                        incomplete = true;
+                        None
+                    }
+                }
+            });
+            output::files(files, &args, options.json)
+        }),
         FileCommand::View { file } => {
-            let entry = find(&file)?;
-            let view = FileView::new(entry.file, &entry.album_ids)?;
+            let (file, album_ids) = find(&file)?;
+            let id = file.id;
+            let view = FileView::new(file, &album_ids).with_context(|| format!("file {id}"))?;
             if options.json {
                 output::json(&view)
             } else {
@@ -156,24 +189,22 @@ async fn file(
             }
         }
         FileCommand::Download { file, output } => {
-            let entry = find(&file)?;
+            ensure!(
+                !incomplete,
+                "album lookup is incomplete; select an available album with --album before downloading"
+            );
+            let (file, _) = find(&file)?;
             let parent = output
                 .parent()
                 .filter(|p| !p.as_os_str().is_empty())
                 .unwrap_or(Path::new("."));
             let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
-            files::download(
-                session,
-                entry.file.id,
-                &entry.file.key,
-                &entry.file.header,
-                || {
-                    let file = temporary.as_file_mut();
-                    file.set_len(0)?;
-                    file.rewind()?;
-                    file.try_clone()
-                },
-            )
+            files::download(session, file.id, &file.key, &file.header, || {
+                let file = temporary.as_file_mut();
+                file.set_len(0)?;
+                file.rewind()?;
+                file.try_clone()
+            })
             .await?;
             temporary.as_file().sync_all()?;
             let bytes = temporary.as_file().metadata()?.len();
@@ -183,11 +214,13 @@ async fn file(
                 .with_context(|| format!("cannot save download to {}", output.display()))?;
             output::action(
                 options.json,
-                &json!({ "id": entry.file.id.to_string(), "output": output, "bytes": bytes }),
-                &format!("Downloaded {:?} to {}.", entry.file.name, output.display()),
+                &json!({ "id": file.id.to_string(), "output": output.to_string_lossy(), "bytes": bytes }),
+                &format!("Downloaded {:?} to {}.", file.name, output.display()),
             )
         }
-    }
+    }?;
+    ensure!(!incomplete, "file results are incomplete");
+    Ok(())
 }
 
 fn open_account(selected: Option<&str>, create: bool) -> Result<(Account, home::AccountHome)> {
@@ -199,7 +232,7 @@ fn open_account(selected: Option<&str>, create: bool) -> Result<(Account, home::
         .into_iter()
         .find(|account| account.storage_id == id)
     else {
-        home.remove()?;
+        home.for_removal()?.remove()?;
         bail!("account was removed while waiting for access");
     };
     if create {
