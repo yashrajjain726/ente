@@ -13,6 +13,7 @@ import {
     Typography,
 } from "@mui/material";
 import { CenteredFill } from "ente-base/components/containers";
+import { useModalVisibility } from "ente-base/components/utils/modal";
 import log from "ente-base/log";
 import { downloadManager } from "ente-gallery/services/download";
 import type { EnteFile } from "ente-media/file";
@@ -48,7 +49,7 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
     const [orderedFiles, setOrderedFiles] = useState(() =>
         settings.randomOrder ? shuffled(files) : files,
     );
-    const [settingsOpen, setSettingsOpen] = useState(false);
+    const settingsModal = useModalVisibility();
     const [slide, setSlide] = useState({ index: 0, ready: false });
     const [playing, setPlaying] = useState(true);
     const [visible, setVisible] = useState(() => !document.hidden);
@@ -60,13 +61,13 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
     const showControls = useCallback(() => {
         setControlsVisible(true);
         clearTimeout(controlsHideTimer.current);
-        if (playing && visible && !settingsOpen) {
+        if (playing && visible && !settingsModal.props.open) {
             controlsHideTimer.current = setTimeout(
                 () => setControlsVisible(false),
                 2000,
             );
         }
-    }, [playing, visible, settingsOpen]);
+    }, [playing, visible, settingsModal.props.open]);
 
     useEffect(() => {
         showControls();
@@ -104,7 +105,7 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
         () =>
             scheduleSlideshowAdvance(
                 {
-                    enabled: playing && visible && !settingsOpen,
+                    enabled: playing && visible && !settingsModal.props.open,
                     ready: slide.ready,
                     count: files.length,
                     durationSeconds: settings.durationSeconds,
@@ -114,7 +115,7 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
         [
             playing,
             visible,
-            settingsOpen,
+            settingsModal.props.open,
             settings.durationSeconds,
             slide.ready,
             files.length,
@@ -135,7 +136,7 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
     }, [setIsFileViewerOpen]);
 
     const handleKeyDown = (event: KeyboardEvent) => {
-        if (settingsOpen) return;
+        if (settingsModal.props.open) return;
         showControls();
         if (
             (event.target as HTMLElement).closest("button") &&
@@ -165,9 +166,6 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
         if (x < 0.25) navigate(-1);
         else if (x > 0.75) navigate(1);
     };
-
-    const openSettings = () => setSettingsOpen(true);
-    const closeSettings = () => setSettingsOpen(false);
 
     const handleSettingsChange = (next: SlideshowSettings) => {
         if (next.randomOrder !== settings.randomOrder) {
@@ -245,7 +243,7 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
                 <IconButton
                     aria-label={t("slideshow_settings")}
                     aria-haspopup="dialog"
-                    onClick={openSettings}
+                    onClick={settingsModal.show}
                     color="inherit"
                 >
                     <SettingsIcon />
@@ -292,8 +290,7 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
                 </Stack>
             )}
             <AlbumSlideshowSettings
-                open={settingsOpen}
-                onClose={closeSettings}
+                {...settingsModal.props}
                 settings={settings}
                 onChange={handleSettingsChange}
             />
