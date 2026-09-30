@@ -5,6 +5,7 @@ import {
     scheduleSlideshowAdvance,
     slideshowFiles,
     slideshowIndex,
+    slideshowPrefetchFiles,
 } from "../src/components/Collections/album-slideshow";
 
 const photo = (id: number, fileType: FileType = FileType.image) =>
@@ -32,6 +33,22 @@ test("navigation loops in both directions and handles empty and single-photo alb
     expect(slideshowIndex(0, -1, 3)).toBe(2);
     expect(slideshowIndex(0, 1, 1)).toBe(0);
     expect(slideshowIndex(0, -1, 0)).toBe(0);
+});
+
+test("prefetches two upcoming photos and one previous photo without duplicates", () => {
+    const files = [photo(1), photo(2), photo(3), photo(4)];
+    expect(slideshowPrefetchFiles(files, 0, 1)).toEqual([
+        files[1],
+        files[2],
+        files[3],
+    ]);
+    expect(slideshowPrefetchFiles(files, 0, -1)).toEqual([
+        files[3],
+        files[2],
+        files[1],
+    ]);
+    expect(slideshowPrefetchFiles(files.slice(0, 2), 0, 1)).toEqual([files[1]]);
+    expect(slideshowPrefetchFiles(files.slice(0, 1), 0, 1)).toEqual([]);
 });
 
 describe("playback timeout", () => {

@@ -52,6 +52,20 @@ export const slideshowFiles = (files: EnteFile[]) =>
 export const slideshowIndex = (index: number, offset: number, count: number) =>
     count ? (index + offset + count) % count : 0;
 
+export const slideshowPrefetchFiles = (
+    files: EnteFile[],
+    index: number,
+    direction: number,
+) => {
+    if (files.length < 2) return [];
+    const indexes = [1, 2, -1].map((offset) =>
+        slideshowIndex(index, offset * direction, files.length),
+    );
+    return [...new Set(indexes)]
+        .filter((nextIndex) => nextIndex !== index)
+        .map((nextIndex) => files[nextIndex]!);
+};
+
 export function scheduleSlideshowAdvance(
     {
         enabled,

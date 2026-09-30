@@ -34,6 +34,7 @@ import {
     saveSlideshowSettings,
     scheduleSlideshowAdvance,
     slideshowIndex,
+    slideshowPrefetchFiles,
     type SlideshowSettings,
 } from "./album-slideshow";
 import { AlbumSlideshowSettings } from "./AlbumSlideshowSettings";
@@ -55,6 +56,7 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
     const [visible, setVisible] = useState(() => !document.hidden);
     const [controlsVisible, setControlsVisible] = useState(true);
     const controlsHideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+    const prefetchDirection = useRef(1);
     const { setIsFileViewerOpen } = usePhotosAppContext();
     const current = orderedFiles[slide.index]!;
 
@@ -76,6 +78,7 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
 
     const navigate = useCallback(
         (offset: number) => {
+            prefetchDirection.current = offset;
             setSlide((previous) => {
                 const index = slideshowIndex(
                     previous.index,
@@ -123,6 +126,19 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
             navigate,
         ],
     );
+
+    useEffect(() => {
+        for (const file of slideshowPrefetchFiles(
+            orderedFiles,
+            slide.index,
+            prefetchDirection.current,
+        )) {
+            void downloadManager
+                .renderableThumbnailURL(file)
+                .then(() => downloadManager.renderableSourceURLs(file))
+                .catch(() => undefined);
+        }
+    }, [orderedFiles, slide.index]);
 
     useEffect(() => {
         const changed = () => setVisible(!document.hidden);
