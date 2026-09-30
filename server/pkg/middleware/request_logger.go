@@ -92,6 +92,9 @@ func shouldSkipBodyLog(method string, path string) bool {
 	if method == http.MethodPost && (path == "/users/recover-account" || path == "/users/recover-account/validate") {
 		return true
 	}
+	if method == http.MethodPost && (path == "/cast/cast-data" || path == "/cast/cast-data/") {
+		return true
+	}
 	if !isReadOnly && (strings.HasPrefix(path, "/space") || strings.HasPrefix(path, "/account/space")) {
 		return true
 	}
