@@ -36,23 +36,26 @@ test("navigation loops in both directions and handles empty and single-photo alb
 
 describe("playback timeout", () => {
     const ready = { enabled: true, ready: true, count: 2 };
-    test("advances once after five seconds", () => {
-        vi.useFakeTimers();
-        const advance = vi.fn();
-        scheduleSlideshowAdvance(ready, advance);
-        vi.advanceTimersByTime(4999);
-        expect(advance).not.toHaveBeenCalled();
-        vi.advanceTimersByTime(1);
-        expect(advance).toHaveBeenCalledTimes(1);
-        vi.advanceTimersByTime(60_000);
-        expect(advance).toHaveBeenCalledTimes(1);
-    });
+    test.each([5, 15, 600])(
+        "advances once after the selected %i seconds",
+        (durationSeconds) => {
+            vi.useFakeTimers();
+            const advance = vi.fn();
+            scheduleSlideshowAdvance({ ...ready, durationSeconds }, advance);
+            vi.advanceTimersByTime(durationSeconds * 1000 - 1);
+            expect(advance).not.toHaveBeenCalled();
+            vi.advanceTimersByTime(1);
+            expect(advance).toHaveBeenCalledTimes(1);
+            vi.advanceTimersByTime(60_000);
+            expect(advance).toHaveBeenCalledTimes(1);
+        },
+    );
 
     test("skips undisplayable media after ten seconds, or replaces that timeout once ready", () => {
         vi.useFakeTimers();
         const advance = vi.fn();
         const cancel = scheduleSlideshowAdvance(
-            { ...ready, ready: false },
+            { ...ready, ready: false, durationSeconds: 600 },
             advance,
         );
         vi.advanceTimersByTime(9999);

@@ -2,6 +2,45 @@ import { uniqueFilesByID } from "ente-gallery/utils/file";
 import type { EnteFile } from "ente-media/file";
 import { FileType } from "ente-media/file-type";
 
+export const slideshowDurationOptions = [5, 10, 15, 30, 60, 300, 600];
+
+export interface SlideshowSettings {
+    durationSeconds: number;
+    randomOrder: boolean;
+    blurredBackground: boolean;
+}
+
+export const savedSlideshowSettings = (): SlideshowSettings => {
+    const durationSeconds = Number(
+        localStorage.getItem("album_slideshow.duration_seconds"),
+    );
+    return {
+        durationSeconds: slideshowDurationOptions.includes(durationSeconds)
+            ? durationSeconds
+            : 5,
+        randomOrder:
+            localStorage.getItem("album_slideshow.random_order") === "true",
+        blurredBackground:
+            localStorage.getItem("album_slideshow.blurred_background") !==
+            "false",
+    };
+};
+
+export const saveSlideshowSettings = (settings: SlideshowSettings) => {
+    localStorage.setItem(
+        "album_slideshow.duration_seconds",
+        String(settings.durationSeconds),
+    );
+    localStorage.setItem(
+        "album_slideshow.random_order",
+        String(settings.randomOrder),
+    );
+    localStorage.setItem(
+        "album_slideshow.blurred_background",
+        String(settings.blurredBackground),
+    );
+};
+
 export const slideshowFiles = (files: EnteFile[]) =>
     uniqueFilesByID(
         files.filter(
@@ -18,12 +57,18 @@ export function scheduleSlideshowAdvance(
         enabled,
         ready,
         count,
-    }: { enabled: boolean; ready: boolean; count: number },
+        durationSeconds = 5,
+    }: {
+        enabled: boolean;
+        ready: boolean;
+        count: number;
+        durationSeconds?: number;
+    },
     advance: () => void,
 ) {
     const timer =
         enabled && count > 1
-            ? setTimeout(advance, ready ? 5000 : 10_000)
+            ? setTimeout(advance, ready ? durationSeconds * 1000 : 10_000)
             : undefined;
     return () => clearTimeout(timer);
 }

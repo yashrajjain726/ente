@@ -3,6 +3,7 @@ import NavigateBeforeIcon from "@mui/icons-material/NavigateBefore";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
 import PauseIcon from "@mui/icons-material/Pause";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import SettingsIcon from "@mui/icons-material/Settings";
 import {
     Box,
     CircularProgress,
@@ -12,20 +13,30 @@ import {
     Typography,
 } from "@mui/material";
 import { CenteredFill } from "ente-base/components/containers";
+import { useModalVisibility } from "ente-base/components/utils/modal";
 import log from "ente-base/log";
 import { downloadManager } from "ente-gallery/services/download";
 import type { EnteFile } from "ente-media/file";
 import { fileFileName } from "ente-media/file-metadata";
 import { usePhotosAppContext } from "ente-new/photos/types/context";
+import { shuffled } from "ente-utils/array";
 import { t } from "i18next";
 import {
     useCallback,
     useEffect,
+    useRef,
     useState,
     type KeyboardEvent,
     type MouseEvent,
 } from "react";
-import { scheduleSlideshowAdvance, slideshowIndex } from "./album-slideshow";
+import {
+    savedSlideshowSettings,
+    saveSlideshowSettings,
+    scheduleSlideshowAdvance,
+    slideshowIndex,
+    type SlideshowSettings,
+} from "./album-slideshow";
+import { AlbumSlideshowSettings } from "./AlbumSlideshowSettings";
 
 interface AlbumSlideshowProps {
     files: EnteFile[];
@@ -34,11 +45,34 @@ interface AlbumSlideshowProps {
 }
 
 export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
+    const [settings, setSettings] = useState(savedSlideshowSettings);
+    const [orderedFiles, setOrderedFiles] = useState(() =>
+        settings.randomOrder ? shuffled(files) : files,
+    );
+    const settingsModal = useModalVisibility();
     const [slide, setSlide] = useState({ index: 0, ready: false });
     const [playing, setPlaying] = useState(true);
     const [visible, setVisible] = useState(() => !document.hidden);
+    const [controlsVisible, setControlsVisible] = useState(true);
+    const controlsHideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
     const { setIsFileViewerOpen } = usePhotosAppContext();
-    const current = files[slide.index]!;
+    const current = orderedFiles[slide.index]!;
+
+    const showControls = useCallback(() => {
+        setControlsVisible(true);
+        clearTimeout(controlsHideTimer.current);
+        if (playing && visible && !settingsModal.props.open) {
+            controlsHideTimer.current = setTimeout(
+                () => setControlsVisible(false),
+                2000,
+            );
+        }
+    }, [playing, visible, settingsModal.props.open]);
+
+    useEffect(() => {
+        showControls();
+        return () => clearTimeout(controlsHideTimer.current);
+    }, [showControls]);
 
     const navigate = useCallback(
         (offset: number) => {
@@ -59,25 +93,35 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
     const markReady = useCallback(
         (id: number) => {
             setSlide((previous) =>
-                files[previous.index]?.id === id && !previous.ready
+                orderedFiles[previous.index]?.id === id && !previous.ready
                     ? { ...previous, ready: true }
                     : previous,
             );
         },
-        [files],
+        [orderedFiles],
     );
 
     useEffect(
         () =>
             scheduleSlideshowAdvance(
                 {
-                    enabled: playing && visible,
+                    enabled: playing && visible && !settingsModal.props.open,
                     ready: slide.ready,
                     count: files.length,
+                    durationSeconds: settings.durationSeconds,
                 },
                 () => navigate(1),
             ),
-        [playing, visible, slide.ready, files.length, current.id, navigate],
+        [
+            playing,
+            visible,
+            settingsModal.props.open,
+            settings.durationSeconds,
+            slide.ready,
+            files.length,
+            current.id,
+            navigate,
+        ],
     );
 
     useEffect(() => {
@@ -92,6 +136,8 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
     }, [setIsFileViewerOpen]);
 
     const handleKeyDown = (event: KeyboardEvent) => {
+        if (settingsModal.props.open) return;
+        showControls();
         if (
             (event.target as HTMLElement).closest("button") &&
             event.key === " "
@@ -121,6 +167,19 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
         else if (x > 0.75) navigate(1);
     };
 
+    const handleSettingsChange = (next: SlideshowSettings) => {
+        if (next.randomOrder !== settings.randomOrder) {
+            const reordered = next.randomOrder ? shuffled(files) : files;
+            setOrderedFiles(reordered);
+            setSlide((previous) => ({
+                ...previous,
+                index: reordered.findIndex((file) => file.id === current.id),
+            }));
+        }
+        setSettings(next);
+        saveSlideshowSettings(next);
+    };
+
     return (
         <Dialog
             open
@@ -128,18 +187,39 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
             onClose={onClose}
             aria-labelledby="album-slideshow-title"
             onKeyDown={handleKeyDown}
+            onPointerMove={showControls}
+            onPointerDown={showControls}
+            onFocusCapture={showControls}
             slotProps={{
                 paper: {
-                    sx: { bgcolor: "#000", color: "#fff", overflow: "hidden" },
+                    sx: {
+                        bgcolor: "#000",
+                        color: "#fff",
+                        overflow: "hidden",
+                        "& .slideshow-controls": {
+                            opacity: controlsVisible ? 1 : 0,
+                            transition: "opacity 200ms",
+                        },
+                        "&:has(button:focus-visible) .slideshow-controls": {
+                            opacity: 1,
+                            "& button": { pointerEvents: "auto" },
+                        },
+                    },
                 },
             }}
         >
-            <Slide key={current.id} file={current} onReady={markReady} />
+            <Slide
+                key={current.id}
+                file={current}
+                onReady={markReady}
+                blurredBackground={settings.blurredBackground}
+            />
             <Box
                 onClick={handlePhotoClick}
                 sx={{ position: "absolute", inset: 0 }}
             />
             <Stack
+                className="slideshow-controls"
                 direction="row"
                 sx={{
                     position: "relative",
@@ -147,6 +227,7 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
                     p: 2,
                     gap: 2,
                     background: "linear-gradient(#000b, transparent)",
+                    pointerEvents: controlsVisible ? "auto" : "none",
                 }}
             >
                 <IconButton
@@ -156,12 +237,21 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
                 >
                     <CloseIcon />
                 </IconButton>
-                <Typography id="album-slideshow-title" noWrap>
+                <Typography id="album-slideshow-title" noWrap sx={{ flex: 1 }}>
                     {title}
                 </Typography>
+                <IconButton
+                    aria-label={t("slideshow_settings")}
+                    aria-haspopup="dialog"
+                    onClick={settingsModal.show}
+                    color="inherit"
+                >
+                    <SettingsIcon />
+                </IconButton>
             </Stack>
             {files.length > 1 && (
                 <Stack
+                    className="slideshow-controls"
                     direction="row"
                     sx={{
                         position: "absolute",
@@ -172,7 +262,10 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
                         justifyContent: "space-between",
                         px: 2,
                         pointerEvents: "none",
-                        "& button": { pointerEvents: "auto", color: "inherit" },
+                        "& button": {
+                            pointerEvents: controlsVisible ? "auto" : "none",
+                            color: "inherit",
+                        },
                     }}
                 >
                     <IconButton
@@ -196,6 +289,11 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
                     </IconButton>
                 </Stack>
             )}
+            <AlbumSlideshowSettings
+                {...settingsModal.props}
+                settings={settings}
+                onChange={handleSettingsChange}
+            />
         </Dialog>
     );
 }
@@ -203,9 +301,11 @@ export function AlbumSlideshow({ files, title, onClose }: AlbumSlideshowProps) {
 function Slide({
     file,
     onReady,
+    blurredBackground,
 }: {
     file: EnteFile;
     onReady: (id: number) => void;
+    blurredBackground: boolean;
 }) {
     const [thumbnail, setThumbnail] = useState<string>();
     const [original, setOriginal] = useState<string>();
@@ -254,18 +354,20 @@ function Slide({
 
     return (
         <>
-            <Box
-                aria-hidden
-                sx={{
-                    position: "absolute",
-                    inset: -100,
-                    backgroundImage: `url("${thumbnail ?? original ?? ""}")`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                    filter: "blur(100px)",
-                    opacity: 0.6,
-                }}
-            />
+            {blurredBackground && (
+                <Box
+                    aria-hidden
+                    sx={{
+                        position: "absolute",
+                        inset: -100,
+                        backgroundImage: `url("${thumbnail ?? original ?? ""}")`,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        filter: "blur(100px)",
+                        opacity: 0.6,
+                    }}
+                />
+            )}
             {thumbnail && (
                 <Box
                     component="img"
