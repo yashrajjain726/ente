@@ -132,7 +132,7 @@ final class VoiceTranscriptionService {
         case .denied:
             onState(.error("Microphone permission is required for voice input."))
         case .undetermined:
-            session.requestRecordPermission { [weak self] granted in
+            session.requestRecordPermission { @Sendable [weak self] granted in
                 Task { @MainActor in
                     guard let self else { return }
                     if granted {
