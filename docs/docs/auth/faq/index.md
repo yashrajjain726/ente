@@ -114,9 +114,11 @@ Note that Ente Photos, Ente Auth, and Ente Locker data will be deleted when you 
 
 To know details of how your data is deleted, including when you delete your account, please see https://ente.com/blog/how-ente-deletes-data/.
 
-### Can Ente Auth run fully offline with no connection to any server? {#auth-fully-offline}
+### Can Ente Auth be used offline? {#auth-fully-offline}
 
-Yes. Choose **Use without backups** to use Auth entirely offline, with no account and no connection to Ente's servers. Learn more in [Using offline mode safely](/auth/features/offline-mode).
+Yes. Choose **Use without backups** to use Ente Auth offline without an account. Your codes are stored locally and are not synced or backed up to Ente.
+
+Desktop and direct-download Android builds may still contact Ente to check for app updates when launched, including in offline mode. Learn more in [Using offline mode safely](/auth/features/offline-mode).
 
 ### Will I lose my offline codes if I create an account later?
 

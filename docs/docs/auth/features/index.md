@@ -70,7 +70,7 @@ Access the sort menu in the top-right corner (next to the search icon) to change
 
 ### Offline mode
 
-Ente Auth can be used entirely offline. Choose "Use without backups" on the login screen. In this mode, your codes are stored locally on your device.
+Ente Auth can be used offline. Choose "Use without backups" on the login screen. In this mode, your codes are stored locally on your device.
 
 Unlike when using an account, data is not synced or backed up to the cloud. You are responsible for manually backing up your codes.
 
