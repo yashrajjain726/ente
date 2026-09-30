@@ -202,30 +202,26 @@ export const FileInfo: React.FC<FileInfoProps> = ({
         };
     }, [file, open]);
 
-    const confirmDiscardCaption = (action: () => void) => {
+    const handleClose = () => {
         if (captionEditState == "saving") return;
         if (captionEditState == "unsaved") {
             showMiniDialog({
                 title: t("discard_changes"),
                 message: t("discard_changes_confirm_message"),
-                continue: { text: t("discard"), color: "critical", action },
+                continue: {
+                    text: t("discard"),
+                    color: "critical",
+                    action: onClose,
+                },
             });
             return;
         }
-        action();
+        onClose();
     };
-
-    const handleClose = () => confirmDiscardCaption(onClose);
-
-    const handleSelectCollection = (collectionID: number) =>
-        confirmDiscardCaption(() => onSelectCollection?.(collectionID));
-
-    const handleSelectPerson = (personID: string) =>
-        confirmDiscardCaption(() => onSelectPerson?.(personID));
 
     const handleSelectFace = ({ personID, faceID }: AnnotatedFaceID) => {
         log.info(`Selected person ${personID} for faceID ${faceID}`);
-        handleSelectPerson(personID);
+        onSelectPerson?.(personID);
     };
 
     const handleAddPerson = async (personID: string) => {
@@ -397,11 +393,7 @@ export const FileInfo: React.FC<FileInfoProps> = ({
                                 annotatedFaceIDs={annotatedFaces}
                                 onSelectFace={handleSelectFace}
                                 manuallyAssignedPeople={manuallyAssignedPeople}
-                                onSelectPerson={
-                                    onSelectPerson
-                                        ? handleSelectPerson
-                                        : undefined
-                                }
+                                onSelectPerson={onSelectPerson}
                                 onAddPerson={
                                     canAddPerson ? showAssignPerson : undefined
                                 }
@@ -420,7 +412,7 @@ export const FileInfo: React.FC<FileInfoProps> = ({
                                 fileCollectionIDs,
                                 collectionNameByID,
                                 hiddenCollectionIDs,
-                                onSelectCollection: handleSelectCollection,
+                                onSelectCollection,
                             }}
                         />
                     )}
