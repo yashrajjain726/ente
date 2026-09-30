@@ -118,7 +118,7 @@ func (n *SpaceWebPushSender) OnSpacePostCreated(actor SpaceActivityActor, postID
 	}
 	n.send(
 		actor,
-		"posted a new photo",
+		"shared a new post",
 		"Check it out",
 		spaceActivityPostCreated,
 		fmt.Sprintf("/app/posts/%s/%d", url.PathEscape(actor.SpaceID), postID),

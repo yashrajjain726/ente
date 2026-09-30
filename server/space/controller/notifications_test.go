@@ -397,7 +397,7 @@ func TestPublicPostPushCarriesOnlyOpaqueLocalRouteTarget(t *testing.T) {
 	sender := NewSpaceWebPushSender(nil, config)
 	sender.send(
 		SpaceActivityActor{UserID: 2, Slug: "alice"},
-		"posted a new photo",
+		"shared a new post",
 		"Check it out",
 		spaceActivityPostCreated,
 		"/app",
@@ -411,7 +411,7 @@ func TestPublicPostPushCarriesOnlyOpaqueLocalRouteTarget(t *testing.T) {
 	)
 	require.Equal(t, spaceWebPushPayload{
 		Title:    "Ente Space",
-		Body:     "@alice posted a new photo",
+		Body:     "@alice shared a new post",
 		Action:   "Check it out",
 		TargetID: "wpt_public_target",
 	}, payload)
@@ -438,7 +438,7 @@ func TestSpaceWebPushSendRateAppliesOncePerActivity(t *testing.T) {
 	}
 	NewSpaceWebPushSender(nil, config).send(
 		SpaceActivityActor{UserID: 3, Slug: "alice"},
-		"posted a new photo",
+		"shared a new post",
 		"Check it out",
 		spaceActivityPostCreated,
 		"/app",
