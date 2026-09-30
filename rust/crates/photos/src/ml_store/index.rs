@@ -1,5 +1,6 @@
+use std::ffi::OsStr;
 use std::fs;
-use std::io::ErrorKind;
+use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::sync::{PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
@@ -78,6 +79,7 @@ pub(super) fn db_stem(db_path: &Path) -> Result<String> {
 pub(super) struct Slot {
     index: Index,
     path: PathBuf,
+    legacy_prefix: PathBuf,
     handle: RwLock<Option<VecDb>>,
 }
 
@@ -86,6 +88,7 @@ impl Slot {
         Self {
             index,
             path: db_path.with_file_name(format!("{db_stem}.vecdb.{}", index.name())),
+            legacy_prefix: db_path.with_file_name(format!("{db_stem}.vectordb.{}.", index.name())),
             handle: RwLock::new(None),
         }
     }
@@ -115,6 +118,10 @@ impl Slot {
         let mut handle = self.write_handle();
         *handle = None;
         VecDb::purge(&self.path).map_err(Into::into)
+    }
+
+    pub(super) fn remove_legacy_files(&self) {
+        remove_files_starting_with(&self.legacy_prefix);
     }
 
     pub(super) fn with_open_handle<T>(
@@ -170,6 +177,60 @@ fn unless_closed<T>(outcome: IndexResult<T>) -> Option<Result<T>> {
     }
 }
 
+fn remove_files_starting_with(prefix_path: &Path) {
+    let Some(prefix) = prefix_path.file_name() else {
+        return;
+    };
+    let directory = scan_directory(prefix_path);
+    match fs::read_dir(directory) {
+        Ok(entries) => {
+            for entry in entries {
+                remove_entry_starting_with(directory, prefix, entry);
+            }
+        }
+        Err(error) => warn_unless_not_found(directory, &error),
+    }
+}
+
+fn scan_directory(prefix_path: &Path) -> &Path {
+    match prefix_path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    }
+}
+
+fn remove_entry_starting_with(directory: &Path, prefix: &OsStr, entry: io::Result<fs::DirEntry>) {
+    let path = match entry {
+        Ok(entry) => entry.path(),
+        Err(error) => {
+            warn_unless_not_found(directory, &error);
+            return;
+        }
+    };
+    if !file_name_starts_with(&path, prefix) {
+        return;
+    }
+    if let Err(error) = fs::remove_file(&path) {
+        warn_unless_not_found(&path, &error);
+    }
+}
+
+fn file_name_starts_with(path: &Path, prefix: &OsStr) -> bool {
+    path.file_name().is_some_and(|name| {
+        name.as_encoded_bytes()
+            .starts_with(prefix.as_encoded_bytes())
+    })
+}
+
+fn warn_unless_not_found(path: &Path, error: &io::Error) {
+    if error.kind() != ErrorKind::NotFound {
+        log::warn!(
+            "{}: could not remove legacy usearch files: {error}",
+            path.display()
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -178,11 +239,12 @@ mod tests {
 
     use ente_vecdb::{OpenCost, StorageKind, VecDb};
 
-    use super::Index;
+    use super::{Index, scan_directory};
     use crate::db::Connection;
     use crate::ml_db::CLIP_EMBEDDING_DIMENSIONS;
     use crate::ml_store::tests::{
-        DB_FILE, centroid, clips, index_path, live_count, lose_index_files, meta, one_hot, open,
+        DB_FILE, all_exist, centroid, clips, create_usearch_files, index_path, live_count,
+        lose_index_files, meta, one_hot, open, open_with_unusable_clip_index,
     };
     use crate::ml_store::{Error, FillOutcome, FillReport, FillState, MlStore};
 
@@ -333,6 +395,76 @@ mod tests {
         assert!(store.contains(Index::Clip, "1").unwrap());
         assert!(store.contains(Index::Clip, "2").unwrap());
         assert_eq!(store.fill_state(Index::Clip).unwrap(), FillState::Filled);
+    }
+
+    #[test]
+    fn completed_fills_remove_their_legacy_usearch_files() {
+        let (directory, store) = open();
+        let clip = create_usearch_files(&directory, "ente.ml.vectordb.clip.usearch");
+        let centroid =
+            create_usearch_files(&directory, "ente.ml.vectordb.cluster_centroid.usearch");
+        let pet = create_usearch_files(&directory, "ente.ml.vectordb.pet.dog_face.usearch");
+        let offline = create_usearch_files(&directory, "ente.ml.offline.vectordb.clip.usearch");
+
+        assert_eq!(
+            store.fill_clip_index(false).unwrap().outcome,
+            FillOutcome::Completed
+        );
+        assert!(clip.iter().all(|path| !path.exists()));
+        assert!(all_exist(&centroid));
+
+        assert_eq!(
+            store.fill_cluster_centroid_index(false).unwrap().outcome,
+            FillOutcome::Completed
+        );
+        assert!(centroid.iter().all(|path| !path.exists()));
+        assert!(all_exist(&pet));
+        assert!(all_exist(&offline));
+    }
+
+    #[test]
+    fn fills_that_do_not_complete_leave_legacy_usearch_files_in_place() {
+        let (directory, store) = open_with_unusable_clip_index();
+        let clip = create_usearch_files(&directory, "ente.ml.vectordb.clip.usearch");
+        assert!(matches!(store.fill_clip_index(false), Err(Error::Index(_))));
+        assert!(all_exist(&clip));
+
+        store.fill_cluster_centroid_index(false).unwrap();
+        let centroid =
+            create_usearch_files(&directory, "ente.ml.vectordb.cluster_centroid.usearch");
+        assert_eq!(
+            store.fill_cluster_centroid_index(false).unwrap().outcome,
+            FillOutcome::AlreadyFilled
+        );
+        assert!(all_exist(&centroid));
+    }
+
+    #[test]
+    fn legacy_usearch_removal_failures_do_not_fail_the_fill() {
+        let (directory, store) = open();
+        let blocker = directory.path().join("ente.ml.vectordb.clip.usearch");
+        fs::create_dir(&blocker).unwrap();
+        let sibling = directory.path().join("ente.ml.vectordb.clip.tmp.1.2");
+        fs::write(&sibling, b"usearch").unwrap();
+        assert_eq!(
+            store.fill_clip_index(false).unwrap().outcome,
+            FillOutcome::Completed
+        );
+        assert!(blocker.is_dir());
+        assert!(!sibling.exists());
+        assert_eq!(store.fill_state(Index::Clip).unwrap(), FillState::Filled);
+    }
+
+    #[test]
+    fn legacy_files_are_scanned_beside_the_prefix() {
+        assert_eq!(
+            scan_directory(Path::new("ente.ml.vectordb.clip.")),
+            Path::new(".")
+        );
+        assert_eq!(
+            scan_directory(Path::new("/data/ente.ml.vectordb.clip.")),
+            Path::new("/data")
+        );
     }
 
     #[test]

@@ -242,6 +242,19 @@ mod tests {
         VecDb::purge(path).unwrap();
     }
 
+    pub(super) fn create_usearch_files(directory: &TempDir, name: &str) -> [PathBuf; 2] {
+        let index_file = directory.path().join(name);
+        let save_temp_file = index_file.with_extension("tmp.1.2");
+        [index_file, save_temp_file].map(|path| {
+            fs::write(&path, b"usearch").unwrap();
+            path
+        })
+    }
+
+    pub(super) fn all_exist(paths: &[PathBuf]) -> bool {
+        paths.iter().all(|path| path.exists())
+    }
+
     #[test]
     fn open_creates_no_index_files_and_fillable_indexes_start_stale() {
         let (directory, store) = open();
