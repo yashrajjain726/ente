@@ -602,7 +602,7 @@ function useMapData(
                 setState((prev) => ({
                     ...prev,
                     isLoading: false,
-                    error: t("something_went_wrong"),
+                    error: t("generic_error"),
                 }));
                 onGenericError(e);
             } finally {

@@ -201,7 +201,7 @@
     "trash_file_title": "Excluir arquivo?",
     "delete_files_title": "Excluir imediatamente?",
     "delete_files_message": "Os arquivos selecionados serão permanentemente excluídos da sua conta do Ente.",
-    "selected_count": "{selected, number} selecionado(s)",
+    "selected_count": "{{selected, number}} selecionado(s)",
     "selected_and_yours_count": "{{selected, number}} selecionado(s) ({{yours, number}} seu(s))",
     "delete": "Excluir",
     "like": "Curtir",

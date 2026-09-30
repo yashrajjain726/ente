@@ -430,7 +430,7 @@
     "cancel_subscription_with_addon_message": "<p>Jste si jisti, že chcete zrušit své předplatné?</p>",
     "subscription_cancel_success": "Předplatné úspěšně zrušeno",
     "reactivate_subscription": "Znovu aktivovat předplatné",
-    "reactivate_subscription_message": "Po opětovné aktivaci Vám bude účtována částka dne {date, date}",
+    "reactivate_subscription_message": "Po opětovné aktivaci Vám bude účtována částka dne {{date, date}}",
     "subscription_activate_success": "Předplatné úspěšně aktivováno ",
     "thank_you": "Děkujeme",
     "cancel_subscription_on_mobile": "Zrušit mobilní předplatné",
