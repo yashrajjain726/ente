@@ -537,7 +537,7 @@ func main() {
 				return base.ServerReqID()
 			},
 		}),
-		middleware.Logger(urlSanitizer), cors(), cacheHeaders(),
+		cors(), middleware.LimitRequestBody(), middleware.Logger(urlSanitizer), cacheHeaders(),
 		gzip.Gzip(gzip.DefaultCompression), middleware.PanicRecover())
 
 	publicAPI := server.Group("/")

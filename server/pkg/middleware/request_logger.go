@@ -108,6 +108,7 @@ func Logger(urlSanitizer func(_ *gin.Context) string) gin.HandlerFunc {
 		buf, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			handler.Error(c, err)
+			return
 		}
 		rdr1 := io.NopCloser(bytes.NewBuffer(buf))
 		rdr2 := io.NopCloser(bytes.NewBuffer(buf))
