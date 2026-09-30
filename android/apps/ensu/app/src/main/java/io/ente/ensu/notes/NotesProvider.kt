@@ -15,6 +15,7 @@ import io.ente.ensu.bindings.NotesException
 import io.ente.ensu.bindings.NotesIndexOptions
 import io.ente.ensu.bindings.NotesProgressCallback
 import io.ente.ensu.bindings.notesContentRevision
+import io.ente.ensu.toDirectByteBuffer
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
@@ -175,7 +176,7 @@ class NotesProvider(private val context: Context) {
     ): ByteArray =
         NotesCancellation().use { cancel ->
             val bytes = withSource(record, cancel) { it.readDocument(reference.documentId) }.bytes
-            if (notesContentRevision(bytes) != reference.indexedRevision)
+            if (notesContentRevision(bytes.toDirectByteBuffer()) != reference.indexedRevision)
                 throw NotesException.SourceChanged()
             bytes
         }

@@ -476,7 +476,7 @@ private fun buildAttachmentFromUri(
         if (type == AttachmentType.Image) {
             val inputStream = resolver.openInputStream(uri) ?: return@runCatching null
             val originalBytes = inputStream.use { input -> input.readAttachmentImageBytes() }
-            val compressedBytes = compressAttachmentImage(originalBytes)
+            val compressedBytes = compressAttachmentImage(originalBytes.toDirectByteBuffer())
             FileOutputStream(destination).use { output -> output.write(compressedBytes) }
             finalName = normalizedJpegAttachmentName(name ?: safeName)
         } else {

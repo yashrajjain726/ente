@@ -113,7 +113,7 @@ impl From<ente_assets::AssetDownloadProgress> for AssetDownloadProgress {
     }
 }
 
-#[uniffi::export(callback_interface)]
+#[uniffi::export(foreign)]
 pub trait AssetDownloadCallback: Send + Sync {
     fn on_progress(&self, progress: AssetDownloadProgress);
 }
@@ -207,7 +207,7 @@ impl AssetStoreCore {
     pub async fn download(
         &self,
         assets: Vec<Arc<Asset>>,
-        callback: Box<dyn AssetDownloadCallback>,
+        callback: Arc<dyn AssetDownloadCallback>,
         cancellation: Arc<CancellationToken>,
     ) -> Result<(), AssetDownloadError> {
         let assets = assets

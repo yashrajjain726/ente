@@ -24,6 +24,7 @@ import io.ente.ensu.bindings.voiceActivityModelAsset
 import io.ente.ensu.llm.ModelMaintenance
 import io.ente.ensu.llm.withMaintenanceSuspended
 import io.ente.ensu.notes.LocalNotesStore
+import io.ente.ensu.toDirectByteBuffer
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import kotlin.coroutines.CoroutineContext
@@ -312,7 +313,7 @@ internal class VoiceTranscriptionController(
                             }
                             transcriber.transcribe(
                                 sampleRate.toUInt(),
-                                pcm,
+                                pcm.toDirectByteBuffer(),
                             )
                         }
                         .trim()

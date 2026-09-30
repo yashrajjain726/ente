@@ -57,7 +57,7 @@ pub struct ConversationResult {
     pub max_tokens: u32,
 }
 
-#[uniffi::export(callback_interface)]
+#[uniffi::export(foreign)]
 pub trait ConversationProgressCallback: Send + Sync {
     fn on_progress(&self);
 }
@@ -213,7 +213,7 @@ impl ConversationPreparation {
 
     pub fn run(
         &self,
-        callback: Box<dyn ConversationProgressCallback>,
+        callback: Arc<dyn ConversationProgressCallback>,
     ) -> Result<ConversationResult, ConversationError> {
         let mut work = self.work.lock().map_err(error)?;
         self.check(&work)?;
