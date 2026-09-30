@@ -73,12 +73,12 @@ const ChangelogContent: React.FC = () => {
         <Stack sx={{ gap: 2, mb: 1 }}>
             <Typography variant="h6">
                 {ut(
-                    "Album slideshows, more RAW formats, better video loading, and more",
+                    "Album slideshows, view more RAW formats, better video loading in viewer, and more",
                 )}
             </Typography>
             <Typography sx={{ color: "text.muted" }}>
                 {ut(
-                    "Play album slideshows and preview more RAW formats. Improved video loading in the viewer, All People view, and thumbnails, plus fixes for video sizing, maps, and more.",
+                    "Album slideshows, previews for more RAW formats, video loading progress and retry in the viewer, updated All People view, improved RAW and Ultra HDR thumbnails on Windows and Linux, plus fixes for video sizing, maps, and more.",
                 )}
             </Typography>
         </Stack>
