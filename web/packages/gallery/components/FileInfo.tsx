@@ -135,7 +135,7 @@ export const FileInfo: React.FC<FileInfoProps> = ({
 }) => {
     const { mapEnabled } = useSettingsSnapshot();
     const peopleState = usePeopleStateSnapshot();
-    const { onGenericError } = useBaseContext();
+    const { showMiniDialog, onGenericError } = useBaseContext();
 
     const [annotatedFaces, setAnnotatedFaces] = useState<AnnotatedFaceID[]>([]);
 
@@ -146,8 +146,8 @@ export const FileInfo: React.FC<FileInfoProps> = ({
     const { show: showEditLocation, props: editLocationVisibilityProps } =
         useModalVisibility();
 
-    const [captionNavigationLocked, setCaptionNavigationLocked] =
-        useState(false);
+    const [captionEditState, setCaptionEditState] =
+        useState<CaptionEditState>("saved");
     const [dateTimeNavigationLocked, setDateTimeNavigationLocked] =
         useState(false);
     const [renameNavigationLocked, setRenameNavigationLocked] = useState(false);
@@ -202,9 +202,30 @@ export const FileInfo: React.FC<FileInfoProps> = ({
         };
     }, [file, open]);
 
+    const confirmDiscardCaption = (action: () => void) => {
+        if (captionEditState == "saving") return;
+        if (captionEditState == "unsaved") {
+            showMiniDialog({
+                title: t("discard_changes"),
+                message: t("discard_changes_confirm_message"),
+                continue: { text: t("discard"), color: "critical", action },
+            });
+            return;
+        }
+        action();
+    };
+
+    const handleClose = () => confirmDiscardCaption(onClose);
+
+    const handleSelectCollection = (collectionID: number) =>
+        confirmDiscardCaption(() => onSelectCollection?.(collectionID));
+
+    const handleSelectPerson = (personID: string) =>
+        confirmDiscardCaption(() => onSelectPerson?.(personID));
+
     const handleSelectFace = ({ personID, faceID }: AnnotatedFaceID) => {
         log.info(`Selected person ${personID} for faceID ${faceID}`);
-        onSelectPerson?.(personID);
+        handleSelectPerson(personID);
     };
 
     const handleAddPerson = async (personID: string) => {
@@ -236,7 +257,7 @@ export const FileInfo: React.FC<FileInfoProps> = ({
         (rawExifVisibilityProps.open ||
             assignPersonVisibilityProps.open ||
             editLocationVisibilityProps.open ||
-            captionNavigationLocked ||
+            captionEditState != "saved" ||
             dateTimeNavigationLocked ||
             renameNavigationLocked);
 
@@ -245,10 +266,10 @@ export const FileInfo: React.FC<FileInfoProps> = ({
     }, [onNavigationLockChange, navigationLocked]);
 
     return (
-        <BottomAlignedFileInfoSidebar {...{ open, onClose }}>
+        <BottomAlignedFileInfoSidebar open={open} onClose={handleClose}>
             <SidebarDrawerTitlebar
-                onClose={onClose}
-                onRootClose={onClose}
+                onClose={handleClose}
+                onRootClose={handleClose}
                 title={t("info")}
             />
             <Stack sx={{ pt: 1, pb: 3, gap: "20px" }}>
@@ -258,7 +279,7 @@ export const FileInfo: React.FC<FileInfoProps> = ({
                         allowEdits,
                         onFileMetadataUpdate,
                         onUpdateCaption,
-                        onNavigationLockChange: setCaptionNavigationLocked,
+                        onEditStateChange: setCaptionEditState,
                     }}
                 />
                 <CreationTime
@@ -376,7 +397,11 @@ export const FileInfo: React.FC<FileInfoProps> = ({
                                 annotatedFaceIDs={annotatedFaces}
                                 onSelectFace={handleSelectFace}
                                 manuallyAssignedPeople={manuallyAssignedPeople}
-                                onSelectPerson={onSelectPerson}
+                                onSelectPerson={
+                                    onSelectPerson
+                                        ? handleSelectPerson
+                                        : undefined
+                                }
                                 onAddPerson={
                                     canAddPerson ? showAssignPerson : undefined
                                 }
@@ -395,7 +420,7 @@ export const FileInfo: React.FC<FileInfoProps> = ({
                                 fileCollectionIDs,
                                 collectionNameByID,
                                 hiddenCollectionIDs,
-                                onSelectCollection,
+                                onSelectCollection: handleSelectCollection,
                             }}
                         />
                     )}
@@ -411,7 +436,7 @@ export const FileInfo: React.FC<FileInfoProps> = ({
             <FileInfoNavigationHint />
             <RawExif
                 {...rawExifVisibilityProps}
-                onInfoClose={onClose}
+                onInfoClose={handleClose}
                 tags={exif?.tags}
                 fileName={fileFileName(file)}
             />
@@ -659,21 +684,19 @@ const EditButton: React.FC<EditButtonProps> = ({ onClick, loading }) => (
     </IconButton>
 );
 
+type CaptionEditState = "saved" | "unsaved" | "saving";
+
 type CaptionProps = Pick<
     FileInfoProps,
-    | "file"
-    | "allowEdits"
-    | "onFileMetadataUpdate"
-    | "onUpdateCaption"
-    | "onNavigationLockChange"
->;
+    "file" | "allowEdits" | "onFileMetadataUpdate" | "onUpdateCaption"
+> & { onEditStateChange: (state: CaptionEditState) => void };
 
 const Caption: React.FC<CaptionProps> = ({
     file,
     allowEdits,
     onFileMetadataUpdate,
     onUpdateCaption,
-    onNavigationLockChange,
+    onEditStateChange,
 }) => {
     const [isSaving, setIsSaving] = useState(false);
 
@@ -704,9 +727,15 @@ const Caption: React.FC<CaptionProps> = ({
 
     const { values, errors, handleChange, handleSubmit, resetForm } = formik;
 
+    const editState: CaptionEditState = isSaving
+        ? "saving"
+        : values.caption != caption
+          ? "unsaved"
+          : "saved";
+
     useEffect(() => {
-        onNavigationLockChange?.(values.caption != caption || isSaving);
-    }, [onNavigationLockChange, values.caption, caption, isSaving]);
+        onEditStateChange(editState);
+    }, [onEditStateChange, editState]);
 
     if (!caption.length && !allowEdits) {
         return <Box sx={{ minHeight: 2 }}></Box>;
