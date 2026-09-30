@@ -1,4 +1,4 @@
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "android")))]
 #[expect(
     unsafe_code,
     reason = "sysconf reads process-independent constants without caller-owned pointers"
@@ -67,4 +67,39 @@ pub(crate) fn final_handle_path(file: &std::fs::File) -> std::io::Result<std::pa
     Ok(PathBuf::from(OsString::from_wide(
         &buffer[..written as usize],
     )))
+}
+
+#[cfg(target_os = "android")]
+#[expect(
+    unsafe_code,
+    reason = "The optional libc mallopt symbol is called with its C signature while its library handle is live; M_PURGE releases only unused allocations"
+)]
+pub(crate) fn release_unused_memory() {
+    use std::ffi::{c_char, c_int, c_void};
+
+    #[link(name = "dl")]
+    unsafe extern "C" {
+        fn dlopen(filename: *const c_char, flags: c_int) -> *mut c_void;
+        fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+        fn dlclose(handle: *mut c_void) -> c_int;
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    const RTLD_NOW: c_int = 2;
+    #[cfg(target_pointer_width = "32")]
+    const RTLD_NOW: c_int = 0;
+    const M_PURGE: c_int = -101;
+
+    let handle = unsafe { dlopen(c"libc.so".as_ptr(), RTLD_NOW) };
+    if handle.is_null() {
+        return;
+    }
+    let symbol = unsafe { dlsym(handle, c"mallopt".as_ptr()) };
+    if !symbol.is_null() {
+        let mallopt = unsafe {
+            std::mem::transmute::<*mut c_void, unsafe extern "C" fn(c_int, c_int) -> c_int>(symbol)
+        };
+        unsafe { mallopt(M_PURGE, 0) };
+    }
+    unsafe { dlclose(handle) };
 }

@@ -79,6 +79,8 @@ impl<T> Drop for Worker<T> {
         self.sender.take();
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
+            #[cfg(target_os = "android")]
+            crate::platform::release_unused_memory();
         }
     }
 }
