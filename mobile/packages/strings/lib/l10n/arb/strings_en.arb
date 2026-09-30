@@ -5007,7 +5007,7 @@
   "youAreViewer": "You are a viewer",
   "youAreCollaborator": "You are a collaborator",
   "youAreAdmin": "You are an admin",
-  "emptyAlbumShareMessage": "You have not shared this album with anyone yet.",
+  "emptyAlbumShareMessage": "Add a person to\nshare your album with them",
   "addPeople": "Add people",
   "fromYourContacts": "From your contacts",
   "chooseAccess": "Choose access",
