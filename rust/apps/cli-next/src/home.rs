@@ -5,12 +5,17 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use uuid::Uuid;
 
 pub struct AccountHome {
     pub path: PathBuf,
     _lock: File,
+}
+
+pub struct RemovalGuard {
+    _lock: File,
+    home: AccountHome,
 }
 
 pub fn application_home() -> Result<PathBuf> {
@@ -38,6 +43,18 @@ pub fn create(path: &Path) -> io::Result<()> {
 }
 
 pub fn lock_account(id: Uuid, create: bool) -> Result<AccountHome> {
+    let home = account_home(id, create)?;
+    home._lock.lock().context("cannot lock the account home")?;
+    Ok(home)
+}
+
+pub fn try_lock_account(id: Uuid) -> Result<AccountHome> {
+    let home = account_home(id, true)?;
+    try_lock(&home._lock)?;
+    Ok(home)
+}
+
+fn account_home(id: Uuid, create: bool) -> Result<AccountHome> {
     let accounts = application_home()?.join("accounts");
     let path = accounts.join(id.to_string());
     let lock_path = accounts.join(format!("{id}.lock"));
@@ -46,6 +63,59 @@ pub fn lock_account(id: Uuid, create: bool) -> Result<AccountHome> {
     } else {
         ensure!(path.is_dir(), "no local data; run the command online first");
     }
+    let lock = open_lock(&lock_path).context("cannot open the account lock")?;
+    Ok(AccountHome { path, _lock: lock })
+}
+
+impl AccountHome {
+    pub fn storage_use(&self) -> Result<File> {
+        let lock = open_lock(&self.path.with_extension("use.lock"))
+            .context("cannot open the account use lock")?;
+        lock.lock_shared().context("cannot lock account storage")?;
+        Ok(lock)
+    }
+
+    pub fn for_removal(self) -> Result<RemovalGuard> {
+        let lock = open_lock(&self.path.with_extension("use.lock"))
+            .context("cannot open the account use lock")?;
+        try_lock(&lock)?;
+        Ok(RemovalGuard {
+            _lock: lock,
+            home: self,
+        })
+    }
+}
+
+impl RemovalGuard {
+    pub fn remove(self) -> Result<()> {
+        if let Err(error) = fs::remove_dir_all(&self.home.path)
+            && error.kind() != io::ErrorKind::NotFound
+        {
+            return Err(error.into());
+        }
+        // The vault must exclude this account before its lock is unlinked.
+        for extension in ["use.lock", "lock"] {
+            if let Err(error) = fs::remove_file(self.home.path.with_extension(extension))
+                && error.kind() != io::ErrorKind::NotFound
+            {
+                return Err(error.into());
+            }
+        }
+        Ok(())
+    }
+}
+
+fn try_lock(lock: &File) -> Result<()> {
+    match lock.try_lock() {
+        Ok(()) => Ok(()),
+        Err(fs::TryLockError::WouldBlock) => {
+            bail!("account is in use; finish or cancel active commands before logging out")
+        }
+        Err(fs::TryLockError::Error(error)) => Err(error).context("cannot lock the account"),
+    }
+}
+
+fn open_lock(path: &Path) -> io::Result<File> {
     let mut options = OpenOptions::new();
     options.read(true).write(true).create(true);
     #[cfg(unix)]
@@ -53,26 +123,5 @@ pub fn lock_account(id: Uuid, create: bool) -> Result<AccountHome> {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    let lock = options
-        .open(lock_path)
-        .context("cannot open the account lock")?;
-    lock.lock().context("cannot lock the account home")?;
-    Ok(AccountHome { path, _lock: lock })
-}
-
-impl AccountHome {
-    pub fn remove(self) -> Result<()> {
-        if let Err(error) = fs::remove_dir_all(&self.path)
-            && error.kind() != io::ErrorKind::NotFound
-        {
-            return Err(error.into());
-        }
-        // The vault must exclude this account before its lock is unlinked.
-        if let Err(error) = fs::remove_file(self.path.with_extension("lock"))
-            && error.kind() != io::ErrorKind::NotFound
-        {
-            return Err(error.into());
-        }
-        Ok(())
-    }
+    options.open(path)
 }

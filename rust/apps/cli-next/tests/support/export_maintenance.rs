@@ -47,6 +47,239 @@ fn count(db: &rusqlite::Connection, sql: &str) -> i64 {
 }
 
 #[test]
+#[cfg(target_os = "linux")]
+fn export_and_download_preserve_non_utf8_paths() {
+    use std::os::unix::ffi::OsStringExt;
+
+    let mut server = mockito::Server::new();
+    let home = TestHome::new();
+    home.seed(&server.url());
+    let key = Key::generate();
+    listing(&mut server, json!([collection(1, "First", &key)]));
+    let (file, bytes) = source(10, &key, b"original", "Photo.jpg");
+    page(&mut server, 1, 0, json!([file]), false).create();
+    let fetched = download(&mut server, 10, &bytes, 2);
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory
+        .path()
+        .join(std::ffi::OsString::from_vec(b"photos-\xff".to_vec()));
+    for exported in [1, 0] {
+        let output = success(
+            home.command(&["photos", "export", "--json"])
+                .arg(&root)
+                .output()
+                .unwrap(),
+        );
+        let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(result["complete"], true);
+        assert_eq!(result["changes"]["exported"], exported);
+        assert_eq!(
+            result["destination"],
+            fs::canonicalize(&root).unwrap().to_string_lossy().as_ref()
+        );
+        assert_component(&root, "First", "Photo.jpg", b"original");
+    }
+    let path = root.join("download.jpg");
+    let output = success(
+        home.command(&["photos", "file", "download", "10", "--json", "--output"])
+            .arg(&path)
+            .output()
+            .unwrap(),
+    );
+    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["output"], path.to_string_lossy().as_ref());
+    assert_eq!(fs::read(path).unwrap(), b"original");
+    fetched.assert();
+}
+
+#[test]
+fn file_name_lookup_uses_latest_scoped_metadata_and_all_memberships() {
+    let mut server = mockito::Server::new();
+    let home = TestHome::new();
+    home.seed(&server.url());
+    let key = Key::generate();
+    let albums = listing(
+        &mut server,
+        json!([collection(1, "First", &key), collection(2, "Second", &key)]),
+    );
+    let (old, _) = source(10, &key, b"original", "Old.jpg");
+    for album in [1, 2] {
+        page(&mut server, album, 0, json!([old]), false).create();
+    }
+    assert_eq!(
+        home.json(&["photos", "file", "list"])[0]["albumIds"],
+        json!(["1", "2"])
+    );
+    albums.remove();
+    listing(
+        &mut server,
+        json!([
+            revision(collection(1, "First", &key), 40),
+            revision(collection(2, "Second", &key), 40)
+        ]),
+    );
+    let (new, _) = source(10, &key, b"original", "New.jpg");
+    let changed = page(&mut server, 1, 10, json!([revision(new, 30)]), false)
+        .expect(1)
+        .create();
+    let failed = page(&mut server, 2, 10, json!([]), false)
+        .with_status(400)
+        .expect(1)
+        .create();
+    failure(&home.run(&["photos", "file", "list"]));
+    let by_id = home.json(&["photos", "file", "view", "10", "--offline"]);
+    assert_eq!(by_id["name"], "New.jpg");
+    assert_eq!(by_id["albumIds"], json!(["1", "2"]));
+    assert_eq!(
+        home.json(&["photos", "file", "view", "New.jpg", "--offline"]),
+        by_id
+    );
+    assert!(
+        failure(&home.run(&["photos", "file", "view", "Old.jpg", "--offline"]))
+            .contains("no file matches")
+    );
+    for (album, name, id) in [("First", "New.jpg", "1"), ("Second", "Old.jpg", "2")] {
+        let scoped = home.json(&[
+            "photos",
+            "file",
+            "view",
+            name,
+            "--album",
+            album,
+            "--offline",
+        ]);
+        assert_eq!(scoped["name"], name);
+        assert_eq!(scoped["albumIds"], json!([id]));
+    }
+    changed.assert();
+    failed.assert();
+    failed.remove();
+    let (numeric, _) = source(11, &key, b"other", "10");
+    page(
+        &mut server,
+        2,
+        10,
+        json!([revision(old, 30), revision(numeric, 30)]),
+        false,
+    )
+    .create();
+    assert_eq!(home.json(&["photos", "file", "view", "New.jpg"]), by_id);
+    assert!(
+        failure(&home.run(&["photos", "file", "view", "Old.jpg", "--offline"]))
+            .contains("no file matches")
+    );
+    let error = failure(&home.run(&["photos", "file", "view", "10", "--offline"]));
+    assert!(error.contains("is ambiguous"));
+    assert!(error.contains("10  \"New.jpg\""));
+    assert!(error.contains("11  \"10\""));
+}
+
+#[test]
+fn failed_catalog_records_do_not_hide_healthy_results() {
+    let mut server = mockito::Server::new();
+    let home = TestHome::new();
+    home.seed(&server.url());
+    let key = Key::generate();
+    let mut album = collection(1, "Unavailable", &key);
+    album["encryptedKey"] = json!("invalid");
+    listing(
+        &mut server,
+        json!([
+            album,
+            collection(2, "Healthy", &key),
+            collection(3, "Other", &key)
+        ]),
+    );
+    let (old, _) = source(10, &key, b"old", "Old.jpg");
+    let bad = public(old.clone(), &key, json!({"editedName": 42}), 20);
+    let (good, bytes) = source(11, &key, b"good", "Good.jpg");
+    page(&mut server, 2, 0, json!([bad, good]), false)
+        .expect(1)
+        .create();
+    page(&mut server, 3, 0, json!([old]), false)
+        .expect(1)
+        .create();
+    let output = home.run(&["photos", "file", "list", "--limit", "1", "--json"]);
+    let error = failure(&output);
+    assert!(error.contains("album 1:"), "{error}");
+    assert!(
+        error.contains("file 10: invalid public file metadata"),
+        "{error}"
+    );
+    let rows: Vec<Value> = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["id"], "11");
+    let db = database(&home);
+    assert_eq!(
+        count(
+            &db,
+            "SELECT count(*) FROM photos_files WHERE collection_id=2 AND id=10 AND failed=1"
+        ),
+        1
+    );
+    db.execute_batch("CREATE TRIGGER no_file_rewrite AFTER UPDATE ON photos_files BEGIN SELECT RAISE(ABORT,'file rewritten'); END; CREATE TRIGGER no_album_rewrite AFTER UPDATE OF record,name ON photos_collections BEGIN SELECT RAISE(ABORT,'album rewritten'); END;").unwrap();
+    let output = home.run(&["photos", "album", "list", "--limit", "1", "--json"]);
+    assert!(failure(&output).contains("album 1:"));
+    let rows: Vec<Value> = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["id"], "2");
+    let output = home.run(&["photos", "file", "list", "--all", "--offline", "--json"]);
+    assert!(failure(&output).contains("file 10:"));
+    assert_eq!(
+        serde_json::from_slice::<Vec<Value>>(&output.stdout)
+            .unwrap()
+            .len(),
+        1
+    );
+    assert!(
+        failure(&home.run(&["photos", "album", "view", "1", "--offline"])).contains("album 1:")
+    );
+    assert!(
+        failure(&home.run(&["photos", "file", "view", "10", "--offline"])).contains("file 10:")
+    );
+    assert!(
+        failure(&home.run(&["photos", "file", "view", "Old.jpg", "--offline"]))
+            .contains("no file matches")
+    );
+    let output = success(home.run(&["photos", "file", "view", "11", "--album", "2", "--json"]));
+    assert!(output.stderr.is_empty());
+    assert_eq!(
+        serde_json::from_slice::<Value>(&output.stdout).unwrap()["id"],
+        "11"
+    );
+    let path = home.dir.path().join("download.jpg");
+    let downloaded = download(&mut server, 11, &bytes, 1);
+    assert!(
+        failure(&home.run(&[
+            "photos",
+            "file",
+            "download",
+            "11",
+            "--output",
+            path.to_str().unwrap()
+        ]))
+        .contains("album lookup is incomplete")
+    );
+    assert!(!path.exists());
+    success(home.run(&[
+        "photos",
+        "file",
+        "download",
+        "11",
+        "--album",
+        "2",
+        "--output",
+        path.to_str().unwrap(),
+    ]));
+    assert_eq!(fs::read(path).unwrap(), b"good");
+    downloaded.assert();
+    db.execute_batch("DROP TRIGGER no_file_rewrite; UPDATE photos_files SET record='{' WHERE collection_id=2 AND id=10;").unwrap();
+    let error = failure(&home.run(&["photos", "file", "list", "--offline", "--all", "--json"]));
+    assert!(error.contains("EOF while parsing"), "{error}");
+    assert!(!error.contains("file results are incomplete"));
+}
+
+#[test]
 fn export_retries_transient_collection_and_file_refresh_failures() {
     for route in ["/collections/v2", "/collections/v2/diff"] {
         let mut server = mockito::Server::new();
@@ -2049,19 +2282,34 @@ fn export_automatically_retries_saved_selected_album_and_file_failures() {
         "saved failure"
     );
     db.execute(
-        "INSERT INTO photos_files SELECT 1,id,name,updated_at,record,decrypt_failed FROM photos_files WHERE collection_id=3 AND id=10",
+        "INSERT INTO photos_files SELECT 1,id,name,updated_at,record,failed FROM photos_files WHERE collection_id=3 AND id=10",
         [],
     )
     .unwrap();
     db.execute(
-        "UPDATE photos_files SET record=json_set(record,'$.documents',NULL,'$.key',NULL,'$.failure','saved failure'),decrypt_failed=1 WHERE id=10",
+        "UPDATE photos_files SET record=json_set(record,'$.documents',NULL,'$.key',NULL,'$.failure','saved failure'),failed=1 WHERE id=10",
         [],
     )
     .unwrap();
     run(&home, &root, &["--album", "1", "--album", "3"], true);
     for album in [1, 3] {
         assert!(record(&db, album, 10)["documents"].is_object());
+        assert!(record(&db, album, 10)["failure"].is_null());
     }
+    assert_eq!(
+        count(
+            &db,
+            "SELECT count(*) FROM photos_files WHERE id=10 AND name='Photo.jpg' AND failed=0"
+        ),
+        2
+    );
+    assert_eq!(
+        count(
+            &db,
+            "SELECT count(*) FROM photos_collections WHERE id=1 AND name='First' AND json_extract(record,'$.failure') IS NULL"
+        ),
+        1
+    );
     assert_component(&root, "First", "Photo.jpg", b"original");
     assert!(
         !home
@@ -2197,28 +2445,33 @@ fn export_recovers_empty_initial_directories_without_claiming_unrelated_contents
 }
 
 #[test]
-fn export_reports_completion_progress_before_the_command_finishes() {
+fn export_reports_progress_and_keeps_account_storage_while_workers_run() {
     use std::sync::{Mutex, mpsc};
     use std::time::{Duration, Instant};
 
     let mut server = mockito::Server::new();
+    let mut media = mockito::Server::new();
     let home = TestHome::new();
     home.seed(&server.url());
     let key = Key::generate();
-    listing(&mut server, json!([collection(1, "Album", &key)]));
+    listing(
+        &mut server,
+        json!([collection(1, "Album", &key), collection(2, "Empty", &key)]),
+    );
+    page(&mut server, 2, 0, json!([]), false).create();
     let (first, first_bytes) = source(10, &key, b"first", "First.jpg");
     let (second, second_bytes) = source(11, &key, b"second", "Second.jpg");
     page(&mut server, 1, 0, json!([first, second]), false).create();
     let fetched = download(&mut server, 10, &first_bytes, 1);
     let url = server
         .mock("GET", "/files/download/v3/11")
-        .with_body(json!({"url":format!("{}/slow",server.url())}).to_string())
+        .with_body(json!({"url":format!("{}/slow",media.url())}).to_string())
         .expect(1)
         .create();
     let (started, reading) = mpsc::channel();
     let (release, receiver) = mpsc::channel::<()>();
     let receiver = Mutex::new(receiver);
-    let slow = server
+    let slow = media
         .mock("GET", "/slow")
         .with_body_from_request(move |_| {
             let _ = started.send(());
@@ -2261,6 +2514,59 @@ fn export_reports_completion_progress_before_the_command_finishes() {
         std::thread::sleep(Duration::from_millis(10));
     }
     assert!(child.try_wait().unwrap().is_none());
+    let state = home.read_vault();
+    let account = home
+        .dir
+        .path()
+        .join("accounts")
+        .join(state["accounts"][0]["storage_id"].as_str().unwrap());
+    let revoke = server.mock("POST", "/users/logout").expect(0).create();
+    for args in [
+        vec!["account", "logout", "fixture", "--local"],
+        vec!["account", "logout", "fixture"],
+        vec!["photos", "logout"],
+    ] {
+        let output = ExportChild::spawn(&mut home.command(&args))
+            .unwrap()
+            .wait_with_output()
+            .unwrap();
+        assert!(failure(&output).contains("account is in use"));
+        assert_eq!(home.read_vault(), state);
+        assert!(account.join("exports").is_dir());
+    }
+    revoke.assert();
+    revoke.remove();
+    success(
+        ExportChild::spawn(&mut home.command(&["photos", "album", "list", "--offline"]))
+            .unwrap()
+            .wait_with_output()
+            .unwrap(),
+    );
+    let other = destination.path().join("other");
+    success(
+        ExportChild::spawn(&mut home.command(&[
+            "photos",
+            "export",
+            other.to_str().unwrap(),
+            "--album",
+            "2",
+        ]))
+        .unwrap()
+        .wait_with_output()
+        .unwrap(),
+    );
+    let mut with_locker = state;
+    with_locker["accounts"][0]["sessions"]["locker"] = json!({"token": [1]});
+    home.write_vault(&with_locker);
+    let revoke = server.mock("POST", "/users/logout").expect(1).create();
+    success(
+        ExportChild::spawn(&mut home.command(&["photos", "logout"]))
+            .unwrap()
+            .wait_with_output()
+            .unwrap(),
+    );
+    assert!(account.is_dir());
+    revoke.assert();
     drop(release);
     let output = child.wait_with_output().unwrap();
     assert!(output.status.success());
@@ -2271,6 +2577,28 @@ fn export_reports_completion_progress_before_the_command_finishes() {
     fetched.assert();
     url.assert();
     slow.assert();
+    let lock = fs::File::options()
+        .read(true)
+        .write(true)
+        .open(account.with_extension("lock"))
+        .unwrap();
+    lock.lock().unwrap();
+    let output =
+        ExportChild::spawn(&mut home.command(&["account", "logout", "fixture", "--local"]))
+            .unwrap()
+            .wait_with_output()
+            .unwrap();
+    assert!(failure(&output).contains("account is in use"));
+    assert!(home.read_vault()["accounts"][0]["sessions"]["locker"].is_object());
+    drop(lock);
+    success(home.run(&["account", "logout", "fixture", "--local"]));
+    assert!(!account.exists());
+    assert_eq!(
+        fs::read_dir(home.dir.path().join("accounts"))
+            .unwrap()
+            .count(),
+        0
+    );
 }
 
 #[test]

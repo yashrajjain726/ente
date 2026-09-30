@@ -678,7 +678,7 @@ fn fatal_cause(cause: &(dyn std::error::Error + 'static)) -> bool {
         match error {
             crate::live_photo::Error::Io(error) => return fatal_cause(error),
             crate::live_photo::Error::Zip(error) => return fatal_cause(error),
-            crate::live_photo::Error::Components => {}
+            crate::live_photo::Error::Components | crate::live_photo::Error::ExpansionLimit => {}
         }
     }
     cause.source().is_some_and(fatal_cause)
@@ -709,7 +709,7 @@ fn summary(store: &Store, destination: &Path, prepared: bool) -> Result<Summary>
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
         )?;
     let complete = !unknown && failures == 0 && completed == expected;
-    let result = json!({"destination":destination,"complete":complete,"files":if unknown {None}else{Some(files)},"copies":if unknown {None}else{Some(json!({"expected":expected,"completed":completed,"pending":expected-completed}))},"changes":{"exported":exported,"metadataUpdated":metadata_updated,"renamed":renamed,"retained":retained},"failures":failures,"conflicts":conflicts});
+    let result = json!({"destination":destination.to_string_lossy(),"complete":complete,"files":if unknown {None}else{Some(files)},"copies":if unknown {None}else{Some(json!({"expected":expected,"completed":completed,"pending":expected-completed}))},"changes":{"exported":exported,"metadataUpdated":metadata_updated,"renamed":renamed,"retained":retained},"failures":failures,"conflicts":conflicts});
     Ok(Summary {
         json: result,
         complete,

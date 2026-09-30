@@ -197,7 +197,7 @@ fn export_reevaluates_saved_metadata_without_an_upstream_change() {
     let home = TestHome::new();
     home.seed(&server.url());
     let key = Key::generate();
-    server
+    let albums = server
         .mock("GET", "/collections/v2")
         .match_query(mockito::Matcher::Any)
         .with_body(json!({"collections":[collection(1,"First",&key)]}).to_string())
@@ -229,6 +229,88 @@ fn export_reevaluates_saved_metadata_without_an_upstream_change() {
     assert_eq!(
         read_json(&root.join("First/metadata/Good.jpg.json"))["description"],
         "reevaluated stored caption"
+    );
+
+    albums.remove();
+    server
+        .mock("GET", "/collections/v2")
+        .match_query(mockito::Matcher::UrlEncoded(
+            "sinceTime".into(),
+            "20".into(),
+        ))
+        .with_body(json!({"collections":[]}).to_string())
+        .create();
+    docs["editedName"] = json!("Recovered.jpg");
+    db.execute(
+        "UPDATE photos_collections SET record=json_set(record,'$.documents.original',?1,'$.failure','saved interpretation failure') WHERE id=1",
+        [b64::encode(b"Recovered")],
+    ).unwrap();
+    db.execute(
+        "UPDATE photos_files SET record=json_set(record,'$.documents.public',?1,'$.failure','saved interpretation failure'),failed=1 WHERE id=10",
+        [b64::encode(&serde_json::to_vec(&docs).unwrap())],
+    ).unwrap();
+    let saved = record(&db, 1, 10);
+    assert!(
+        failure(&home.run(&[
+            "photos",
+            "file",
+            "view",
+            "Recovered.jpg",
+            "--album",
+            "1",
+            "--offline"
+        ]))
+        .contains("no file matches")
+    );
+    assert_eq!(record(&db, 1, 10), saved);
+    assert_eq!(
+        home.json(&[
+            "photos",
+            "file",
+            "view",
+            "Recovered.jpg",
+            "--album",
+            "Recovered"
+        ])["id"],
+        "10"
+    );
+    assert!(record(&db, 1, 10)["failure"].is_null());
+    assert_eq!(
+        db.query_row("SELECT failed FROM photos_files WHERE id=10", [], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        read_json(&root.join("First/metadata.json"))["title"],
+        "First"
+    );
+    assert!(root.join("First/metadata/Good.jpg.json").exists());
+
+    db.execute_batch("UPDATE photos_collections SET name='First',record=json_set(record,'$.failure','saved interpretation failure') WHERE id=1; UPDATE photos_files SET name='Good.jpg',record=json_set(record,'$.failure','saved interpretation failure'),failed=1 WHERE id=10;").unwrap();
+    run(&home, &root, &["--album", "1"], true);
+    assert_eq!(
+        read_json(&root.join("Recovered/metadata.json"))["title"],
+        "Recovered"
+    );
+    assert_eq!(
+        read_json(&root.join("Recovered/metadata/Recovered.jpg.json"))["description"],
+        "reevaluated stored caption"
+    );
+    assert_eq!(
+        fs::read(root.join("Recovered/Recovered.jpg")).unwrap(),
+        b"original"
+    );
+    assert!(record(&db, 1, 10)["failure"].is_null());
+    assert_eq!(db.query_row("SELECT count(*) FROM photos_collections WHERE name='Recovered' AND json_extract(record,'$.failure') IS NULL", [], |r| r.get::<_, i64>(0)).unwrap(), 1);
+    assert_eq!(
+        db.query_row(
+            "SELECT count(*) FROM photos_files WHERE name='Recovered.jpg' AND failed=0",
+            [],
+            |r| r.get::<_, i64>(0)
+        )
+        .unwrap(),
+        1
     );
 
     page.assert();
